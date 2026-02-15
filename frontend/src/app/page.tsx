@@ -1,7 +1,9 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { type MouseEvent, useMemo, useRef, useState } from "react";
+import { Settings2, Sparkles } from "lucide-react";
 import { PlatformCard } from "@/components/platform-card";
+import { ContextPanel } from "@/components/context-panel";
 import {
   enqueuePublish,
   generatePosts,
@@ -16,19 +18,12 @@ import type { CardState, CardVersion, GeneratedCard, ModelOption, Platform, Publ
 const PLATFORM_ORDER: Platform[] = ["reddit", "linkedin", "twitter", "instagram", "blog"];
 const MODEL_OPTIONS: ModelOption[] = ["gpt-4o-mini", "gpt-4o", "gpt-4.1-mini"];
 
-const initialProfile: UserProfile = {
-  styles: {
-    linkedin: {
-      mode: "manual",
-      customInstructions: "Use short paragraphs and business takeaways.",
-      referencePosts: [],
-    },
-    twitter: {
-      mode: "manual",
-      customInstructions: "Use very short sentences. No emojis.",
-      referencePosts: [],
-    },
-  },
+const EMPTY_CONTEXTS: Record<Platform, string> = {
+  reddit: "",
+  linkedin: "",
+  twitter: "",
+  instagram: "",
+  blog: "",
 };
 
 function toCardState(card: GeneratedCard): CardState {
@@ -48,12 +43,25 @@ function toCardState(card: GeneratedCard): CardState {
   };
 }
 
-const HMB_IMAGE_URL =
-  process.env.NEXT_PUBLIC_HMB_IMAGE_URL ||
-  "https://images.unsplash.com/photo-1560272564-c83b66b1ad12?auto=format&fit=crop&w=1200&q=80";
+function buildUserProfile(contexts: Record<Platform, string>): UserProfile {
+  const styles: UserProfile["styles"] = {};
+
+  for (const platform of PLATFORM_ORDER) {
+    const text = contexts[platform]?.trim();
+    if (!text) continue;
+
+    styles[platform] = {
+      mode: "manual",
+      customInstructions: text,
+      referencePosts: [],
+    };
+  }
+
+  return { styles };
+}
 
 export default function HomePage() {
-  const [draft, setDraft] = useState("홍명보 감독처럼 흔들리지 않고 꾸준히 성장하는 팀 문화를 만들었습니다.");
+  const [draft, setDraft] = useState("");
   const [selectedModel, setSelectedModel] = useState<ModelOption>("gpt-4o-mini");
   const [draftId, setDraftId] = useState<number | null>(null);
   const [cards, setCards] = useState<CardState[]>([]);
@@ -61,6 +69,12 @@ export default function HomePage() {
   const [publishJob, setPublishJob] = useState<PublishJob | null>(null);
   const [publishing, setPublishing] = useState(false);
   const [oauthBusyPlatform, setOauthBusyPlatform] = useState<Platform | null>(null);
+
+  const [contextOpen, setContextOpen] = useState(false);
+  const [contexts, setContexts] = useState<Record<Platform, string>>(EMPTY_CONTEXTS);
+
+  const carouselRef = useRef<HTMLDivElement | null>(null);
+  const dragRef = useRef({ isDown: false, startX: 0, scrollLeft: 0 });
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
@@ -70,6 +84,7 @@ export default function HomePage() {
   }, [cards]);
 
   const acceptedCount = useMemo(() => cards.filter((c) => c.status === "accepted").length, [cards]);
+  const userProfile = useMemo(() => buildUserProfile(contexts), [contexts]);
 
   const setCardRefining = (platform: Platform, isRefining: boolean) => {
     setCards((prev) => prev.map((c) => (c.platform === platform ? { ...c, isRefining } : c)));
@@ -80,9 +95,10 @@ export default function HomePage() {
   };
 
   const handleGenerate = async () => {
+    if (!draft.trim()) return;
     try {
       setLoading(true);
-      const generated = await generatePosts(draft, initialProfile, selectedModel);
+      const generated = await generatePosts(draft, userProfile, selectedModel);
       setDraftId(generated.draftId);
       setCards(generated.cards.map(toCardState));
       setPublishJob(null);
@@ -123,7 +139,7 @@ export default function HomePage() {
         originalDraft: draft,
         currentContent: `${currentVersion.title}\n\n${currentVersion.body}`,
         feedback,
-        userProfile: initialProfile,
+        userProfile,
         model: selectedModel,
       });
 
@@ -235,107 +251,164 @@ export default function HomePage() {
     }
   };
 
+  const scrollCarousel = (dir: "left" | "right") => {
+    if (!carouselRef.current) return;
+    const amount = carouselRef.current.clientWidth * 0.9;
+    carouselRef.current.scrollBy({ left: dir === "left" ? -amount : amount, behavior: "smooth" });
+  };
+
+  const onMouseDownCarousel = (e: MouseEvent<HTMLDivElement>) => {
+    if (!carouselRef.current) return;
+    dragRef.current.isDown = true;
+    dragRef.current.startX = e.pageX - carouselRef.current.offsetLeft;
+    dragRef.current.scrollLeft = carouselRef.current.scrollLeft;
+  };
+
+  const onMouseLeaveCarousel = () => {
+    dragRef.current.isDown = false;
+  };
+
+  const onMouseUpCarousel = () => {
+    dragRef.current.isDown = false;
+  };
+
+  const onMouseMoveCarousel = (e: MouseEvent<HTMLDivElement>) => {
+    if (!dragRef.current.isDown || !carouselRef.current) return;
+    e.preventDefault();
+    const x = e.pageX - carouselRef.current.offsetLeft;
+    const walk = (x - dragRef.current.startX) * 1.15;
+    carouselRef.current.scrollLeft = dragRef.current.scrollLeft - walk;
+  };
+
   return (
-    <main className="mx-auto min-h-screen max-w-7xl p-6">
-      <section className="mb-6 grid grid-cols-1 overflow-hidden rounded-3xl border border-white/40 bg-gradient-to-r from-red-600 via-rose-500 to-orange-400 text-white shadow-soft lg:grid-cols-[1.4fr_1fr]">
-        <div className="p-6 lg:p-8">
-          <p className="mb-2 text-xs uppercase tracking-[0.3em] text-white/80">Campaign Studio</p>
-          <h1 className="font-display text-4xl leading-tight lg:text-5xl">홍명보 파이팅</h1>
-          <p className="mt-3 max-w-xl text-sm text-white/90">
-            하나의 메시지를 5개 플랫폼으로 즉시 전개하고, 버전 히스토리로 복원/재수정까지 가능한 홍보형 크로스 포스팅 에이전트.
-          </p>
-          <div className="mt-4 flex flex-wrap items-center gap-2">
-            <span className="rounded-full bg-white/20 px-3 py-1 text-xs">Draft ID: {draftId ?? "-"}</span>
-            <span className="rounded-full bg-white/20 px-3 py-1 text-xs">Accepted: {acceptedCount}</span>
+    <>
+      <ContextPanel open={contextOpen} contexts={contexts} onClose={() => setContextOpen(false)} onSave={setContexts} />
+
+      <main className="mx-auto min-h-screen w-full max-w-7xl px-4 py-6 md:px-6">
+        <header className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-zinc-200 bg-white/80 p-4 shadow-sm backdrop-blur dark:border-zinc-800 dark:bg-zinc-900/70">
+          <div>
+            <p className="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">AI Cross Posting</p>
+            <h1 className="text-xl font-semibold text-zinc-900 dark:text-zinc-100">Social Content Studio</h1>
           </div>
-        </div>
-        <div className="relative min-h-[220px]">
-          <img src={HMB_IMAGE_URL} alt="홍명보 감독" className="h-full w-full object-cover" />
-          <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/60 to-transparent p-4 text-sm font-semibold">홍명보 감독의 리더십 톤으로 콘텐츠 확장</div>
-        </div>
-      </section>
-
-      <section className="mb-4 rounded-2xl border border-black/10 bg-white p-4 shadow-soft">
-        <div className="flex flex-wrap items-center gap-3 text-sm">
-          <label className="text-xs font-semibold uppercase tracking-wide text-black/60">Model</label>
-          <select
-            value={selectedModel}
-            onChange={(e) => setSelectedModel(e.target.value as ModelOption)}
-            className="rounded-lg border border-black/20 bg-white px-3 py-2 text-sm"
-          >
-            {MODEL_OPTIONS.map((model) => (
-              <option key={model} value={model}>
-                {model}
-              </option>
-            ))}
-          </select>
-          <button
-            onClick={handlePublish}
-            disabled={publishing || !draftId || acceptedCount === 0}
-            className="rounded-lg bg-black px-4 py-2 text-xs font-semibold text-white disabled:opacity-50"
-          >
-            {publishing ? "발행 큐 처리 중..." : "Accepted 카드 발행"}
-          </button>
-          {publishJob && <span className="text-xs">Job #{publishJob.id}: {publishJob.status}</span>}
-        </div>
-
-        <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
-          <span className="mr-1">OAuth 연결:</span>
-          {(["linkedin", "twitter", "instagram", "reddit"] as Platform[]).map((platform) => (
+          <div className="flex flex-wrap items-center gap-2">
             <button
-              key={platform}
-              onClick={() => void handleOAuthConnect(platform)}
-              disabled={oauthBusyPlatform === platform}
-              className="rounded-lg border border-black/20 bg-white px-2 py-1 capitalize disabled:opacity-50"
+              onClick={() => setContextOpen(true)}
+              className="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-xs font-medium dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
             >
-              {oauthBusyPlatform === platform ? `${platform}...` : platform}
+              <Settings2 className="mr-1 inline h-3.5 w-3.5" /> 플랫폼별 스타일 설정
             </button>
-          ))}
-        </div>
-      </section>
-
-      <section className="grid grid-cols-1 gap-6 lg:grid-cols-[1.05fr_1.95fr]">
-        <aside className="rounded-2xl border border-black/10 bg-white p-4 shadow-soft">
-          <h2 className="mb-2 font-display text-xl">Campaign Draft</h2>
-          <textarea
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            className="mb-3 h-[460px] w-full rounded-xl border border-black/20 bg-white px-3 py-2"
-          />
-          <button
-            onClick={handleGenerate}
-            disabled={loading || !draft.trim()}
-            className="w-full rounded-xl bg-red-600 px-4 py-3 text-sm font-semibold text-white disabled:opacity-50"
-          >
-            {loading ? "생성 중..." : "5개 플랫폼 버전 생성"}
-          </button>
-
-          <div className="mt-4 rounded-xl bg-red-50 p-3 text-xs text-red-800">
-            OAuth 오류가 나면 보통 Redirect URI 불일치, Client ID/Secret 오입력, 플랫폼 앱 권한 누락 순으로 확인하세요.
+            <select
+              value={selectedModel}
+              onChange={(e) => setSelectedModel(e.target.value as ModelOption)}
+              className="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-xs dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
+            >
+              {MODEL_OPTIONS.map((model) => (
+                <option key={model} value={model}>
+                  {model}
+                </option>
+              ))}
+            </select>
           </div>
-        </aside>
+        </header>
 
-        <section className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-          {cardsByOrder.map((card) => (
-            <PlatformCard
-              key={card.platform}
-              card={card}
-              onAccept={() => void handleStatus(card, "accepted")}
-              onReject={() => void handleStatus(card, "rejected")}
-              onRefine={(feedback) => handleRefine(card.platform, feedback)}
-              onVoiceRefine={() => handleVoiceRefine(card.platform)}
-              onUndo={() => patchCard(card.platform, { versionIndex: Math.max(0, card.versionIndex - 1) })}
-              onRedo={() => patchCard(card.platform, { versionIndex: Math.min(card.versions.length - 1, card.versionIndex + 1) })}
-              onSelectVersion={(index) => patchCard(card.platform, { versionIndex: index })}
-            />
-          ))}
-          {!cardsByOrder.length && (
-            <div className="rounded-2xl border border-dashed border-black/20 bg-white p-8 text-center text-sm text-black/65 xl:col-span-2">
-              초안을 입력하고 생성 버튼을 누르면 플랫폼별 카드가 여기에 표시됩니다.
+        <section className="mb-4 grid grid-cols-1 gap-4 lg:grid-cols-[1.05fr_1.95fr]">
+          <aside className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+            <div className="mb-2 flex items-center justify-between">
+              <h2 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Draft</h2>
+              <span className="text-xs text-zinc-500 dark:text-zinc-400">ID: {draftId ?? "-"}</span>
             </div>
-          )}
+            <textarea
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              placeholder="초안을 입력하세요..."
+              className="mb-3 h-64 w-full rounded-xl border border-zinc-300 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-zinc-300 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100 dark:focus:ring-zinc-700"
+            />
+            <div className="flex gap-2">
+              <button
+                onClick={handleGenerate}
+                disabled={loading || !draft.trim()}
+                className="rounded-lg bg-zinc-900 px-3 py-2 text-xs font-semibold text-white disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900"
+              >
+                <Sparkles className="mr-1 inline h-3.5 w-3.5" /> {loading ? "생성 중..." : "5개 플랫폼 생성"}
+              </button>
+              <button
+                onClick={handlePublish}
+                disabled={publishing || !draftId || acceptedCount === 0}
+                className="rounded-lg border border-zinc-300 px-3 py-2 text-xs font-medium disabled:opacity-50 dark:border-zinc-700 dark:text-zinc-100"
+              >
+                {publishing ? "발행 중..." : `Accepted 발행 (${acceptedCount})`}
+              </button>
+            </div>
+            <div className="mt-3 flex flex-wrap gap-1.5">
+              {(["linkedin", "twitter", "instagram", "reddit"] as Platform[]).map((platform) => (
+                <button
+                  key={platform}
+                  onClick={() => void handleOAuthConnect(platform)}
+                  disabled={oauthBusyPlatform === platform}
+                  className="rounded-full border border-zinc-300 px-2 py-1 text-[11px] capitalize text-zinc-700 disabled:opacity-50 dark:border-zinc-700 dark:text-zinc-200"
+                >
+                  {oauthBusyPlatform === platform ? `${platform}...` : `${platform} OAuth`}
+                </button>
+              ))}
+            </div>
+            {publishJob && (
+              <p className="mt-3 text-xs text-zinc-600 dark:text-zinc-300">
+                Job #{publishJob.id}: {publishJob.status}
+              </p>
+            )}
+          </aside>
+
+          <section className="rounded-2xl border border-zinc-200 bg-white p-3 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+            <div className="mb-2 flex items-center justify-between">
+              <h2 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Platform Results</h2>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => scrollCarousel("left")}
+                  className="rounded-lg border border-zinc-300 px-2 py-1 text-xs dark:border-zinc-700 dark:text-zinc-200"
+                >
+                  ←
+                </button>
+                <button
+                  onClick={() => scrollCarousel("right")}
+                  className="rounded-lg border border-zinc-300 px-2 py-1 text-xs dark:border-zinc-700 dark:text-zinc-200"
+                >
+                  →
+                </button>
+              </div>
+            </div>
+
+            <div
+              ref={carouselRef}
+              onMouseDown={onMouseDownCarousel}
+              onMouseLeave={onMouseLeaveCarousel}
+              onMouseUp={onMouseUpCarousel}
+              onMouseMove={onMouseMoveCarousel}
+              className="flex min-h-[580px] gap-3 overflow-x-auto rounded-xl p-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+            >
+              {cardsByOrder.map((card) => (
+                <div key={card.platform} className="w-[min(88vw,420px)] shrink-0 snap-start">
+                  <PlatformCard
+                    card={card}
+                    onAccept={() => void handleStatus(card, "accepted")}
+                    onReject={() => void handleStatus(card, "rejected")}
+                    onRefine={(feedback) => handleRefine(card.platform, feedback)}
+                    onVoiceRefine={() => handleVoiceRefine(card.platform)}
+                    onUndo={() => patchCard(card.platform, { versionIndex: Math.max(0, card.versionIndex - 1) })}
+                    onRedo={() => patchCard(card.platform, { versionIndex: Math.min(card.versions.length - 1, card.versionIndex + 1) })}
+                    onSelectVersion={(index) => patchCard(card.platform, { versionIndex: index })}
+                  />
+                </div>
+              ))}
+
+              {!cardsByOrder.length && (
+                <div className="grid h-[560px] w-full place-items-center rounded-xl border border-dashed border-zinc-300 text-sm text-zinc-500 dark:border-zinc-700 dark:text-zinc-400">
+                  생성된 결과가 여기에 카드로 표시됩니다.
+                </div>
+              )}
+            </div>
+          </section>
         </section>
-      </section>
-    </main>
+      </main>
+    </>
   );
 }
