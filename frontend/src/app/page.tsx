@@ -1,6 +1,6 @@
 "use client";
 
-import { type MouseEvent, useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { ArchiveRestore, CheckCheck, Settings2, Sparkles } from "lucide-react";
 import { PlatformCard } from "@/components/platform-card";
 import { ContextPanel } from "@/components/context-panel";
@@ -13,7 +13,7 @@ import {
   transcribeAudio,
   updateCardStatus,
 } from "@/lib/api";
-import type { CardState, CardVersion, GeneratedCard, ModelOption, Platform, PublishJob, UserProfile } from "@/lib/types";
+import type { CardState, CardVersion, GeneratedCard, LanguageOption, ModelOption, Platform, PublishJob, UserProfile } from "@/lib/types";
 
 const PLATFORM_ORDER: Platform[] = ["reddit", "linkedin", "twitter", "instagram", "blog"];
 const MODEL_OPTIONS: ModelOption[] = ["gpt-4o-mini", "gpt-4o", "gpt-4.1-mini"];
@@ -24,6 +24,13 @@ const EMPTY_CONTEXTS: Record<Platform, string> = {
   twitter: "",
   instagram: "",
   blog: "",
+};
+const DEFAULT_ENABLED_PLATFORMS: Record<Platform, boolean> = {
+  reddit: true,
+  linkedin: true,
+  twitter: true,
+  instagram: true,
+  blog: true,
 };
 
 function cardKey(card: CardState): string {
@@ -82,9 +89,11 @@ export default function HomePage() {
 
   const [contextOpen, setContextOpen] = useState(false);
   const [contexts, setContexts] = useState<Record<Platform, string>>(EMPTY_CONTEXTS);
+  const [enabledPlatforms, setEnabledPlatforms] = useState<Record<Platform, boolean>>(DEFAULT_ENABLED_PLATFORMS);
+  const [autoPublish, setAutoPublish] = useState(false);
+  const [language, setLanguage] = useState<LanguageOption>("auto");
 
   const carouselRef = useRef<HTMLDivElement | null>(null);
-  const dragRef = useRef({ isDown: false, startX: 0, scrollLeft: 0 });
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
@@ -93,6 +102,10 @@ export default function HomePage() {
   const queueByOrder = useMemo(() => insertByPlatformOrder(queueCards), [queueCards]);
   const acceptedCount = queueByOrder.length;
   const userProfile = useMemo(() => buildUserProfile(contexts), [contexts]);
+  const selectedPlatforms = useMemo(
+    () => PLATFORM_ORDER.filter((platform) => enabledPlatforms[platform]),
+    [enabledPlatforms],
+  );
 
   const setCardRefining = (platform: Platform, isRefining: boolean) => {
     setResultCards((prev) => prev.map((c) => (c.platform === platform ? { ...c, isRefining } : c)));
@@ -106,12 +119,35 @@ export default function HomePage() {
     if (!draft.trim()) return;
     try {
       setLoading(true);
-      const generated = await generatePosts(draft, userProfile, selectedModel);
+      if (!selectedPlatforms.length) {
+        alert("최소 1개 플랫폼을 선택하세요.");
+        setLoading(false);
+        return;
+      }
+
+      const generated = await generatePosts(draft, userProfile, selectedModel, selectedPlatforms, language);
       setDraftId(generated.draftId);
-      setResultCards(generated.cards.map(toCardState));
+      const nextCards = generated.cards.map(toCardState);
+      setResultCards(nextCards);
       setQueueCards([]);
       setPublishJob(null);
       setCollapsingKeys(new Set());
+
+      if (autoPublish && generated.cards.length > 0) {
+        const cardIds = generated.cards.map((c) => c.id).filter((id): id is number => typeof id === "number");
+        const queued = await enqueuePublish({
+          draftId: generated.draftId,
+          cardIds,
+          acceptedOnly: false,
+        });
+
+        for (let i = 0; i < 20; i += 1) {
+          const job = await getJob(queued.jobId);
+          setPublishJob(job);
+          if (job.status === "done" || job.status === "failed") break;
+          await new Promise((resolve) => setTimeout(resolve, 600));
+        }
+      }
     } catch (err) {
       console.error(err);
       alert("생성 중 오류가 발생했습니다.");
@@ -193,6 +229,7 @@ export default function HomePage() {
         feedback,
         userProfile,
         model: selectedModel,
+        language,
       });
 
       setResultCards((prev) =>
@@ -303,32 +340,39 @@ export default function HomePage() {
     }
   };
 
-  const onMouseDownCarousel = (e: MouseEvent<HTMLDivElement>) => {
+  const scrollResults = (dir: "left" | "right") => {
     if (!carouselRef.current) return;
-    dragRef.current.isDown = true;
-    dragRef.current.startX = e.pageX - carouselRef.current.offsetLeft;
-    dragRef.current.scrollLeft = carouselRef.current.scrollLeft;
+    const amount = Math.max(280, Math.floor(carouselRef.current.clientWidth * 0.82));
+    carouselRef.current.scrollBy({ left: dir === "left" ? -amount : amount, behavior: "smooth" });
   };
 
-  const onMouseLeaveCarousel = () => {
-    dragRef.current.isDown = false;
-  };
-
-  const onMouseUpCarousel = () => {
-    dragRef.current.isDown = false;
-  };
-
-  const onMouseMoveCarousel = (e: MouseEvent<HTMLDivElement>) => {
-    if (!dragRef.current.isDown || !carouselRef.current) return;
-    e.preventDefault();
-    const x = e.pageX - carouselRef.current.offsetLeft;
-    const walk = (x - dragRef.current.startX) * 1.15;
-    carouselRef.current.scrollLeft = dragRef.current.scrollLeft - walk;
+  const handlePreviewEdit = (platform: Platform, title: string, body: string) => {
+    setResultCards((prev) =>
+      prev.map((c) => {
+        if (c.platform !== platform) return c;
+        const nextVersions = [...c.versions];
+        nextVersions[c.versionIndex] = { ...nextVersions[c.versionIndex], title, body };
+        return { ...c, title, body, versions: nextVersions };
+      }),
+    );
   };
 
   return (
     <>
-      <ContextPanel open={contextOpen} contexts={contexts} onClose={() => setContextOpen(false)} onSave={setContexts} />
+      <ContextPanel
+        open={contextOpen}
+        contexts={contexts}
+        enabledPlatforms={enabledPlatforms}
+        autoPublish={autoPublish}
+        language={language}
+        onClose={() => setContextOpen(false)}
+        onSave={({ contexts: nextContexts, enabledPlatforms: nextEnabled, autoPublish: nextAutoPublish, language: nextLanguage }) => {
+          setContexts(nextContexts);
+          setEnabledPlatforms(nextEnabled);
+          setAutoPublish(nextAutoPublish);
+          setLanguage(nextLanguage);
+        }}
+      />
 
       <main className="mx-auto min-h-screen w-full max-w-7xl px-4 py-6 md:px-6">
         <header className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-zinc-200 bg-white/80 p-4 shadow-sm backdrop-blur dark:border-zinc-800 dark:bg-zinc-900/70">
@@ -357,8 +401,8 @@ export default function HomePage() {
           </div>
         </header>
 
-        <section className="mb-4 grid grid-cols-1 gap-4 lg:grid-cols-[1.05fr_1.95fr]">
-          <aside className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+        <section className="mb-4 grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-[1.05fr_1.95fr]">
+          <aside className="min-w-0 rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
             <div className="mb-2 flex items-center justify-between">
               <h2 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Draft</h2>
               <span className="text-xs text-zinc-500 dark:text-zinc-400">ID: {draftId ?? "-"}</span>
@@ -387,6 +431,15 @@ export default function HomePage() {
             </div>
 
             <div className="mt-3 flex flex-wrap gap-1.5">
+              <span className="rounded-full bg-zinc-100 px-2 py-1 text-[11px] text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">
+                선택 플랫폼: {selectedPlatforms.join(", ") || "없음"}
+              </span>
+              <span className="rounded-full bg-zinc-100 px-2 py-1 text-[11px] text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">
+                자동 게시: {autoPublish ? "ON" : "OFF"}
+              </span>
+              <span className="rounded-full bg-zinc-100 px-2 py-1 text-[11px] text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">
+                언어: {language}
+              </span>
               {(["linkedin", "twitter", "instagram", "reddit"] as Platform[]).map((platform) => (
                 <button
                   key={platform}
@@ -431,49 +484,63 @@ export default function HomePage() {
             )}
           </aside>
 
-          <section className="rounded-2xl border border-zinc-200 bg-white p-3 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+          <section className="min-w-0 rounded-2xl border border-zinc-200 bg-white p-3 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
             <div className="mb-2 flex items-center justify-between">
               <h2 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Platform Results</h2>
-              <span className="text-xs text-zinc-500 dark:text-zinc-400">드래그로 좌우 탐색</span>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-zinc-500 dark:text-zinc-400">좌우 버튼으로 탐색</span>
+                <button
+                  onClick={() => scrollResults("left")}
+                  className="rounded-md border border-zinc-300 px-2 py-1 text-xs dark:border-zinc-700 dark:text-zinc-200"
+                >
+                  ←
+                </button>
+                <button
+                  onClick={() => scrollResults("right")}
+                  className="rounded-md border border-zinc-300 px-2 py-1 text-xs dark:border-zinc-700 dark:text-zinc-200"
+                >
+                  →
+                </button>
+              </div>
             </div>
 
-            <div className="overflow-hidden rounded-xl border border-zinc-200 dark:border-zinc-800">
-              <div
-                ref={carouselRef}
-                onMouseDown={onMouseDownCarousel}
-                onMouseLeave={onMouseLeaveCarousel}
-                onMouseUp={onMouseUpCarousel}
-                onMouseMove={onMouseMoveCarousel}
-                className="flex min-h-[620px] gap-3 overflow-x-auto p-2 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
-              >
-                {cardsByOrder.map((card) => {
-                  const isCollapsing = collapsingKeys.has(cardKey(card));
-                  return (
-                    <div
-                      key={cardKey(card)}
-                      className={`overflow-hidden transition-all duration-300 ease-out ${
-                        isCollapsing ? "w-0 scale-95 opacity-0" : "w-[min(88vw,420px)] shrink-0 scale-100 opacity-100"
-                      }`}
-                    >
-                      <PlatformCard
-                        card={card}
-                        onAccept={() => void handleAccept(card)}
-                        onReject={() => void handleReject(card)}
-                        onRefine={(feedback) => handleRefine(card.platform, feedback)}
-                        onVoiceRefine={() => handleVoiceRefine(card.platform)}
-                        onUndo={() => patchCard(card.platform, { versionIndex: Math.max(0, card.versionIndex - 1) })}
-                        onRedo={() => patchCard(card.platform, { versionIndex: Math.min(card.versions.length - 1, card.versionIndex + 1) })}
-                        onSelectVersion={(index) => patchCard(card.platform, { versionIndex: index })}
-                      />
-                    </div>
-                  );
-                })}
+            <div className="relative w-full overflow-hidden rounded-xl border border-zinc-200 dark:border-zinc-800">
+              <div ref={carouselRef} className="w-full min-w-0 overflow-x-auto p-3 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+                <div className="flex w-max min-w-full gap-4">
+                  {cardsByOrder.map((card) => {
+                    const isCollapsing = collapsingKeys.has(cardKey(card));
+                    return (
+                      <div
+                        key={cardKey(card)}
+                        className={`overflow-hidden transition-all duration-300 ease-out ${
+                          isCollapsing ? "w-0 scale-95 opacity-0" : "w-[350px] flex-shrink-0 scale-100 opacity-100"
+                        }`}
+                      >
+                        <PlatformCard
+                          card={card}
+                          onAccept={() => void handleAccept(card)}
+                          onReject={() => void handleReject(card)}
+                          onRefine={(feedback) => handleRefine(card.platform, feedback)}
+                          onVoiceRefine={() => handleVoiceRefine(card.platform)}
+                          onUndo={() => patchCard(card.platform, { versionIndex: Math.max(0, card.versionIndex - 1) })}
+                          onRedo={() => patchCard(card.platform, { versionIndex: Math.min(card.versions.length - 1, card.versionIndex + 1) })}
+                          onSelectVersion={(index) => patchCard(card.platform, { versionIndex: index })}
+                          onPreviewChange={(title, body) => handlePreviewEdit(card.platform, title, body)}
+                        />
+                      </div>
+                    );
+                  })}
 
-                {!cardsByOrder.length && (
-                  <div className="grid h-[600px] w-full place-items-center rounded-xl border border-dashed border-zinc-300 text-sm text-zinc-500 dark:border-zinc-700 dark:text-zinc-400">
-                    결과 카드가 비어 있습니다. Draft 생성 후 Accept로 Queue에 보관할 수 있습니다.
-                  </div>
-                )}
+                  {!cardsByOrder.length && (
+                    <div className="grid h-[600px] w-[350px] flex-shrink-0 place-items-center rounded-xl border border-dashed border-zinc-300 text-sm text-zinc-500 dark:border-zinc-700 dark:text-zinc-400">
+                      결과 카드가 비어 있습니다. Draft 생성 후 Accept로 Queue에 보관할 수 있습니다.
+                    </div>
+                  )}
+                  <div className="w-2 flex-shrink-0" />
+                </div>
+              </div>
+              <div className="px-3 pb-2 text-[11px] text-zinc-500 dark:text-zinc-400">
+                박스 바깥 카드는 숨겨지고, 내부 스크롤/버튼으로만 탐색됩니다.
               </div>
             </div>
           </section>

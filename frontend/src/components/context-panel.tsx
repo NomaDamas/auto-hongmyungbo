@@ -1,27 +1,51 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import type { Platform } from "@/lib/types";
+import { useEffect, useMemo, useState } from "react";
+import type { LanguageOption, Platform } from "@/lib/types";
 
 const PLATFORM_ORDER: Platform[] = ["instagram", "twitter", "linkedin", "reddit", "blog"];
 
 type Props = {
   open: boolean;
   contexts: Record<Platform, string>;
+  enabledPlatforms: Record<Platform, boolean>;
+  autoPublish: boolean;
+  language: LanguageOption;
   onClose: () => void;
-  onSave: (next: Record<Platform, string>) => void;
+  onSave: (payload: {
+    contexts: Record<Platform, string>;
+    enabledPlatforms: Record<Platform, boolean>;
+    autoPublish: boolean;
+    language: LanguageOption;
+  }) => void;
 };
 
-export function ContextPanel({ open, contexts, onClose, onSave }: Props) {
+export function ContextPanel({ open, contexts, enabledPlatforms, autoPublish, language, onClose, onSave }: Props) {
   const [tab, setTab] = useState<Platform>("instagram");
-  const [draft, setDraft] = useState<Record<Platform, string>>(contexts);
+  const [draftContexts, setDraftContexts] = useState<Record<Platform, string>>(contexts);
+  const [draftEnabled, setDraftEnabled] = useState<Record<Platform, boolean>>(enabledPlatforms);
+  const [draftAutoPublish, setDraftAutoPublish] = useState(autoPublish);
+  const [draftLanguage, setDraftLanguage] = useState<LanguageOption>(language);
 
-  const currentValue = useMemo(() => draft[tab] ?? "", [draft, tab]);
+  useEffect(() => {
+    if (!open) return;
+    setDraftContexts(contexts);
+    setDraftEnabled(enabledPlatforms);
+    setDraftAutoPublish(autoPublish);
+    setDraftLanguage(language);
+  }, [autoPublish, contexts, enabledPlatforms, language, open]);
+
+  const currentValue = useMemo(() => draftContexts[tab] ?? "", [draftContexts, tab]);
 
   if (!open) return null;
 
   const handleSave = () => {
-    onSave(draft);
+    onSave({
+      contexts: draftContexts,
+      enabledPlatforms: draftEnabled,
+      autoPublish: draftAutoPublish,
+      language: draftLanguage,
+    });
     onClose();
   };
 
@@ -32,7 +56,7 @@ export function ContextPanel({ open, contexts, onClose, onSave }: Props) {
         <header className="mb-4 flex items-center justify-between">
           <div>
             <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">플랫폼별 스타일 설정</h2>
-            <p className="text-xs text-zinc-500 dark:text-zinc-400">저장된 문구는 생성/수정 시 시스템 컨텍스트로 전달됩니다.</p>
+            <p className="text-xs text-zinc-500 dark:text-zinc-400">체크한 플랫폼만 생성/자동 게시 대상이 됩니다.</p>
           </div>
           <button
             onClick={onClose}
@@ -41,6 +65,39 @@ export function ContextPanel({ open, contexts, onClose, onSave }: Props) {
             닫기
           </button>
         </header>
+
+        <div className="mb-4 rounded-xl border border-zinc-200 p-3 dark:border-zinc-700">
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-600 dark:text-zinc-300">게시 대상 플랫폼</p>
+          <div className="grid grid-cols-2 gap-2">
+            {PLATFORM_ORDER.map((p) => (
+              <label key={p} className="flex items-center gap-2 rounded-lg border border-zinc-200 px-2 py-1.5 text-xs capitalize dark:border-zinc-700">
+                <input
+                  type="checkbox"
+                  checked={draftEnabled[p]}
+                  onChange={(e) => setDraftEnabled((prev) => ({ ...prev, [p]: e.target.checked }))}
+                />
+                <span className="text-zinc-700 dark:text-zinc-200">{p}</span>
+              </label>
+            ))}
+          </div>
+          <label className="mt-3 flex items-center gap-2 text-xs text-zinc-700 dark:text-zinc-200">
+            <input type="checkbox" checked={draftAutoPublish} onChange={(e) => setDraftAutoPublish(e.target.checked)} />
+            생성 후 자동 게시
+          </label>
+          <div className="mt-3">
+            <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">출력 언어</label>
+            <select
+              value={draftLanguage}
+              onChange={(e) => setDraftLanguage(e.target.value as LanguageOption)}
+              className="w-full rounded-md border border-zinc-300 bg-white px-2 py-1.5 text-xs dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
+            >
+              <option value="auto">Auto (입력과 동일)</option>
+              <option value="korean">Korean</option>
+              <option value="english">English</option>
+              <option value="japanese">Japanese</option>
+            </select>
+          </div>
+        </div>
 
         <div className="mb-4 flex gap-2 overflow-x-auto pb-1">
           {PLATFORM_ORDER.map((p) => (
@@ -58,19 +115,22 @@ export function ContextPanel({ open, contexts, onClose, onSave }: Props) {
           ))}
         </div>
 
-        <label className="mb-2 block text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-          {tab} Context
-        </label>
+        <label className="mb-2 block text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">{tab} Context</label>
         <textarea
           value={currentValue}
-          onChange={(e) => setDraft((prev) => ({ ...prev, [tab]: e.target.value }))}
+          onChange={(e) => setDraftContexts((prev) => ({ ...prev, [tab]: e.target.value }))}
           placeholder="예: 문장 길이는 짧게, 이모지 금지, 해시태그는 마지막에 3개"
-          className="h-[54vh] w-full rounded-2xl border border-zinc-300 bg-white px-3 py-3 text-sm outline-none focus:ring-2 focus:ring-zinc-300 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100 dark:focus:ring-zinc-700"
+          className="h-[40vh] w-full rounded-2xl border border-zinc-300 bg-white px-3 py-3 text-sm outline-none focus:ring-2 focus:ring-zinc-300 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100 dark:focus:ring-zinc-700"
         />
 
         <div className="mt-4 flex items-center justify-end gap-2">
           <button
-            onClick={() => setDraft(contexts)}
+            onClick={() => {
+              setDraftContexts(contexts);
+              setDraftEnabled(enabledPlatforms);
+              setDraftAutoPublish(autoPublish);
+              setDraftLanguage(language);
+            }}
             className="rounded-lg border border-zinc-300 px-3 py-2 text-xs dark:border-zinc-700 dark:text-zinc-200"
           >
             초기화

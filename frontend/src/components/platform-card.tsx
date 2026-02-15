@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Check, Loader2, Mic, Pencil, RotateCcw, RotateCw, X } from "lucide-react";
 import type { CardState, Platform } from "@/lib/types";
 
@@ -13,55 +13,35 @@ type Props = {
   onUndo: () => void;
   onRedo: () => void;
   onSelectVersion: (index: number) => void;
+  onPreviewChange: (title: string, body: string) => void;
 };
 
-function Preview({ platform, title, body }: { platform: Platform; title: string; body: string }) {
-  if (platform === "twitter") {
-    return (
-      <div className="rounded-xl border border-zinc-200 bg-black p-3 text-white dark:border-zinc-700">
-        <p className="mb-2 text-[11px] text-white/70">X Preview</p>
-        <p className="text-sm font-semibold">{title}</p>
-        <p className="mt-2 whitespace-pre-wrap text-sm">{body}</p>
-      </div>
-    );
-  }
+function PreviewFrame({ platform, title }: { platform: Platform; title: string }) {
+  const cls =
+    platform === "twitter"
+      ? "rounded-xl border border-zinc-200 bg-black p-3 text-white dark:border-zinc-700"
+      : platform === "instagram"
+        ? "rounded-xl border border-zinc-200 bg-gradient-to-b from-fuchsia-50 to-rose-50 p-3 dark:border-zinc-700 dark:from-zinc-900 dark:to-zinc-800"
+        : platform === "reddit"
+          ? "rounded-xl border border-zinc-200 bg-orange-50 p-3 dark:border-zinc-700 dark:bg-zinc-800"
+          : "rounded-xl border border-zinc-200 bg-white p-3 dark:border-zinc-700 dark:bg-zinc-800";
 
-  if (platform === "instagram") {
-    return (
-      <div className="rounded-xl border border-zinc-200 bg-gradient-to-b from-fuchsia-50 to-rose-50 p-3 dark:border-zinc-700 dark:from-zinc-900 dark:to-zinc-800">
-        <p className="mb-2 text-[11px] text-zinc-600 dark:text-zinc-300">Instagram Preview</p>
-        <div className="mb-2 h-20 rounded-lg bg-white/75 dark:bg-zinc-700/50" />
-        <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">{title}</p>
-        <p className="mt-1 whitespace-pre-wrap text-sm text-zinc-800 dark:text-zinc-200">{body}</p>
-      </div>
-    );
-  }
-
-  if (platform === "linkedin") {
-    return (
-      <div className="rounded-xl border border-zinc-200 bg-white p-3 dark:border-zinc-700 dark:bg-zinc-800">
-        <p className="mb-2 text-[11px] text-zinc-500 dark:text-zinc-300">LinkedIn Preview</p>
-        <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">{title}</p>
-        <p className="mt-2 whitespace-pre-wrap text-sm text-zinc-800 dark:text-zinc-200">{body}</p>
-      </div>
-    );
-  }
-
-  if (platform === "reddit") {
-    return (
-      <div className="rounded-xl border border-zinc-200 bg-orange-50 p-3 dark:border-zinc-700 dark:bg-zinc-800">
-        <p className="mb-2 text-[11px] text-zinc-500 dark:text-zinc-300">Reddit Preview</p>
-        <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">{title}</p>
-        <p className="mt-2 whitespace-pre-wrap text-sm text-zinc-800 dark:text-zinc-200">{body}</p>
-      </div>
-    );
-  }
+  const label =
+    platform === "twitter"
+      ? "X Preview"
+      : platform === "instagram"
+        ? "Instagram Preview"
+        : platform === "linkedin"
+          ? "LinkedIn Preview"
+          : platform === "reddit"
+            ? "Reddit Preview"
+            : "Blog Preview";
 
   return (
-    <div className="rounded-xl border border-zinc-200 bg-white p-3 dark:border-zinc-700 dark:bg-zinc-800">
-      <p className="mb-2 text-[11px] text-zinc-500 dark:text-zinc-300">Blog Preview</p>
-      <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">{title}</p>
-      <p className="mt-2 whitespace-pre-wrap text-sm text-zinc-800 dark:text-zinc-200">{body}</p>
+    <div className={cls}>
+      <p className="mb-2 text-[11px] text-zinc-500 dark:text-zinc-300">{label}</p>
+      {platform === "instagram" && <div className="mb-2 h-20 rounded-lg bg-white/75 dark:bg-zinc-700/50" />}
+      <p className="text-sm font-semibold break-words whitespace-normal text-zinc-900 dark:text-zinc-100">{title}</p>
     </div>
   );
 }
@@ -75,9 +55,22 @@ export function PlatformCard({
   onUndo,
   onRedo,
   onSelectVersion,
+  onPreviewChange,
 }: Props) {
   const [feedback, setFeedback] = useState("");
+  const [expandedPreview, setExpandedPreview] = useState(false);
+  const [editingPreview, setEditingPreview] = useState(false);
   const current = useMemo(() => card.versions[card.versionIndex], [card.versionIndex, card.versions]);
+  const canExpand = current.body.length > 180 || current.body.split("\n").length > 5;
+
+  const [draftTitle, setDraftTitle] = useState(current.title);
+  const [draftBody, setDraftBody] = useState(current.body);
+
+  useEffect(() => {
+    setDraftTitle(current.title);
+    setDraftBody(current.body);
+    setEditingPreview(false);
+  }, [current.title, current.body]);
 
   return (
     <article className="relative h-full rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
@@ -132,7 +125,73 @@ export function PlatformCard({
         ))}
       </div>
 
-      <Preview platform={card.platform} title={current.title} body={current.body} />
+      <PreviewFrame platform={card.platform} title={current.title} />
+
+      <div className="mt-2 rounded-lg border border-zinc-200 bg-zinc-50 p-2 dark:border-zinc-700 dark:bg-zinc-800/60">
+        <div className="mb-1 flex items-center justify-between">
+          <p className="text-[11px] text-zinc-500 dark:text-zinc-400">본문 Preview</p>
+          <button
+            onClick={() => setEditingPreview((v) => !v)}
+            className="rounded-md px-2 py-1 text-[11px] font-medium text-zinc-600 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-700"
+          >
+            {editingPreview ? "닫기" : "Preview Edit"}
+          </button>
+        </div>
+
+        <div className={`overflow-hidden transition-all duration-300 ease-out ${expandedPreview ? "max-h-[340px]" : "max-h-[7.8rem]"}`}>
+          <p
+            className={`break-words whitespace-pre-wrap text-sm text-zinc-700 dark:text-zinc-200 ${
+              expandedPreview ? "" : "[display:-webkit-box] [-webkit-line-clamp:5] [-webkit-box-orient:vertical] overflow-hidden"
+            }`}
+          >
+            {current.body}
+          </p>
+        </div>
+        {canExpand && (
+          <button
+            onClick={() => setExpandedPreview((v) => !v)}
+            className="mt-1 rounded-md px-1 py-1 text-[11px] font-medium text-zinc-600 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-700"
+          >
+            {expandedPreview ? "접기" : "더보기"}
+          </button>
+        )}
+
+        {editingPreview && (
+          <div className="mt-2 space-y-2 rounded-lg border border-zinc-200 bg-white p-2 dark:border-zinc-700 dark:bg-zinc-900">
+            <input
+              value={draftTitle}
+              onChange={(e) => setDraftTitle(e.target.value)}
+              className="w-full rounded-md border border-zinc-300 bg-white px-2 py-1 text-sm font-semibold text-zinc-900 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
+            />
+            <textarea
+              value={draftBody}
+              onChange={(e) => setDraftBody(e.target.value)}
+              className="h-24 w-full rounded-md border border-zinc-300 bg-white px-2 py-1 text-sm text-zinc-800 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-200"
+            />
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => {
+                  setDraftTitle(current.title);
+                  setDraftBody(current.body);
+                  setEditingPreview(false);
+                }}
+                className="rounded-md border border-zinc-300 px-2 py-1 text-[11px] dark:border-zinc-700 dark:text-zinc-200"
+              >
+                취소
+              </button>
+              <button
+                onClick={() => {
+                  onPreviewChange(draftTitle, draftBody);
+                  setEditingPreview(false);
+                }}
+                className="rounded-md bg-zinc-900 px-2 py-1 text-[11px] font-semibold text-white dark:bg-zinc-100 dark:text-zinc-900"
+              >
+                적용
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
 
       <div className="mt-3 flex flex-wrap gap-1.5">
         {current.suggestions.map((s) => (

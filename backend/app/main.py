@@ -79,6 +79,8 @@ class GenerateRequest(BaseModel):
     draft: str
     userProfile: Optional[UserProfile] = None
     model: Optional[str] = None
+    platforms: Optional[List[Platform]] = None
+    language: Optional[str] = None
 
 
 class GeneratedCard(BaseModel):
@@ -103,6 +105,7 @@ class RefineRequest(BaseModel):
     feedback: str
     userProfile: Optional[UserProfile] = None
     model: Optional[str] = None
+    language: Optional[str] = None
 
 
 class CardStatusRequest(BaseModel):
@@ -215,6 +218,7 @@ async def generate_for_platform(
     draft: str,
     profile: Optional[UserProfile],
     model: Optional[str],
+    language: Optional[str],
 ) -> GeneratedCard:
     system_prompt = PLATFORM_PROMPTS[platform]
     style_block = build_style_block(platform, profile)
@@ -222,6 +226,7 @@ async def generate_for_platform(
     user_prompt = (
         "Transform the following draft for the target platform.\n"
         f"Target platform: {platform.value}\n"
+        f"Output language: {language or 'Same as input'}\n"
         f"Draft:\n{draft}\n\n"
         f"Style constraints:\n{style_block}\n\n"
         "Return strict JSON with shape: "
@@ -472,7 +477,11 @@ async def generate_content(req: GenerateRequest) -> GenerateResponse:
     if not req.draft.strip():
         raise HTTPException(status_code=400, detail="Draft cannot be empty")
 
-    tasks = [generate_for_platform(platform, req.draft, req.userProfile, req.model) for platform in Platform]
+    selected_platforms = req.platforms or list(Platform)
+    if not selected_platforms:
+        raise HTTPException(status_code=400, detail="At least one platform must be selected")
+
+    tasks = [generate_for_platform(platform, req.draft, req.userProfile, req.model, req.language) for platform in selected_platforms]
     cards = await asyncio.gather(*tasks)
 
     draft_id = store.create_draft(req.draft)
@@ -519,6 +528,7 @@ async def refine_content(req: RefineRequest) -> GeneratedCard:
     user_prompt = (
         "You are refining an already generated post while preserving platform fit.\n"
         f"Platform: {req.platform.value}\n"
+        f"Output language: {req.language or 'Same as input'}\n"
         f"Original user draft:\n{req.originalDraft}\n\n"
         f"Current generated content:\n{req.currentContent}\n\n"
         f"User feedback to apply:\n{req.feedback}\n\n"
