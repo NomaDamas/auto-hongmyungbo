@@ -74,3 +74,10 @@ npm run dev
 - 토큰/필수 설정값이 없으면 `missing_token` 또는 `config_error` 결과를 반환합니다.
 - OAuth connect/callback은 LinkedIn/X/Instagram/Reddit의 authorization_code 토큰 교환을 수행합니다.
 - Twitter는 PKCE(S256)를 사용하며 state/verifier는 DB에 저장됩니다.
+
+## Ops Docs
+
+- Publish env 체크리스트: `docs/PUBLISH_ENV_CHECKLIST.md`
+- 모노레포/분리 푸시 가이드: `docs/MONOREPO_GITHUB.md`
+- 모노레포 최초 푸시 스크립트: `scripts/init_monorepo_github.sh`
+- frontend/backend 분리 푸시 스크립트: `scripts/push_split_repos.sh`
