@@ -1,7 +1,7 @@
 "use client";
 
 import { type MouseEvent, useMemo, useRef, useState } from "react";
-import { Settings2, Sparkles } from "lucide-react";
+import { ArchiveRestore, CheckCheck, Settings2, Sparkles } from "lucide-react";
 import { PlatformCard } from "@/components/platform-card";
 import { ContextPanel } from "@/components/context-panel";
 import {
@@ -25,6 +25,14 @@ const EMPTY_CONTEXTS: Record<Platform, string> = {
   instagram: "",
   blog: "",
 };
+
+function cardKey(card: CardState): string {
+  return card.id ? `id-${card.id}` : `platform-${card.platform}`;
+}
+
+function insertByPlatformOrder(cards: CardState[]): CardState[] {
+  return [...cards].sort((a, b) => PLATFORM_ORDER.indexOf(a.platform) - PLATFORM_ORDER.indexOf(b.platform));
+}
 
 function toCardState(card: GeneratedCard): CardState {
   const initialVersion: CardVersion = {
@@ -64,7 +72,9 @@ export default function HomePage() {
   const [draft, setDraft] = useState("");
   const [selectedModel, setSelectedModel] = useState<ModelOption>("gpt-4o-mini");
   const [draftId, setDraftId] = useState<number | null>(null);
-  const [cards, setCards] = useState<CardState[]>([]);
+  const [resultCards, setResultCards] = useState<CardState[]>([]);
+  const [queueCards, setQueueCards] = useState<CardState[]>([]);
+  const [collapsingKeys, setCollapsingKeys] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
   const [publishJob, setPublishJob] = useState<PublishJob | null>(null);
   const [publishing, setPublishing] = useState(false);
@@ -79,19 +89,17 @@ export default function HomePage() {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
 
-  const cardsByOrder = useMemo(() => {
-    return [...cards].sort((a, b) => PLATFORM_ORDER.indexOf(a.platform) - PLATFORM_ORDER.indexOf(b.platform));
-  }, [cards]);
-
-  const acceptedCount = useMemo(() => cards.filter((c) => c.status === "accepted").length, [cards]);
+  const cardsByOrder = useMemo(() => insertByPlatformOrder(resultCards), [resultCards]);
+  const queueByOrder = useMemo(() => insertByPlatformOrder(queueCards), [queueCards]);
+  const acceptedCount = queueByOrder.length;
   const userProfile = useMemo(() => buildUserProfile(contexts), [contexts]);
 
   const setCardRefining = (platform: Platform, isRefining: boolean) => {
-    setCards((prev) => prev.map((c) => (c.platform === platform ? { ...c, isRefining } : c)));
+    setResultCards((prev) => prev.map((c) => (c.platform === platform ? { ...c, isRefining } : c)));
   };
 
   const patchCard = (platform: Platform, patch: Partial<CardState>) => {
-    setCards((prev) => prev.map((c) => (c.platform === platform ? { ...c, ...patch } : c)));
+    setResultCards((prev) => prev.map((c) => (c.platform === platform ? { ...c, ...patch } : c)));
   };
 
   const handleGenerate = async () => {
@@ -100,8 +108,10 @@ export default function HomePage() {
       setLoading(true);
       const generated = await generatePosts(draft, userProfile, selectedModel);
       setDraftId(generated.draftId);
-      setCards(generated.cards.map(toCardState));
+      setResultCards(generated.cards.map(toCardState));
+      setQueueCards([]);
       setPublishJob(null);
+      setCollapsingKeys(new Set());
     } catch (err) {
       console.error(err);
       alert("생성 중 오류가 발생했습니다.");
@@ -110,23 +120,65 @@ export default function HomePage() {
     }
   };
 
-  const handleStatus = async (card: CardState, status: "accepted" | "rejected") => {
+  const moveToQueue = (card: CardState) => {
+    const key = cardKey(card);
+    setCollapsingKeys((prev) => new Set([...prev, key]));
+
+    window.setTimeout(() => {
+      setResultCards((prev) => prev.filter((c) => cardKey(c) !== key));
+      setQueueCards((prev) => insertByPlatformOrder([...prev, { ...card, status: "accepted" }]));
+      setCollapsingKeys((prev) => {
+        const next = new Set(prev);
+        next.delete(key);
+        return next;
+      });
+    }, 260);
+  };
+
+  const handleAccept = async (card: CardState) => {
+    try {
+      if (card.id) {
+        await updateCardStatus(card.id, "accepted");
+      }
+      moveToQueue(card);
+    } catch (err) {
+      console.error(err);
+      alert("Accept 처리 중 오류가 발생했습니다.");
+    }
+  };
+
+  const handleRestoreFromQueue = async (card: CardState) => {
+    try {
+      if (card.id) {
+        await updateCardStatus(card.id, "draft");
+      }
+
+      const key = cardKey(card);
+      setQueueCards((prev) => prev.filter((c) => cardKey(c) !== key));
+      setResultCards((prev) => insertByPlatformOrder([...prev, { ...card, status: "draft" }]));
+    } catch (err) {
+      console.error(err);
+      alert("복원 중 오류가 발생했습니다.");
+    }
+  };
+
+  const handleReject = async (card: CardState) => {
     if (!card.id) {
-      patchCard(card.platform, { status });
+      patchCard(card.platform, { status: "rejected" });
       return;
     }
 
     try {
-      const updated = await updateCardStatus(card.id, status);
+      const updated = await updateCardStatus(card.id, "rejected");
       patchCard(card.platform, { status: updated.status });
     } catch (err) {
       console.error(err);
-      alert("상태 저장 중 오류가 발생했습니다.");
+      alert("Reject 처리 중 오류가 발생했습니다.");
     }
   };
 
   const handleRefine = async (platform: Platform, feedback: string) => {
-    const current = cards.find((c) => c.platform === platform);
+    const current = resultCards.find((c) => c.platform === platform);
     if (!current) return;
 
     const currentVersion = current.versions[current.versionIndex];
@@ -143,7 +195,7 @@ export default function HomePage() {
         model: selectedModel,
       });
 
-      setCards((prev) =>
+      setResultCards((prev) =>
         prev.map((c) => {
           if (c.platform !== platform) return c;
 
@@ -251,12 +303,6 @@ export default function HomePage() {
     }
   };
 
-  const scrollCarousel = (dir: "left" | "right") => {
-    if (!carouselRef.current) return;
-    const amount = carouselRef.current.clientWidth * 0.9;
-    carouselRef.current.scrollBy({ left: dir === "left" ? -amount : amount, behavior: "smooth" });
-  };
-
   const onMouseDownCarousel = (e: MouseEvent<HTMLDivElement>) => {
     if (!carouselRef.current) return;
     dragRef.current.isDown = true;
@@ -321,7 +367,7 @@ export default function HomePage() {
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
               placeholder="초안을 입력하세요..."
-              className="mb-3 h-64 w-full rounded-xl border border-zinc-300 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-zinc-300 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100 dark:focus:ring-zinc-700"
+              className="mb-3 h-44 w-full rounded-xl border border-zinc-300 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-zinc-300 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100 dark:focus:ring-zinc-700"
             />
             <div className="flex gap-2">
               <button
@@ -336,9 +382,10 @@ export default function HomePage() {
                 disabled={publishing || !draftId || acceptedCount === 0}
                 className="rounded-lg border border-zinc-300 px-3 py-2 text-xs font-medium disabled:opacity-50 dark:border-zinc-700 dark:text-zinc-100"
               >
-                {publishing ? "발행 중..." : `Accepted 발행 (${acceptedCount})`}
+                {publishing ? "발행 중..." : `Queue 발행 (${acceptedCount})`}
               </button>
             </div>
+
             <div className="mt-3 flex flex-wrap gap-1.5">
               {(["linkedin", "twitter", "instagram", "reddit"] as Platform[]).map((platform) => (
                 <button
@@ -351,6 +398,32 @@ export default function HomePage() {
                 </button>
               ))}
             </div>
+
+            <section className="mt-4 rounded-xl border border-zinc-200 p-3 dark:border-zinc-800">
+              <div className="mb-2 flex items-center justify-between">
+                <h3 className="text-xs font-semibold uppercase tracking-wide text-zinc-600 dark:text-zinc-300">Queue</h3>
+                <span className="text-[11px] text-zinc-500 dark:text-zinc-400">{acceptedCount} accepted</span>
+              </div>
+              <div className="space-y-2">
+                {queueByOrder.map((card) => (
+                  <button
+                    key={cardKey(card)}
+                    onClick={() => void handleRestoreFromQueue(card)}
+                    className="flex w-full items-start justify-between rounded-lg border border-zinc-200 px-3 py-2 text-left hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-800"
+                  >
+                    <div>
+                      <p className="text-xs font-semibold capitalize text-zinc-900 dark:text-zinc-100">{card.platform}</p>
+                      <p className="line-clamp-1 text-[11px] text-zinc-600 dark:text-zinc-300">{card.versions[card.versionIndex].title}</p>
+                    </div>
+                    <span className="ml-2 rounded-md bg-zinc-100 px-2 py-1 text-[11px] dark:bg-zinc-800 dark:text-zinc-100">
+                      <ArchiveRestore className="inline h-3 w-3" />
+                    </span>
+                  </button>
+                ))}
+                {!queueByOrder.length && <p className="text-xs text-zinc-500 dark:text-zinc-400">Accept한 카드가 여기에 보관됩니다.</p>}
+              </div>
+            </section>
+
             {publishJob && (
               <p className="mt-3 text-xs text-zinc-600 dark:text-zinc-300">
                 Job #{publishJob.id}: {publishJob.status}
@@ -361,53 +434,55 @@ export default function HomePage() {
           <section className="rounded-2xl border border-zinc-200 bg-white p-3 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
             <div className="mb-2 flex items-center justify-between">
               <h2 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Platform Results</h2>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => scrollCarousel("left")}
-                  className="rounded-lg border border-zinc-300 px-2 py-1 text-xs dark:border-zinc-700 dark:text-zinc-200"
-                >
-                  ←
-                </button>
-                <button
-                  onClick={() => scrollCarousel("right")}
-                  className="rounded-lg border border-zinc-300 px-2 py-1 text-xs dark:border-zinc-700 dark:text-zinc-200"
-                >
-                  →
-                </button>
-              </div>
+              <span className="text-xs text-zinc-500 dark:text-zinc-400">드래그로 좌우 탐색</span>
             </div>
 
-            <div
-              ref={carouselRef}
-              onMouseDown={onMouseDownCarousel}
-              onMouseLeave={onMouseLeaveCarousel}
-              onMouseUp={onMouseUpCarousel}
-              onMouseMove={onMouseMoveCarousel}
-              className="flex min-h-[580px] gap-3 overflow-x-auto rounded-xl p-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
-            >
-              {cardsByOrder.map((card) => (
-                <div key={card.platform} className="w-[min(88vw,420px)] shrink-0 snap-start">
-                  <PlatformCard
-                    card={card}
-                    onAccept={() => void handleStatus(card, "accepted")}
-                    onReject={() => void handleStatus(card, "rejected")}
-                    onRefine={(feedback) => handleRefine(card.platform, feedback)}
-                    onVoiceRefine={() => handleVoiceRefine(card.platform)}
-                    onUndo={() => patchCard(card.platform, { versionIndex: Math.max(0, card.versionIndex - 1) })}
-                    onRedo={() => patchCard(card.platform, { versionIndex: Math.min(card.versions.length - 1, card.versionIndex + 1) })}
-                    onSelectVersion={(index) => patchCard(card.platform, { versionIndex: index })}
-                  />
-                </div>
-              ))}
+            <div className="overflow-hidden rounded-xl border border-zinc-200 dark:border-zinc-800">
+              <div
+                ref={carouselRef}
+                onMouseDown={onMouseDownCarousel}
+                onMouseLeave={onMouseLeaveCarousel}
+                onMouseUp={onMouseUpCarousel}
+                onMouseMove={onMouseMoveCarousel}
+                className="flex min-h-[620px] gap-3 overflow-x-auto p-2 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+              >
+                {cardsByOrder.map((card) => {
+                  const isCollapsing = collapsingKeys.has(cardKey(card));
+                  return (
+                    <div
+                      key={cardKey(card)}
+                      className={`overflow-hidden transition-all duration-300 ease-out ${
+                        isCollapsing ? "w-0 scale-95 opacity-0" : "w-[min(88vw,420px)] shrink-0 scale-100 opacity-100"
+                      }`}
+                    >
+                      <PlatformCard
+                        card={card}
+                        onAccept={() => void handleAccept(card)}
+                        onReject={() => void handleReject(card)}
+                        onRefine={(feedback) => handleRefine(card.platform, feedback)}
+                        onVoiceRefine={() => handleVoiceRefine(card.platform)}
+                        onUndo={() => patchCard(card.platform, { versionIndex: Math.max(0, card.versionIndex - 1) })}
+                        onRedo={() => patchCard(card.platform, { versionIndex: Math.min(card.versions.length - 1, card.versionIndex + 1) })}
+                        onSelectVersion={(index) => patchCard(card.platform, { versionIndex: index })}
+                      />
+                    </div>
+                  );
+                })}
 
-              {!cardsByOrder.length && (
-                <div className="grid h-[560px] w-full place-items-center rounded-xl border border-dashed border-zinc-300 text-sm text-zinc-500 dark:border-zinc-700 dark:text-zinc-400">
-                  생성된 결과가 여기에 카드로 표시됩니다.
-                </div>
-              )}
+                {!cardsByOrder.length && (
+                  <div className="grid h-[600px] w-full place-items-center rounded-xl border border-dashed border-zinc-300 text-sm text-zinc-500 dark:border-zinc-700 dark:text-zinc-400">
+                    결과 카드가 비어 있습니다. Draft 생성 후 Accept로 Queue에 보관할 수 있습니다.
+                  </div>
+                )}
+              </div>
             </div>
           </section>
         </section>
+
+        <footer className="text-center text-[11px] text-zinc-500 dark:text-zinc-400">
+          Accept: 오른쪽 Results → 왼쪽 Queue | Queue 클릭: Restore
+          <CheckCheck className="ml-1 inline h-3.5 w-3.5" />
+        </footer>
       </main>
     </>
   );
