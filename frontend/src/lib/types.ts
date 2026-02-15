@@ -1,5 +1,7 @@
 export type Platform = "reddit" | "linkedin" | "twitter" | "instagram" | "blog";
 
+export type ModelOption = "gpt-4o-mini" | "gpt-4o" | "gpt-4.1-mini";
+
 export type GeneratedCard = {
   id?: number;
   platform: Platform;
@@ -7,6 +9,21 @@ export type GeneratedCard = {
   body: string;
   suggestions: string[];
   status: "draft" | "accepted" | "rejected";
+};
+
+export type CardVersion = {
+  title: string;
+  body: string;
+  suggestions: string[];
+  source: "initial" | "refine";
+  feedback?: string;
+  createdAt: string;
+};
+
+export type CardState = GeneratedCard & {
+  versions: CardVersion[];
+  versionIndex: number;
+  isRefining: boolean;
 };
 
 export type GenerateResponse = {

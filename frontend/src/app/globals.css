@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Pretendard:wght@400;500;600;700&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -8,9 +8,20 @@
   color-scheme: light;
 }
 
+* {
+  box-sizing: border-box;
+}
+
 body {
-  @apply bg-bg text-ink;
-  background-image:
-    radial-gradient(circle at 20% 20%, rgba(249,115,22,0.12), transparent 35%),
-    radial-gradient(circle at 80% 0%, rgba(15,118,110,0.12), transparent 30%);
+  @apply text-ink;
+  margin: 0;
+  font-family: "Pretendard", "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+  background:
+    radial-gradient(circle at 12% 10%, rgba(239, 68, 68, 0.22), transparent 26%),
+    radial-gradient(circle at 84% 0%, rgba(249, 115, 22, 0.2), transparent 34%),
+    linear-gradient(180deg, #fff7ed 0%, #fff 48%, #fff5f5 100%);
+}
+
+.font-display {
+  font-family: "Black Han Sans", "Pretendard", sans-serif;
 }

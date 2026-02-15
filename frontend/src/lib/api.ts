@@ -1,12 +1,16 @@
-import type { GenerateResponse, GeneratedCard, Platform, PublishJob, UserProfile } from "@/lib/types";
+import type { GenerateResponse, GeneratedCard, ModelOption, Platform, PublishJob, UserProfile } from "@/lib/types";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
-export async function generatePosts(draft: string, userProfile?: UserProfile): Promise<GenerateResponse> {
+export async function generatePosts(
+  draft: string,
+  userProfile?: UserProfile,
+  model?: ModelOption,
+): Promise<GenerateResponse> {
   const res = await fetch(`${API_URL}/api/generate`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ draft, userProfile }),
+    body: JSON.stringify({ draft, userProfile, model }),
   });
 
   if (!res.ok) {
@@ -23,6 +27,7 @@ export async function refinePost(payload: {
   currentContent: string;
   feedback: string;
   userProfile?: UserProfile;
+  model?: ModelOption;
 }): Promise<GeneratedCard> {
   const res = await fetch(`${API_URL}/api/refine`, {
     method: "POST",

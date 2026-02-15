@@ -78,6 +78,7 @@ class UserProfile(BaseModel):
 class GenerateRequest(BaseModel):
     draft: str
     userProfile: Optional[UserProfile] = None
+    model: Optional[str] = None
 
 
 class GeneratedCard(BaseModel):
@@ -101,6 +102,7 @@ class RefineRequest(BaseModel):
     currentContent: str
     feedback: str
     userProfile: Optional[UserProfile] = None
+    model: Optional[str] = None
 
 
 class CardStatusRequest(BaseModel):
@@ -110,6 +112,7 @@ class CardStatusRequest(BaseModel):
 class StyleExtractRequest(BaseModel):
     platform: Platform
     referencePosts: List[str]
+    model: Optional[str] = None
 
 
 class StyleExtractResponse(BaseModel):
@@ -207,7 +210,12 @@ def _expires_at_from_seconds(expires_in: Optional[int]) -> Optional[str]:
     return (datetime.now(timezone.utc) + timedelta(seconds=int(expires_in))).isoformat()
 
 
-async def generate_for_platform(platform: Platform, draft: str, profile: Optional[UserProfile]) -> GeneratedCard:
+async def generate_for_platform(
+    platform: Platform,
+    draft: str,
+    profile: Optional[UserProfile],
+    model: Optional[str],
+) -> GeneratedCard:
     system_prompt = PLATFORM_PROMPTS[platform]
     style_block = build_style_block(platform, profile)
 
@@ -221,7 +229,7 @@ async def generate_for_platform(platform: Platform, draft: str, profile: Optiona
     )
 
     completion = await client.chat.completions.create(
-        model=DEFAULT_MODEL,
+        model=model or DEFAULT_MODEL,
         response_format={"type": "json_object"},
         temperature=0.7,
         messages=[
@@ -464,7 +472,7 @@ async def generate_content(req: GenerateRequest) -> GenerateResponse:
     if not req.draft.strip():
         raise HTTPException(status_code=400, detail="Draft cannot be empty")
 
-    tasks = [generate_for_platform(platform, req.draft, req.userProfile) for platform in Platform]
+    tasks = [generate_for_platform(platform, req.draft, req.userProfile, req.model) for platform in Platform]
     cards = await asyncio.gather(*tasks)
 
     draft_id = store.create_draft(req.draft)
@@ -520,7 +528,7 @@ async def refine_content(req: RefineRequest) -> GeneratedCard:
     )
 
     completion = await client.chat.completions.create(
-        model=DEFAULT_MODEL,
+        model=req.model or DEFAULT_MODEL,
         response_format={"type": "json_object"},
         temperature=0.7,
         messages=[
@@ -568,7 +576,7 @@ async def extract_style(req: StyleExtractRequest) -> StyleExtractResponse:
     )
 
     completion = await client.chat.completions.create(
-        model=DEFAULT_MODEL,
+        model=req.model or DEFAULT_MODEL,
         response_format={"type": "json_object"},
         temperature=0.3,
         messages=[

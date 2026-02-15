@@ -11,9 +11,10 @@ import {
   transcribeAudio,
   updateCardStatus,
 } from "@/lib/api";
-import type { GeneratedCard, Platform, PublishJob, UserProfile } from "@/lib/types";
+import type { CardState, CardVersion, GeneratedCard, ModelOption, Platform, PublishJob, UserProfile } from "@/lib/types";
 
 const PLATFORM_ORDER: Platform[] = ["reddit", "linkedin", "twitter", "instagram", "blog"];
+const MODEL_OPTIONS: ModelOption[] = ["gpt-4o-mini", "gpt-4o", "gpt-4.1-mini"];
 
 const initialProfile: UserProfile = {
   styles: {
@@ -30,12 +31,33 @@ const initialProfile: UserProfile = {
   },
 };
 
+function toCardState(card: GeneratedCard): CardState {
+  const initialVersion: CardVersion = {
+    title: card.title,
+    body: card.body,
+    suggestions: card.suggestions,
+    source: "initial",
+    createdAt: new Date().toISOString(),
+  };
+
+  return {
+    ...card,
+    versions: [initialVersion],
+    versionIndex: 0,
+    isRefining: false,
+  };
+}
+
+const HMB_IMAGE_URL =
+  process.env.NEXT_PUBLIC_HMB_IMAGE_URL ||
+  "https://images.unsplash.com/photo-1560272564-c83b66b1ad12?auto=format&fit=crop&w=1200&q=80";
+
 export default function HomePage() {
-  const [draft, setDraft] = useState("여기에 초안을 입력하세요. 제품 출시 이야기, 인사이트, 경험담 등.");
+  const [draft, setDraft] = useState("홍명보 감독처럼 흔들리지 않고 꾸준히 성장하는 팀 문화를 만들었습니다.");
+  const [selectedModel, setSelectedModel] = useState<ModelOption>("gpt-4o-mini");
   const [draftId, setDraftId] = useState<number | null>(null);
-  const [cards, setCards] = useState<GeneratedCard[]>([]);
+  const [cards, setCards] = useState<CardState[]>([]);
   const [loading, setLoading] = useState(false);
-  const [refiningPlatform, setRefiningPlatform] = useState<Platform | null>(null);
   const [publishJob, setPublishJob] = useState<PublishJob | null>(null);
   const [publishing, setPublishing] = useState(false);
   const [oauthBusyPlatform, setOauthBusyPlatform] = useState<Platform | null>(null);
@@ -49,12 +71,20 @@ export default function HomePage() {
 
   const acceptedCount = useMemo(() => cards.filter((c) => c.status === "accepted").length, [cards]);
 
+  const setCardRefining = (platform: Platform, isRefining: boolean) => {
+    setCards((prev) => prev.map((c) => (c.platform === platform ? { ...c, isRefining } : c)));
+  };
+
+  const patchCard = (platform: Platform, patch: Partial<CardState>) => {
+    setCards((prev) => prev.map((c) => (c.platform === platform ? { ...c, ...patch } : c)));
+  };
+
   const handleGenerate = async () => {
     try {
       setLoading(true);
-      const generated = await generatePosts(draft, initialProfile);
+      const generated = await generatePosts(draft, initialProfile, selectedModel);
       setDraftId(generated.draftId);
-      setCards(generated.cards);
+      setCards(generated.cards.map(toCardState));
       setPublishJob(null);
     } catch (err) {
       console.error(err);
@@ -64,11 +94,7 @@ export default function HomePage() {
     }
   };
 
-  const patchCard = (platform: Platform, patch: Partial<GeneratedCard>) => {
-    setCards((prev) => prev.map((c) => (c.platform === platform ? { ...c, ...patch } : c)));
-  };
-
-  const handleStatus = async (card: GeneratedCard, status: "accepted" | "rejected") => {
+  const handleStatus = async (card: CardState, status: "accepted" | "rejected") => {
     if (!card.id) {
       patchCard(card.platform, { status });
       return;
@@ -76,7 +102,7 @@ export default function HomePage() {
 
     try {
       const updated = await updateCardStatus(card.id, status);
-      patchCard(card.platform, updated);
+      patchCard(card.platform, { status: updated.status });
     } catch (err) {
       console.error(err);
       alert("상태 저장 중 오류가 발생했습니다.");
@@ -87,22 +113,52 @@ export default function HomePage() {
     const current = cards.find((c) => c.platform === platform);
     if (!current) return;
 
+    const currentVersion = current.versions[current.versionIndex];
+
     try {
-      setRefiningPlatform(platform);
+      setCardRefining(platform, true);
       const updated = await refinePost({
         cardId: current.id,
         platform,
         originalDraft: draft,
-        currentContent: `${current.title}\n\n${current.body}`,
+        currentContent: `${currentVersion.title}\n\n${currentVersion.body}`,
         feedback,
         userProfile: initialProfile,
+        model: selectedModel,
       });
-      patchCard(platform, updated);
+
+      setCards((prev) =>
+        prev.map((c) => {
+          if (c.platform !== platform) return c;
+
+          const nextVersion: CardVersion = {
+            title: updated.title,
+            body: updated.body,
+            suggestions: updated.suggestions,
+            source: "refine",
+            feedback,
+            createdAt: new Date().toISOString(),
+          };
+
+          const kept = c.versions.slice(0, c.versionIndex + 1);
+          const nextVersions = [...kept, nextVersion];
+
+          return {
+            ...c,
+            title: updated.title,
+            body: updated.body,
+            suggestions: updated.suggestions,
+            status: updated.status,
+            versions: nextVersions,
+            versionIndex: nextVersions.length - 1,
+            isRefining: false,
+          };
+        }),
+      );
     } catch (err) {
       console.error(err);
       alert("수정 중 오류가 발생했습니다.");
-    } finally {
-      setRefiningPlatform(null);
+      setCardRefining(platform, false);
     }
   };
 
@@ -113,7 +169,6 @@ export default function HomePage() {
     }
 
     try {
-      setRefiningPlatform(platform);
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const recorder = new MediaRecorder(stream, { mimeType: "audio/webm" });
       mediaRecorderRef.current = recorder;
@@ -124,10 +179,13 @@ export default function HomePage() {
       };
 
       recorder.onstop = async () => {
-        const audioBlob = new Blob(chunksRef.current, { type: "audio/webm" });
-        const feedback = await transcribeAudio(audioBlob);
-        await handleRefine(platform, feedback);
-        stream.getTracks().forEach((track) => track.stop());
+        try {
+          const audioBlob = new Blob(chunksRef.current, { type: "audio/webm" });
+          const feedback = await transcribeAudio(audioBlob);
+          await handleRefine(platform, feedback);
+        } finally {
+          stream.getTracks().forEach((track) => track.stop());
+        }
       };
 
       recorder.start();
@@ -135,7 +193,6 @@ export default function HomePage() {
     } catch (err) {
       console.error(err);
       alert("음성 수정 중 오류가 발생했습니다.");
-      setRefiningPlatform(null);
     }
   };
 
@@ -180,24 +237,48 @@ export default function HomePage() {
 
   return (
     <main className="mx-auto min-h-screen max-w-7xl p-6">
-      <header className="mb-6">
-        <h1 className="font-display text-3xl">AI Social Cross Posting Agent</h1>
-        <p className="text-sm text-black/70">하나의 초안을 5개 플랫폼 문법으로 자동 변환하고 즉시 리뷰/수정합니다.</p>
-      </header>
+      <section className="mb-6 grid grid-cols-1 overflow-hidden rounded-3xl border border-white/40 bg-gradient-to-r from-red-600 via-rose-500 to-orange-400 text-white shadow-soft lg:grid-cols-[1.4fr_1fr]">
+        <div className="p-6 lg:p-8">
+          <p className="mb-2 text-xs uppercase tracking-[0.3em] text-white/80">Campaign Studio</p>
+          <h1 className="font-display text-4xl leading-tight lg:text-5xl">홍명보 파이팅</h1>
+          <p className="mt-3 max-w-xl text-sm text-white/90">
+            하나의 메시지를 5개 플랫폼으로 즉시 전개하고, 버전 히스토리로 복원/재수정까지 가능한 홍보형 크로스 포스팅 에이전트.
+          </p>
+          <div className="mt-4 flex flex-wrap items-center gap-2">
+            <span className="rounded-full bg-white/20 px-3 py-1 text-xs">Draft ID: {draftId ?? "-"}</span>
+            <span className="rounded-full bg-white/20 px-3 py-1 text-xs">Accepted: {acceptedCount}</span>
+          </div>
+        </div>
+        <div className="relative min-h-[220px]">
+          <img src={HMB_IMAGE_URL} alt="홍명보 감독" className="h-full w-full object-cover" />
+          <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/60 to-transparent p-4 text-sm font-semibold">홍명보 감독의 리더십 톤으로 콘텐츠 확장</div>
+        </div>
+      </section>
 
-      <section className="mb-4 rounded-2xl border border-black/10 bg-panel p-4 shadow-soft">
+      <section className="mb-4 rounded-2xl border border-black/10 bg-white p-4 shadow-soft">
         <div className="flex flex-wrap items-center gap-3 text-sm">
-          <span>Draft ID: {draftId ?? "-"}</span>
-          <span>Accepted: {acceptedCount}</span>
+          <label className="text-xs font-semibold uppercase tracking-wide text-black/60">Model</label>
+          <select
+            value={selectedModel}
+            onChange={(e) => setSelectedModel(e.target.value as ModelOption)}
+            className="rounded-lg border border-black/20 bg-white px-3 py-2 text-sm"
+          >
+            {MODEL_OPTIONS.map((model) => (
+              <option key={model} value={model}>
+                {model}
+              </option>
+            ))}
+          </select>
           <button
             onClick={handlePublish}
             disabled={publishing || !draftId || acceptedCount === 0}
-            className="rounded-lg bg-accent2 px-3 py-2 text-xs font-semibold text-white disabled:opacity-50"
+            className="rounded-lg bg-black px-4 py-2 text-xs font-semibold text-white disabled:opacity-50"
           >
-            {publishing ? "Publish Queue 처리 중..." : "Accepted 카드 발행"}
+            {publishing ? "발행 큐 처리 중..." : "Accepted 카드 발행"}
           </button>
-          {publishJob && <span>Job #{publishJob.id}: {publishJob.status}</span>}
+          {publishJob && <span className="text-xs">Job #{publishJob.id}: {publishJob.status}</span>}
         </div>
+
         <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
           <span className="mr-1">OAuth 연결:</span>
           {(["linkedin", "twitter", "instagram", "reddit"] as Platform[]).map((platform) => (
@@ -213,21 +294,25 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section className="grid grid-cols-1 gap-6 lg:grid-cols-[1.1fr_1.9fr]">
-        <aside className="rounded-2xl border border-black/10 bg-panel p-4 shadow-soft">
-          <h2 className="mb-2 font-display text-xl">Raw Draft</h2>
+      <section className="grid grid-cols-1 gap-6 lg:grid-cols-[1.05fr_1.95fr]">
+        <aside className="rounded-2xl border border-black/10 bg-white p-4 shadow-soft">
+          <h2 className="mb-2 font-display text-xl">Campaign Draft</h2>
           <textarea
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
-            className="mb-3 h-[420px] w-full rounded-xl border border-black/15 bg-white px-3 py-2"
+            className="mb-3 h-[460px] w-full rounded-xl border border-black/20 bg-white px-3 py-2"
           />
           <button
             onClick={handleGenerate}
             disabled={loading || !draft.trim()}
-            className="w-full rounded-xl bg-ink px-4 py-3 text-sm font-semibold text-white disabled:opacity-50"
+            className="w-full rounded-xl bg-red-600 px-4 py-3 text-sm font-semibold text-white disabled:opacity-50"
           >
             {loading ? "생성 중..." : "5개 플랫폼 버전 생성"}
           </button>
+
+          <div className="mt-4 rounded-xl bg-red-50 p-3 text-xs text-red-800">
+            OAuth 오류가 나면 보통 Redirect URI 불일치, Client ID/Secret 오입력, 플랫폼 앱 권한 누락 순으로 확인하세요.
+          </div>
         </aside>
 
         <section className="grid grid-cols-1 gap-4 xl:grid-cols-2">
@@ -235,15 +320,17 @@ export default function HomePage() {
             <PlatformCard
               key={card.platform}
               card={card}
-              busy={refiningPlatform === card.platform}
               onAccept={() => void handleStatus(card, "accepted")}
               onReject={() => void handleStatus(card, "rejected")}
               onRefine={(feedback) => handleRefine(card.platform, feedback)}
               onVoiceRefine={() => handleVoiceRefine(card.platform)}
+              onUndo={() => patchCard(card.platform, { versionIndex: Math.max(0, card.versionIndex - 1) })}
+              onRedo={() => patchCard(card.platform, { versionIndex: Math.min(card.versions.length - 1, card.versionIndex + 1) })}
+              onSelectVersion={(index) => patchCard(card.platform, { versionIndex: index })}
             />
           ))}
           {!cardsByOrder.length && (
-            <div className="rounded-2xl border border-dashed border-black/20 bg-white/60 p-8 text-center text-sm text-black/65 xl:col-span-2">
+            <div className="rounded-2xl border border-dashed border-black/20 bg-white p-8 text-center text-sm text-black/65 xl:col-span-2">
               초안을 입력하고 생성 버튼을 누르면 플랫폼별 카드가 여기에 표시됩니다.
             </div>
           )}
