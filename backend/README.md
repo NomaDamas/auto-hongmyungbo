@@ -4,11 +4,17 @@
 
 ```bash
 cd backend
-python -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
+uv sync
 cp .env.example .env
-uvicorn app.main:app --reload --port 8000
+uv run uvicorn app.main:app --reload --port 8000
+```
+
+## Re-run
+
+```bash
+cd backend
+uv sync
+uv run uvicorn app.main:app --reload --port 8000
 ```
 
 ## Endpoints

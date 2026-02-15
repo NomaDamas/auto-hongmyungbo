@@ -1,0 +1,17 @@
+[project]
+name = "cross-posting-agent-backend"
+version = "0.1.0"
+description = "FastAPI backend for AI social cross posting agent"
+requires-python = ">=3.10"
+dependencies = [
+  "fastapi==0.115.8",
+  "uvicorn[standard]==0.34.0",
+  "python-multipart==0.0.20",
+  "pydantic==2.10.6",
+  "openai==1.61.1",
+  "httpx==0.28.1",
+  "python-dotenv==1.0.1",
+]
+
+[tool.uv]
+package = false

@@ -11,7 +11,7 @@
 │   ├── app
 │   │   ├── main.py
 │   │   └── store.py
-│   ├── requirements.txt
+│   ├── pyproject.toml
 │   └── .env.example
 └── frontend
     ├── src
@@ -32,11 +32,9 @@
 
 ```bash
 cd backend
-python -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
+uv sync
 cp .env.example .env
-uvicorn app.main:app --reload --port 8000
+uv run uvicorn app.main:app --reload --port 8000
 ```
 
 ## 2) Frontend Run (Next.js)
@@ -45,6 +43,53 @@ uvicorn app.main:app --reload --port 8000
 cd frontend
 cp .env.local.example .env.local
 npm install
+npm run dev
+```
+
+## 실행 메뉴얼 (다시 실행 포함)
+
+1. `uv` 설치 (최초 1회)
+```bash
+brew install uv
+```
+
+2. 백엔드 의존성 동기화 + 실행
+```bash
+cd backend
+uv sync
+cp .env.example .env   # 최초 1회
+# backend/.env 값 입력 (OPENAI_API_KEY, OAuth 관련 값)
+uv run uvicorn app.main:app --reload --port 8000
+```
+
+3. 프론트 의존성 설치 + 실행
+```bash
+cd frontend
+cp .env.local.example .env.local   # 최초 1회
+npm install                         # 최초 1회
+npm run dev
+```
+
+4. 접속
+- `http://localhost:3000`
+
+5. 사용 순서
+1. Draft 입력 후 `5개 플랫폼 버전 생성`
+2. 카드 `Accept/Reject/Edit`
+3. 상단 OAuth 연결 버튼 클릭 (LinkedIn/X/Instagram/Reddit)
+4. `Accepted 카드 발행` 클릭
+5. 필요 시 `GET /api/jobs/{job_id}`로 발행 상태 확인
+
+6. 다음 실행 때(재실행)
+- 백엔드:
+```bash
+cd backend
+uv sync
+uv run uvicorn app.main:app --reload --port 8000
+```
+- 프론트:
+```bash
+cd frontend
 npm run dev
 ```
 

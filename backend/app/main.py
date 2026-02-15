@@ -6,16 +6,20 @@ import os
 import secrets
 from datetime import datetime, timedelta, timezone
 from enum import Enum
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 from urllib.parse import urlencode
 
 import httpx
 from fastapi import FastAPI, File, HTTPException, Query, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field
 from openai import AsyncOpenAI
+from pydantic import BaseModel, Field
+from dotenv import load_dotenv
 
 from app import store
+
+load_dotenv(Path(__file__).resolve().parents[1] / ".env")
 
 
 class Platform(str, Enum):
