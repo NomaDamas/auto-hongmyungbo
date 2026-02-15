@@ -1,0 +1,16 @@
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+}
+
+body {
+  @apply bg-bg text-ink;
+  background-image:
+    radial-gradient(circle at 20% 20%, rgba(249,115,22,0.12), transparent 35%),
+    radial-gradient(circle at 80% 0%, rgba(15,118,110,0.12), transparent 30%);
+}
