@@ -183,8 +183,16 @@ npm run dev
    - OAuth / Publish 관련 환경변수 (`backend/.env.example` 참고)
 4. CORS:
    - `ALLOWED_ORIGIN=https://<frontend-domain>`
+   - 또는 `ALLOWED_ORIGINS`에 다중 도메인 지정
 
-### 3) 배포 후 점검
+### 3) Traffic Monitoring 배포
+
+1. `hongmyungbo_automation_traffic_monitoring`를 별도 서비스로 배포
+2. collector: `apps/collector`, dashboard: `apps/dashboard`
+3. dashboard env:
+   - `COLLECTOR_URL=https://<collector-domain>`
+
+### 4) 배포 후 점검
 
 1. 생성/수정/발행 API 동작 확인
 2. OAuth callback URL을 배포 도메인으로 재등록

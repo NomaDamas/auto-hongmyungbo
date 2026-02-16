@@ -1,0 +1,23 @@
+version: "3.9"
+services:
+  collector:
+    build: ./apps/collector
+    ports:
+      - "8090:8090"
+    environment:
+      - PORT=8090
+    volumes:
+      - collector_data:/app/data
+
+  dashboard:
+    build: ./apps/dashboard
+    ports:
+      - "8091:8091"
+    environment:
+      - PORT=8091
+      - COLLECTOR_URL=http://collector:8090
+    depends_on:
+      - collector
+
+volumes:
+  collector_data:

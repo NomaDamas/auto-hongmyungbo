@@ -44,3 +44,13 @@ npm run build
 1. `auto_hongmyungbo_frontend` repo 연결
 2. Build Command: `npm run build`
 3. Env 변수 입력 후 배포
+   - `NEXT_PUBLIC_API_URL=https://<backend-domain>`
+   - `NEXT_PUBLIC_ENABLE_ADS=false` (기본)
+
+## Docker 배포
+
+```bash
+cd frontend
+docker build -t hmb-frontend .
+docker run --rm -p 3000:3000 -e NEXT_PUBLIC_API_URL=http://localhost:8000 hmb-frontend
+```

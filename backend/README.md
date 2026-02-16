@@ -72,5 +72,14 @@ uv sync && uv run uvicorn app.main:app --host 0.0.0.0 --port $PORT
 필수 환경변수:
 
 - `OPENAI_API_KEY`
-- `ALLOWED_ORIGIN=https://<frontend-domain>`
+- `ALLOWED_ORIGIN=https://<frontend-domain>` 또는
+- `ALLOWED_ORIGINS=https://<frontend-domain>,https://<preview-domain>`
 - OAuth / Publish 관련 변수 (`.env.example` 참고)
+
+## Docker 배포
+
+```bash
+cd backend
+docker build -t hmb-backend .
+docker run --rm -p 8000:8000 --env-file .env hmb-backend
+```

@@ -6,8 +6,15 @@
 
 ```bash
 cd apps/collector
-pnpm install
-pnpm dev
+npm install
+npm run dev
+```
+
+## 배포
+
+```bash
+docker build -t hmb-collector .
+docker run --rm -p 8090:8090 -e PORT=8090 hmb-collector
 ```
 
 ## 엔드포인트

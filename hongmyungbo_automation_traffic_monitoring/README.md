@@ -39,8 +39,32 @@ pnpm dev
 ## 배포
 
 1. collector -> Railway/Render/Fly.io
-2. dashboard -> Vercel 또는 Node 서버
-3. collector URL을 dashboard fetch URL로 연결
+2. dashboard -> Railway/Render/Vercel(Node 런타임)
+3. collector URL을 dashboard의 `COLLECTOR_URL`로 연결
+
+## Docker Compose (로컬/서버)
+
+```bash
+cd hongmyungbo_automation_traffic_monitoring
+docker compose up --build
+```
+
+- collector: `http://localhost:8090`
+- dashboard: `http://localhost:8091`
+
+## 단독 Docker 배포
+
+```bash
+# collector
+cd apps/collector
+docker build -t hmb-collector .
+docker run --rm -p 8090:8090 -e PORT=8090 hmb-collector
+
+# dashboard
+cd ../dashboard
+docker build -t hmb-dashboard .
+docker run --rm -p 8091:8091 -e PORT=8091 -e COLLECTOR_URL=http://host.docker.internal:8090 hmb-dashboard
+```
 
 ## GitHub
 

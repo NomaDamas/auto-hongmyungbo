@@ -50,7 +50,7 @@
         const ctr = document.getElementById('ctr').value;
         const cpc = document.getElementById('cpc').value;
         const fillRate = document.getElementById('fillRate').value;
-        const res = await fetch(`http://localhost:8090/api/summary?days=14&cpm=${cpm}&ctr=${ctr}&cpc=${cpc}&fillRate=${fillRate}&slotsPerPage=2`);
+        const res = await fetch(`/api/summary?days=14&cpm=${cpm}&ctr=${ctr}&cpc=${cpc}&fillRate=${fillRate}&slotsPerPage=2`);
         const data = await res.json();
 
         document.getElementById('kpis').innerHTML = [

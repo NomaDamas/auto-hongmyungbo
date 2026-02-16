@@ -200,11 +200,20 @@ class AnalyticsSummaryResponse(BaseModel):
     revenueEstimate: RevenueEstimate
 
 
+def _parse_allowed_origins() -> List[str]:
+    raw = os.getenv("ALLOWED_ORIGINS")
+    if raw:
+        origins = [part.strip() for part in raw.split(",") if part.strip()]
+        if origins:
+            return origins
+    return [os.getenv("ALLOWED_ORIGIN", "http://localhost:3000")]
+
+
 app = FastAPI(title="Cross Posting Agent API", version="0.2.0")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[os.getenv("ALLOWED_ORIGIN", "http://localhost:3000")],
+    allow_origins=_parse_allowed_origins(),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
