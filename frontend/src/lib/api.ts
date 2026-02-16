@@ -1,4 +1,14 @@
-import type { GenerateResponse, GeneratedCard, LanguageOption, ModelOption, Platform, PublishJob, UserProfile } from "@/lib/types";
+import type {
+  AnalyticsEventPayload,
+  AnalyticsSummary,
+  GenerateResponse,
+  GeneratedCard,
+  LanguageOption,
+  ModelOption,
+  Platform,
+  PublishJob,
+  UserProfile,
+} from "@/lib/types";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
@@ -109,4 +119,35 @@ export async function transcribeAudio(file: Blob): Promise<string> {
 
   const data = await res.json();
   return data.text as string;
+}
+
+export async function trackAnalyticsEvent(payload: AnalyticsEventPayload): Promise<void> {
+  await fetch(`${API_URL}/api/analytics/events`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function getAnalyticsSummary(params?: {
+  days?: number;
+  cpm?: number;
+  ctr?: number;
+  cpc?: number;
+  fillRate?: number;
+  slotsPerPage?: number;
+}): Promise<AnalyticsSummary> {
+  const qp = new URLSearchParams();
+  if (params?.days !== undefined) qp.set("days", String(params.days));
+  if (params?.cpm !== undefined) qp.set("cpm", String(params.cpm));
+  if (params?.ctr !== undefined) qp.set("ctr", String(params.ctr));
+  if (params?.cpc !== undefined) qp.set("cpc", String(params.cpc));
+  if (params?.fillRate !== undefined) qp.set("fillRate", String(params.fillRate));
+  if (params?.slotsPerPage !== undefined) qp.set("slotsPerPage", String(params.slotsPerPage));
+
+  const res = await fetch(`${API_URL}/api/analytics/summary?${qp.toString()}`);
+  if (!res.ok) {
+    throw new Error("트래픽 요약 조회 실패");
+  }
+  return (await res.json()) as AnalyticsSummary;
 }

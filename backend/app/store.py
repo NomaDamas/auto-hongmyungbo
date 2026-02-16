@@ -79,6 +79,24 @@ def init_db() -> None:
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL
             );
+
+            CREATE TABLE IF NOT EXISTS traffic_events (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                session_id TEXT,
+                event_type TEXT NOT NULL,
+                platform TEXT,
+                path TEXT,
+                user_agent TEXT,
+                referrer TEXT,
+                meta_json TEXT NOT NULL,
+                created_at TEXT NOT NULL
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_traffic_events_created_at
+            ON traffic_events(created_at);
+
+            CREATE INDEX IF NOT EXISTS idx_traffic_events_type_created_at
+            ON traffic_events(event_type, created_at);
             """
         )
         _conn.commit()
@@ -319,3 +337,90 @@ def get_job(job_id: int) -> Optional[Dict[str, Any]]:
     result_json = data.pop("result_json", None)
     data["result"] = json.loads(result_json) if result_json else None
     return data
+
+
+def create_traffic_event(
+    event_type: str,
+    session_id: Optional[str] = None,
+    platform: Optional[str] = None,
+    path: Optional[str] = None,
+    user_agent: Optional[str] = None,
+    referrer: Optional[str] = None,
+    meta: Optional[Dict[str, Any]] = None,
+) -> int:
+    with _lock:
+        cur = _conn.cursor()
+        cur.execute(
+            """
+            INSERT INTO traffic_events(
+                session_id, event_type, platform, path, user_agent, referrer, meta_json, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                session_id,
+                event_type,
+                platform,
+                path,
+                user_agent,
+                referrer,
+                json.dumps(meta or {}),
+                _utc_now(),
+            ),
+        )
+        _conn.commit()
+        return int(cur.lastrowid)
+
+
+def get_traffic_summary(days: int) -> Dict[str, Any]:
+    with _lock:
+        cur = _conn.cursor()
+        rows = cur.execute(
+            """
+            SELECT
+                substr(created_at, 1, 10) AS day,
+                COUNT(*) AS total_events,
+                SUM(CASE WHEN event_type = 'page_view' THEN 1 ELSE 0 END) AS page_views,
+                SUM(CASE WHEN event_type = 'generate' THEN 1 ELSE 0 END) AS generate_count,
+                SUM(CASE WHEN event_type = 'refine' THEN 1 ELSE 0 END) AS refine_count,
+                SUM(CASE WHEN event_type = 'accept' THEN 1 ELSE 0 END) AS accept_count,
+                SUM(CASE WHEN event_type = 'reject' THEN 1 ELSE 0 END) AS reject_count,
+                SUM(CASE WHEN event_type = 'publish' THEN 1 ELSE 0 END) AS publish_count
+            FROM traffic_events
+            WHERE datetime(created_at) >= datetime('now', ?)
+            GROUP BY substr(created_at, 1, 10)
+            ORDER BY day ASC
+            """,
+            (f"-{int(days)} days",),
+        ).fetchall()
+
+    daily = []
+    totals = {
+        "totalEvents": 0,
+        "pageViews": 0,
+        "generateCount": 0,
+        "refineCount": 0,
+        "acceptCount": 0,
+        "rejectCount": 0,
+        "publishCount": 0,
+    }
+    for row in rows:
+        item = {
+            "day": row["day"],
+            "totalEvents": int(row["total_events"] or 0),
+            "pageViews": int(row["page_views"] or 0),
+            "generateCount": int(row["generate_count"] or 0),
+            "refineCount": int(row["refine_count"] or 0),
+            "acceptCount": int(row["accept_count"] or 0),
+            "rejectCount": int(row["reject_count"] or 0),
+            "publishCount": int(row["publish_count"] or 0),
+        }
+        daily.append(item)
+        totals["totalEvents"] += item["totalEvents"]
+        totals["pageViews"] += item["pageViews"]
+        totals["generateCount"] += item["generateCount"]
+        totals["refineCount"] += item["refineCount"]
+        totals["acceptCount"] += item["acceptCount"]
+        totals["rejectCount"] += item["rejectCount"]
+        totals["publishCount"] += item["publishCount"]
+
+    return {"daily": daily, "totals": totals}

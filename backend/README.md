@@ -27,9 +27,23 @@ uv run uvicorn app.main:app --reload --port 8000
 - `POST /api/cards/{card_id}/status`
 - `POST /api/publish`
 - `GET /api/jobs/{job_id}`
+- `POST /api/analytics/events`
+- `GET /api/analytics/summary`
 - `GET /api/oauth/{platform}/connect`
 - `GET /api/oauth/{platform}/callback`
 - `GET /health`
+
+## Traffic/Revenue Monitor
+
+- 프론트에서 `POST /api/analytics/events`로 사용자 이벤트를 수집합니다.
+- `GET /api/analytics/summary`는 기간 내 트래픽 집계 + 예상 광고수익을 반환합니다.
+- 수익 추정 파라미터:
+  - `days` (기본 14)
+  - `cpm` (기본 1.8)
+  - `ctr` (기본 0.012)
+  - `cpc` (기본 0.18)
+  - `fillRate` (기본 0.65, 0~1)
+  - `slotsPerPage` (기본 2)
 
 ## Publish Config
 
@@ -46,3 +60,17 @@ uv run uvicorn app.main:app --reload --port 8000
 2. Client ID/Secret이 `.env`와 콘솔 설정에 일치하는지 확인
 3. 플랫폼 앱 권한(scope) 활성화 여부 확인
 4. 실패 시 백엔드 로그의 token exchange 에러 payload 확인
+
+## 배포 (Railway/Render)
+
+Start Command:
+
+```bash
+uv sync && uv run uvicorn app.main:app --host 0.0.0.0 --port $PORT
+```
+
+필수 환경변수:
+
+- `OPENAI_API_KEY`
+- `ALLOWED_ORIGIN=https://<frontend-domain>`
+- OAuth / Publish 관련 변수 (`.env.example` 참고)

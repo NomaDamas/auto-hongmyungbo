@@ -11,7 +11,7 @@ from typing import Any, Dict, List, Optional
 from urllib.parse import urlencode
 
 import httpx
-from fastapi import FastAPI, File, HTTPException, Query, UploadFile
+from fastapi import FastAPI, File, HTTPException, Query, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from openai import AsyncOpenAI
 from pydantic import BaseModel, Field
@@ -150,6 +150,54 @@ class JobResponse(BaseModel):
 class OAuthConnectResponse(BaseModel):
     authUrl: str
     state: str
+
+
+class AnalyticsEventRequest(BaseModel):
+    eventType: str = Field(min_length=2, max_length=64)
+    sessionId: Optional[str] = Field(default=None, max_length=128)
+    platform: Optional[Platform] = None
+    path: Optional[str] = Field(default=None, max_length=255)
+    referrer: Optional[str] = Field(default=None, max_length=1024)
+    meta: Dict[str, Any] = Field(default_factory=dict)
+
+
+class DailyTrafficPoint(BaseModel):
+    day: str
+    totalEvents: int
+    pageViews: int
+    generateCount: int
+    refineCount: int
+    acceptCount: int
+    rejectCount: int
+    publishCount: int
+
+
+class TrafficTotals(BaseModel):
+    totalEvents: int
+    pageViews: int
+    generateCount: int
+    refineCount: int
+    acceptCount: int
+    rejectCount: int
+    publishCount: int
+
+
+class RevenueEstimate(BaseModel):
+    impressions: int
+    estimatedClicks: int
+    cpmBasedRevenue: float
+    cpcBasedRevenue: float
+    estimatedRevenue: float
+    avgDailyRevenue: float
+    projectedMonthlyRevenue: float
+    assumptions: Dict[str, float]
+
+
+class AnalyticsSummaryResponse(BaseModel):
+    windowDays: int
+    totals: TrafficTotals
+    daily: List[DailyTrafficPoint]
+    revenueEstimate: RevenueEstimate
 
 
 app = FastAPI(title="Cross Posting Agent API", version="0.2.0")
@@ -654,6 +702,68 @@ async def get_job(job_id: int) -> JobResponse:
         payload=job["payload"],
         result=job["result"],
         error=job.get("error"),
+    )
+
+
+@app.post("/api/analytics/events")
+async def track_event(req: AnalyticsEventRequest, request: Request) -> Dict[str, Any]:
+    event_type = req.eventType.strip().lower().replace(" ", "_")
+    if not event_type:
+        raise HTTPException(status_code=400, detail="eventType is required")
+
+    event_id = store.create_traffic_event(
+        event_type=event_type,
+        session_id=(req.sessionId or "").strip() or None,
+        platform=req.platform.value if req.platform else None,
+        path=(req.path or "").strip() or None,
+        user_agent=request.headers.get("user-agent"),
+        referrer=(req.referrer or request.headers.get("referer") or "").strip() or None,
+        meta=req.meta,
+    )
+    return {"ok": True, "eventId": event_id}
+
+
+@app.get("/api/analytics/summary", response_model=AnalyticsSummaryResponse)
+async def get_analytics_summary(
+    days: int = Query(14, ge=1, le=90),
+    cpm: float = Query(1.8, ge=0),
+    ctr: float = Query(0.012, ge=0, le=1),
+    cpc: float = Query(0.18, ge=0),
+    fillRate: float = Query(0.65, ge=0, le=1),
+    slotsPerPage: int = Query(2, ge=1, le=10),
+) -> AnalyticsSummaryResponse:
+    summary = store.get_traffic_summary(days)
+    totals = summary["totals"]
+    daily = summary["daily"]
+
+    impressions = int(round(float(totals["pageViews"]) * float(slotsPerPage) * float(fillRate)))
+    estimated_clicks = int(round(float(impressions) * float(ctr)))
+    cpm_based_revenue = round((impressions / 1000.0) * float(cpm), 4)
+    cpc_based_revenue = round(float(estimated_clicks) * float(cpc), 4)
+    estimated_revenue = round(max(cpm_based_revenue, cpc_based_revenue), 4)
+    avg_daily = round(estimated_revenue / float(days), 4)
+    projected_monthly = round(avg_daily * 30.0, 4)
+
+    return AnalyticsSummaryResponse(
+        windowDays=days,
+        totals=TrafficTotals(**totals),
+        daily=[DailyTrafficPoint(**row) for row in daily],
+        revenueEstimate=RevenueEstimate(
+            impressions=impressions,
+            estimatedClicks=estimated_clicks,
+            cpmBasedRevenue=cpm_based_revenue,
+            cpcBasedRevenue=cpc_based_revenue,
+            estimatedRevenue=estimated_revenue,
+            avgDailyRevenue=avg_daily,
+            projectedMonthlyRevenue=projected_monthly,
+            assumptions={
+                "cpm": float(cpm),
+                "ctr": float(ctr),
+                "cpc": float(cpc),
+                "fillRate": float(fillRate),
+                "slotsPerPage": float(slotsPerPage),
+            },
+        ),
     )
 
 

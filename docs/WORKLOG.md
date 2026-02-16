@@ -31,6 +31,14 @@
   - `README.md`
   - `docs/MONOREPO_GITHUB.md`
   - `docs/PUBLISH_ENV_CHECKLIST.md`
+- 트래픽/수익 모니터링 추가
+  - 이벤트 수집 API: `POST /api/analytics/events`
+  - 집계/추정 API: `GET /api/analytics/summary`
+  - 프론트 모니터 패널(가정값: CPM/FillRate/Slots)
+- 광고 모듈 기본 비활성 토글 추가 (`NEXT_PUBLIC_ENABLE_ADS=false`)
+- 별도 최상위 모노레포 스캐폴딩 생성
+  - `hongmyungbo_automation_traffic_monitoring/`
+  - `apps/collector`, `apps/dashboard`, `packages/shared`
 
 ### In Progress
 

@@ -1,0 +1,10 @@
+{
+  "name": "hongmyungbo-automation-traffic-monitoring",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "dev": "pnpm --parallel --filter collector --filter dashboard dev",
+    "dev:collector": "pnpm --filter collector dev",
+    "dev:dashboard": "pnpm --filter dashboard dev"
+  }
+}

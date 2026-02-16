@@ -17,6 +17,12 @@
 │   ├── MONOREPO_GITHUB.md
 │   ├── PUBLISH_ENV_CHECKLIST.md
 │   └── WORKLOG.md
+├── hongmyungbo_automation_traffic_monitoring
+│   ├── apps
+│   │   ├── collector
+│   │   └── dashboard
+│   └── packages
+│       └── shared
 └── frontend
     ├── src
     │   ├── app
@@ -55,6 +61,21 @@ npm run dev
 ### 3) 접속
 
 - `http://localhost:3000`
+
+## 광고(AdSense) 모듈 (기본 OFF)
+
+광고 코드는 모듈로 포함되어 있고 기본값은 비활성입니다.  
+추후 수익화를 시작할 때만 아래 값을 설정해 활성화하세요.
+
+```bash
+NEXT_PUBLIC_ENABLE_ADS=true
+NEXT_PUBLIC_ADSENSE_CLIENT=ca-pub-xxxxxxxxxxxxxxxx
+NEXT_PUBLIC_ADSENSE_SLOT_SIDEBAR=1234567890
+NEXT_PUBLIC_ADSENSE_SLOT_FOOTER=0987654321
+```
+
+- 기본 비활성: `NEXT_PUBLIC_ENABLE_ADS=false` 또는 미설정
+- 실제 광고 수익화는 AdSense 승인 도메인에서만 가능합니다.
 
 ## 실행 메뉴얼 (재실행 포함)
 
@@ -96,8 +117,20 @@ npm run dev
 - `POST /api/stt`: 음성 파일 -> 텍스트 변환
 - `POST /api/publish`: 발행 작업 큐 등록
 - `GET /api/jobs/{job_id}`: 큐 상태 조회
+- `POST /api/analytics/events`: 사용자 트래픽 이벤트 수집
+- `GET /api/analytics/summary`: 기간별 트래픽/예상 광고수익 집계
 - `GET /api/oauth/{platform}/connect`: OAuth 연결 URL 생성
 - `GET /api/oauth/{platform}/callback`: OAuth 콜백 + access token 저장
+
+## Traffic & Revenue Monitor
+
+- 프론트에서 `page_view / generate / refine / accept / reject / publish` 이벤트를 백엔드로 전송합니다.
+- 대시보드에서 아래 가정값으로 예상 광고수익을 즉시 계산합니다.
+  - `CPM`
+  - `CTR`
+  - `CPC`
+  - `Fill Rate`
+  - `Ad Slots / Page`
 
 ## Frontend UX
 
@@ -126,3 +159,33 @@ npm run dev
 - 작업 로그(지속 관리): `docs/WORKLOG.md`
 - 모노레포 최초 푸시 스크립트: `scripts/init_monorepo_github.sh`
 - frontend/backend 분리 푸시 스크립트: `scripts/push_split_repos.sh`
+
+## 배포 가이드 (권장)
+
+### 1) Frontend 배포 (Vercel)
+
+1. `auto_hongmyungbo_frontend` repo를 Vercel에 연결
+2. Build Command: `npm run build`
+3. Env 설정:
+   - `NEXT_PUBLIC_API_URL=https://<backend-domain>`
+   - `NEXT_PUBLIC_ENABLE_ADS=false` (기본)
+   - `NEXT_PUBLIC_ADSENSE_CLIENT` (선택)
+   - `NEXT_PUBLIC_ADSENSE_SLOT_SIDEBAR` (선택)
+   - `NEXT_PUBLIC_ADSENSE_SLOT_FOOTER` (선택)
+
+### 2) Backend 배포 (Railway 또는 Render)
+
+1. `auto_hongmyungbo_backend` repo를 서비스에 연결
+2. Start Command:
+   - `uv sync && uv run uvicorn app.main:app --host 0.0.0.0 --port $PORT`
+3. Env 설정:
+   - `OPENAI_API_KEY`
+   - OAuth / Publish 관련 환경변수 (`backend/.env.example` 참고)
+4. CORS:
+   - `ALLOWED_ORIGIN=https://<frontend-domain>`
+
+### 3) 배포 후 점검
+
+1. 생성/수정/발행 API 동작 확인
+2. OAuth callback URL을 배포 도메인으로 재등록
+3. AdSense 도메인 승인 및 광고 노출 확인
