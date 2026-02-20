@@ -1,5 +1,6 @@
 # AI 기반 소셜 미디어 크로스 포스팅 에이전트 (Prototype)
-<img width="1536" height="1024" alt="image" src="https://github.com/user-attachments/assets/c29d3efe-4f82-4f50-8bf1-7a0904cdd1fc" />
+<img width="1536" height="1024" alt="image" src="https://github.com/user-attachments/assets/5e88f6c0-8d65-4488-a36e-a1dbd0903685" />
+
 
 하나의 Draft를 입력하면 Reddit/LinkedIn/X/Instagram/Blog 형식으로 병렬 생성하고,
 카드 단위 Review(Accept/Reject/Edit), Voice Refinement(STT), 버전 히스토리(Undo/Redo), DB 저장, Publish Queue까지 수행하는 프로토타입입니다.
