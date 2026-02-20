@@ -27,8 +27,14 @@ uv run uvicorn app.main:app --reload --port 8000
 - `POST /api/cards/{card_id}/status`
 - `POST /api/publish`
 - `GET /api/jobs/{job_id}`
+- `GET /api/publish/logs` (로그인 사용자 발행 기록)
+- `GET /api/threads` (플랫폼별 스레드 기록)
 - `POST /api/analytics/events`
 - `GET /api/analytics/summary`
+- `GET /api/auth/me`
+- `POST /api/auth/logout`
+- `GET /api/auth/{provider}/connect` (`google|kakao|naver`)
+- `GET /api/auth/{provider}/callback`
 - `GET /api/oauth/{platform}/connect`
 - `GET /api/oauth/{platform}/callback`
 - `GET /health`
@@ -75,6 +81,7 @@ uv sync && uv run uvicorn app.main:app --host 0.0.0.0 --port $PORT
 - `ALLOWED_ORIGIN=https://<frontend-domain>` 또는
 - `ALLOWED_ORIGINS=https://<frontend-domain>,https://<preview-domain>`
 - OAuth / Publish 관련 변수 (`.env.example` 참고)
+- 소셜 로그인 변수: `GOOGLE_*`, `KAKAO_*`, `NAVER_*`
 
 ## Docker 배포
 

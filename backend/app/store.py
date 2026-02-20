@@ -2,7 +2,7 @@ import json
 import os
 import sqlite3
 import threading
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
 DB_PATH = os.getenv("DB_PATH", "./app.db")
@@ -16,11 +16,55 @@ def _utc_now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def _ensure_column(table: str, column: str, definition: str) -> None:
+    cur = _conn.cursor()
+    cols = {row["name"] for row in cur.execute(f"PRAGMA table_info({table})").fetchall()}
+    if column not in cols:
+        cur.execute(f"ALTER TABLE {table} ADD COLUMN {column} {definition}")
+
+
 def init_db() -> None:
     with _lock:
         cur = _conn.cursor()
         cur.executescript(
             """
+            CREATE TABLE IF NOT EXISTS users (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT,
+                email TEXT,
+                avatar_url TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS auth_identities (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                provider TEXT NOT NULL,
+                provider_user_id TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                UNIQUE(provider, provider_user_id),
+                FOREIGN KEY(user_id) REFERENCES users(id)
+            );
+
+            CREATE TABLE IF NOT EXISTS user_sessions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                session_token TEXT NOT NULL UNIQUE,
+                expires_at TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                FOREIGN KEY(user_id) REFERENCES users(id)
+            );
+
+            CREATE TABLE IF NOT EXISTS social_auth_states (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                state TEXT NOT NULL UNIQUE,
+                provider TEXT NOT NULL,
+                redirect_uri TEXT NOT NULL,
+                created_at TEXT NOT NULL
+            );
+
             CREATE TABLE IF NOT EXISTS drafts (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 raw_text TEXT NOT NULL,
@@ -60,6 +104,18 @@ def init_db() -> None:
                 updated_at TEXT NOT NULL
             );
 
+            CREATE TABLE IF NOT EXISTS user_oauth_tokens (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                platform TEXT NOT NULL,
+                access_token TEXT NOT NULL,
+                refresh_token TEXT,
+                expires_at TEXT,
+                updated_at TEXT NOT NULL,
+                UNIQUE(user_id, platform),
+                FOREIGN KEY(user_id) REFERENCES users(id)
+            );
+
             CREATE TABLE IF NOT EXISTS oauth_states (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 state TEXT NOT NULL UNIQUE,
@@ -78,6 +134,24 @@ def init_db() -> None:
                 error TEXT,
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS publish_logs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER,
+                draft_id INTEGER,
+                card_id INTEGER,
+                platform TEXT NOT NULL,
+                title TEXT,
+                body TEXT,
+                post_id TEXT,
+                post_url TEXT,
+                status TEXT NOT NULL,
+                error_text TEXT,
+                created_at TEXT NOT NULL,
+                FOREIGN KEY(user_id) REFERENCES users(id),
+                FOREIGN KEY(draft_id) REFERENCES drafts(id),
+                FOREIGN KEY(card_id) REFERENCES cards(id)
             );
 
             CREATE TABLE IF NOT EXISTS traffic_events (
@@ -99,16 +173,130 @@ def init_db() -> None:
             ON traffic_events(event_type, created_at);
             """
         )
+
+        _ensure_column("drafts", "user_id", "INTEGER")
+        _ensure_column("jobs", "user_id", "INTEGER")
+        _ensure_column("jobs", "run_at", "TEXT")
+
         _conn.commit()
 
 
-def create_draft(raw_text: str) -> int:
+def create_or_get_user_by_identity(
+    provider: str,
+    provider_user_id: str,
+    name: Optional[str],
+    email: Optional[str],
+    avatar_url: Optional[str],
+) -> Dict[str, Any]:
+    with _lock:
+        cur = _conn.cursor()
+        row = cur.execute(
+            "SELECT u.* FROM users u JOIN auth_identities a ON a.user_id = u.id WHERE a.provider = ? AND a.provider_user_id = ?",
+            (provider, provider_user_id),
+        ).fetchone()
+        if row:
+            cur.execute(
+                "UPDATE users SET name = ?, email = ?, avatar_url = ?, updated_at = ? WHERE id = ?",
+                (name, email, avatar_url, _utc_now(), row["id"]),
+            )
+            _conn.commit()
+            return dict(cur.execute("SELECT * FROM users WHERE id = ?", (row["id"],)).fetchone())
+
+        now = _utc_now()
+        cur.execute(
+            "INSERT INTO users(name, email, avatar_url, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
+            (name, email, avatar_url, now, now),
+        )
+        user_id = int(cur.lastrowid)
+        cur.execute(
+            "INSERT INTO auth_identities(user_id, provider, provider_user_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
+            (user_id, provider, provider_user_id, now, now),
+        )
+        _conn.commit()
+        return dict(cur.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone())
+
+
+def create_user_session(user_id: int, ttl_days: int = 30) -> str:
+    import secrets
+
+    token = secrets.token_urlsafe(48)
+    expires_at = (datetime.now(timezone.utc) + timedelta(days=ttl_days)).isoformat()
+    with _lock:
+        cur = _conn.cursor()
+        cur.execute(
+            "INSERT INTO user_sessions(user_id, session_token, expires_at, created_at) VALUES (?, ?, ?, ?)",
+            (user_id, token, expires_at, _utc_now()),
+        )
+        _conn.commit()
+    return token
+
+
+def get_user_by_session(token: str) -> Optional[Dict[str, Any]]:
+    with _lock:
+        cur = _conn.cursor()
+        row = cur.execute(
+            """
+            SELECT u.*, s.expires_at AS session_expires_at
+            FROM user_sessions s
+            JOIN users u ON u.id = s.user_id
+            WHERE s.session_token = ?
+            """,
+            (token,),
+        ).fetchone()
+        if not row:
+            return None
+
+        expires_at = row["session_expires_at"]
+        if expires_at and datetime.fromisoformat(expires_at) < datetime.now(timezone.utc):
+            cur.execute("DELETE FROM user_sessions WHERE session_token = ?", (token,))
+            _conn.commit()
+            return None
+
+        return {
+            "id": row["id"],
+            "name": row["name"],
+            "email": row["email"],
+            "avatar_url": row["avatar_url"],
+            "created_at": row["created_at"],
+            "updated_at": row["updated_at"],
+        }
+
+
+def delete_user_session(token: str) -> None:
+    with _lock:
+        cur = _conn.cursor()
+        cur.execute("DELETE FROM user_sessions WHERE session_token = ?", (token,))
+        _conn.commit()
+
+
+def create_social_auth_state(state: str, provider: str, redirect_uri: str) -> None:
+    with _lock:
+        cur = _conn.cursor()
+        cur.execute(
+            "INSERT INTO social_auth_states(state, provider, redirect_uri, created_at) VALUES (?, ?, ?, ?)",
+            (state, provider, redirect_uri, _utc_now()),
+        )
+        _conn.commit()
+
+
+def pop_social_auth_state(state: str) -> Optional[Dict[str, Any]]:
+    with _lock:
+        cur = _conn.cursor()
+        row = cur.execute("SELECT * FROM social_auth_states WHERE state = ?", (state,)).fetchone()
+        if not row:
+            return None
+        cur.execute("DELETE FROM social_auth_states WHERE state = ?", (state,))
+        _conn.commit()
+    return dict(row)
+
+
+def create_draft(raw_text: str, user_id: Optional[int] = None) -> int:
     with _lock:
         now = _utc_now()
         cur = _conn.cursor()
         cur.execute(
-            "INSERT INTO drafts(raw_text, created_at) VALUES (?, ?)",
-            (raw_text, now),
+            "INSERT INTO drafts(raw_text, user_id, created_at) VALUES (?, ?, ?)",
+            (raw_text, user_id, now),
         )
         _conn.commit()
         return int(cur.lastrowid)
@@ -248,6 +436,43 @@ def get_oauth_token(platform: str) -> Optional[Dict[str, Any]]:
     return dict(row)
 
 
+def upsert_user_oauth_token(
+    user_id: int,
+    platform: str,
+    access_token: str,
+    refresh_token: Optional[str],
+    expires_at: Optional[str],
+) -> None:
+    with _lock:
+        cur = _conn.cursor()
+        cur.execute(
+            """
+            INSERT INTO user_oauth_tokens(user_id, platform, access_token, refresh_token, expires_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?)
+            ON CONFLICT(user_id, platform)
+            DO UPDATE SET
+                access_token = excluded.access_token,
+                refresh_token = excluded.refresh_token,
+                expires_at = excluded.expires_at,
+                updated_at = excluded.updated_at
+            """,
+            (user_id, platform, access_token, refresh_token, expires_at, _utc_now()),
+        )
+        _conn.commit()
+
+
+def get_user_oauth_token(user_id: int, platform: str) -> Optional[Dict[str, Any]]:
+    with _lock:
+        cur = _conn.cursor()
+        row = cur.execute(
+            "SELECT * FROM user_oauth_tokens WHERE user_id = ? AND platform = ?",
+            (user_id, platform),
+        ).fetchone()
+        if not row:
+            return None
+    return dict(row)
+
+
 def create_oauth_state(state: str, platform: str, redirect_uri: str, code_verifier: Optional[str]) -> None:
     with _lock:
         cur = _conn.cursor()
@@ -272,23 +497,30 @@ def pop_oauth_state(state: str) -> Optional[Dict[str, Any]]:
     return dict(row)
 
 
-def create_job(job_type: str, payload: Dict[str, Any]) -> int:
+def create_job(job_type: str, payload: Dict[str, Any], user_id: Optional[int] = None, run_at: Optional[str] = None) -> tuple[int, str]:
     with _lock:
         now = _utc_now()
+        status = "scheduled" if run_at else "queued"
         cur = _conn.cursor()
         cur.execute(
-            "INSERT INTO jobs(type, status, payload_json, created_at, updated_at) VALUES (?, 'queued', ?, ?, ?)",
-            (job_type, json.dumps(payload), now, now),
+            "INSERT INTO jobs(type, status, payload_json, user_id, run_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (job_type, status, json.dumps(payload), user_id, run_at, now, now),
         )
         _conn.commit()
-        return int(cur.lastrowid)
+        return int(cur.lastrowid), status
 
 
 def get_next_queued_job() -> Optional[Dict[str, Any]]:
     with _lock:
         cur = _conn.cursor()
         row = cur.execute(
-            "SELECT * FROM jobs WHERE status = 'queued' ORDER BY id ASC LIMIT 1"
+            """
+            SELECT * FROM jobs
+            WHERE status = 'queued'
+               OR (status = 'scheduled' AND run_at IS NOT NULL AND datetime(run_at) <= datetime('now'))
+            ORDER BY COALESCE(run_at, created_at) ASC, id ASC
+            LIMIT 1
+            """
         ).fetchone()
         if not row:
             return None
@@ -337,6 +569,80 @@ def get_job(job_id: int) -> Optional[Dict[str, Any]]:
     result_json = data.pop("result_json", None)
     data["result"] = json.loads(result_json) if result_json else None
     return data
+
+
+def create_publish_log(
+    user_id: Optional[int],
+    draft_id: Optional[int],
+    card_id: Optional[int],
+    platform: str,
+    title: Optional[str],
+    body: Optional[str],
+    result: Dict[str, Any],
+) -> int:
+    with _lock:
+        cur = _conn.cursor()
+        cur.execute(
+            """
+            INSERT INTO publish_logs(
+              user_id, draft_id, card_id, platform, title, body, post_id, post_url, status, error_text, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                user_id,
+                draft_id,
+                card_id,
+                platform,
+                title,
+                body,
+                result.get("postId"),
+                result.get("url"),
+                "success" if result.get("ok") else "failed",
+                json.dumps(result.get("error") or result.get("message") or "") if not result.get("ok") else None,
+                _utc_now(),
+            ),
+        )
+        _conn.commit()
+        return int(cur.lastrowid)
+
+
+def list_publish_logs(user_id: int, limit: int = 100) -> List[Dict[str, Any]]:
+    with _lock:
+        cur = _conn.cursor()
+        rows = cur.execute(
+            """
+            SELECT id, user_id, draft_id, card_id, platform, title, body, post_id, post_url, status, error_text, created_at
+            FROM publish_logs
+            WHERE user_id = ?
+            ORDER BY id DESC
+            LIMIT ?
+            """,
+            (user_id, int(limit)),
+        ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def list_threads_by_platform(user_id: int, limit_per_platform: int = 20) -> Dict[str, List[Dict[str, Any]]]:
+    with _lock:
+        cur = _conn.cursor()
+        rows = cur.execute(
+            """
+            SELECT platform, id, draft_id, card_id, title, body, post_id, post_url, status, created_at
+            FROM publish_logs
+            WHERE user_id = ?
+            ORDER BY created_at DESC
+            """,
+            (user_id,),
+        ).fetchall()
+
+    grouped: Dict[str, List[Dict[str, Any]]] = {}
+    for row in rows:
+        d = dict(row)
+        p = d["platform"]
+        grouped.setdefault(p, [])
+        if len(grouped[p]) < limit_per_platform:
+            grouped[p].append(d)
+    return grouped
 
 
 def create_traffic_event(

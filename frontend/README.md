@@ -27,6 +27,9 @@ npm run build
 - 모델 선택 (`gpt-4o-mini`, `gpt-4o`, `gpt-4.1-mini`)
 - 출력 언어 선택 (`auto`, `korean`, `english`, `japanese`)
 - 플랫폼 선택 후 선택된 플랫폼만 생성/자동게시 옵션
+- 간편 로그인 (Google/Kakao/Naver)
+- 예약 발행 시간 옵션
+- 내 발행 로그/플랫폼별 스레드 조회
 - AdSlot 컴포넌트 (AdSense, 기본 비활성 모듈)
 - Traffic & Revenue Monitor 패널 (이벤트 집계 + 예상 광고수익)
 

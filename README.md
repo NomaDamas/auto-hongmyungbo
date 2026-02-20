@@ -104,7 +104,7 @@ npm run dev
 3. OAuth 연결 버튼 클릭 (LinkedIn/X/Instagram/Reddit)
 4. 카드 버전 히스토리(가로 슬라이드) 확인
 5. Undo/Redo로 버전 복원/재적용
-6. `Accepted 카드 발행` 클릭
+6. 필요 시 예약 시간 설정 후 `Accepted 카드 발행` 클릭
 7. 필요 시 `GET /api/jobs/{job_id}`로 발행 상태 확인
 
 ## Core APIs
@@ -117,8 +117,14 @@ npm run dev
 - `POST /api/stt`: 음성 파일 -> 텍스트 변환
 - `POST /api/publish`: 발행 작업 큐 등록
 - `GET /api/jobs/{job_id}`: 큐 상태 조회
+- `GET /api/publish/logs`: 로그인 사용자 발행 로그
+- `GET /api/threads`: 플랫폼별 발행 스레드
 - `POST /api/analytics/events`: 사용자 트래픽 이벤트 수집
 - `GET /api/analytics/summary`: 기간별 트래픽/예상 광고수익 집계
+- `GET /api/auth/me`: 현재 로그인 사용자
+- `POST /api/auth/logout`: 로그아웃
+- `GET /api/auth/{provider}/connect`: 간편 로그인 연결
+- `GET /api/auth/{provider}/callback`: 간편 로그인 콜백
 - `GET /api/oauth/{platform}/connect`: OAuth 연결 URL 생성
 - `GET /api/oauth/{platform}/callback`: OAuth 콜백 + access token 저장
 

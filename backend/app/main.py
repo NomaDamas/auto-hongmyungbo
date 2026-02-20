@@ -11,8 +11,9 @@ from typing import Any, Dict, List, Optional
 from urllib.parse import urlencode
 
 import httpx
-from fastapi import FastAPI, File, HTTPException, Query, Request, UploadFile
+from fastapi import FastAPI, File, HTTPException, Query, Request, Response, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import RedirectResponse
 from openai import AsyncOpenAI
 from pydantic import BaseModel, Field
 from dotenv import load_dotenv
@@ -28,6 +29,12 @@ class Platform(str, Enum):
     twitter = "twitter"
     instagram = "instagram"
     blog = "blog"
+
+
+class SocialProvider(str, Enum):
+    google = "google"
+    kakao = "kakao"
+    naver = "naver"
 
 
 PLATFORM_PROMPTS: Dict[Platform, str] = {
@@ -131,6 +138,7 @@ class PublishRequest(BaseModel):
     draftId: int
     cardIds: Optional[List[int]] = None
     acceptedOnly: bool = True
+    scheduledAt: Optional[str] = None
 
 
 class PublishResponse(BaseModel):
@@ -150,6 +158,32 @@ class JobResponse(BaseModel):
 class OAuthConnectResponse(BaseModel):
     authUrl: str
     state: str
+
+
+class UserInfo(BaseModel):
+    id: int
+    name: Optional[str] = None
+    email: Optional[str] = None
+    avatarUrl: Optional[str] = None
+
+
+class PublishLogItem(BaseModel):
+    id: int
+    draftId: Optional[int] = None
+    cardId: Optional[int] = None
+    platform: str
+    title: Optional[str] = None
+    body: Optional[str] = None
+    postId: Optional[str] = None
+    postUrl: Optional[str] = None
+    status: str
+    errorText: Optional[str] = None
+    createdAt: str
+
+
+class PlatformThread(BaseModel):
+    platform: str
+    items: List[PublishLogItem]
 
 
 class AnalyticsEventRequest(BaseModel):
@@ -224,6 +258,9 @@ DEFAULT_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
 DEFAULT_STT_MODEL = os.getenv("OPENAI_STT_MODEL", "gpt-4o-mini-transcribe")
 
 PUBLISH_WORKER_TASK: Optional[asyncio.Task] = None
+SESSION_COOKIE_NAME = "hmb_session"
+SESSION_TTL_DAYS = int(os.getenv("SESSION_TTL_DAYS", "30"))
+FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
 
 
 def build_style_block(platform: Platform, profile: Optional[UserProfile]) -> str:
@@ -270,6 +307,22 @@ def _expires_at_from_seconds(expires_in: Optional[int]) -> Optional[str]:
     return (datetime.now(timezone.utc) + timedelta(seconds=int(expires_in))).isoformat()
 
 
+def _get_current_user(request: Request, required: bool = False) -> Optional[Dict[str, Any]]:
+    token = request.cookies.get(SESSION_COOKIE_NAME, "")
+    if not token:
+        if required:
+            raise HTTPException(status_code=401, detail="Login required")
+        return None
+    user = store.get_user_by_session(token)
+    if not user and required:
+        raise HTTPException(status_code=401, detail="Session expired or invalid")
+    return user
+
+
+def _normalize_frontend_redirect() -> str:
+    return FRONTEND_URL.rstrip("/")
+
+
 async def generate_for_platform(
     platform: Platform,
     draft: str,
@@ -313,7 +366,11 @@ def _clip(value: str, max_len: int) -> str:
     return value if len(value) <= max_len else value[: max_len - 1] + "…"
 
 
-def _resolve_access_token(platform: str) -> Optional[str]:
+def _resolve_access_token(platform: str, user_id: Optional[int] = None) -> Optional[str]:
+    if user_id is not None:
+        user_token = store.get_user_oauth_token(user_id, platform)
+        if user_token and user_token.get("access_token"):
+            return str(user_token["access_token"])
     db_token = store.get_oauth_token(platform)
     if db_token and db_token.get("access_token"):
         return str(db_token["access_token"])
@@ -453,8 +510,8 @@ async def _publish_blog(http: httpx.AsyncClient, title: str, body: str) -> Dict[
     }
 
 
-async def publish_to_platform(platform: str, title: str, body: str) -> Dict[str, Any]:
-    token = _resolve_access_token(platform)
+async def publish_to_platform(platform: str, title: str, body: str, user_id: Optional[int] = None) -> Dict[str, Any]:
+    token = _resolve_access_token(platform, user_id=user_id)
     async with httpx.AsyncClient(timeout=20.0) as http:
         if platform == "linkedin":
             if not token:
@@ -499,9 +556,20 @@ async def publish_worker() -> None:
                 selected.append(c)
 
             results = []
+            user_id = job.get("user_id")
+            draft_id = payload.get("draftId")
             for card in selected:
-                result = await publish_to_platform(card["platform"], card["title"], card["body"])
+                result = await publish_to_platform(card["platform"], card["title"], card["body"], user_id=user_id)
                 results.append(result)
+                store.create_publish_log(
+                    user_id=user_id,
+                    draft_id=draft_id,
+                    card_id=card.get("id"),
+                    platform=card["platform"],
+                    title=card.get("title"),
+                    body=card.get("body"),
+                    result=result,
+                )
 
             store.finish_job(job["id"], {"published": results, "count": len(results)})
         except Exception as exc:  # noqa: BLE001
@@ -530,7 +598,7 @@ async def health() -> Dict[str, str]:
 
 
 @app.post("/api/generate", response_model=GenerateResponse)
-async def generate_content(req: GenerateRequest) -> GenerateResponse:
+async def generate_content(req: GenerateRequest, request: Request) -> GenerateResponse:
     if not req.draft.strip():
         raise HTTPException(status_code=400, detail="Draft cannot be empty")
 
@@ -541,7 +609,8 @@ async def generate_content(req: GenerateRequest) -> GenerateResponse:
     tasks = [generate_for_platform(platform, req.draft, req.userProfile, req.model, req.language) for platform in selected_platforms]
     cards = await asyncio.gather(*tasks)
 
-    draft_id = store.create_draft(req.draft)
+    user = _get_current_user(request, required=False)
+    draft_id = store.create_draft(req.draft, user_id=(int(user["id"]) if user else None))
     persisted: List[GeneratedCard] = []
     for card in cards:
         card_id = store.create_card(
@@ -686,16 +755,20 @@ async def transcribe_voice(file: UploadFile = File(...)) -> STTResponse:
 
 
 @app.post("/api/publish", response_model=PublishResponse)
-async def enqueue_publish(req: PublishRequest) -> PublishResponse:
-    job_id = store.create_job(
+async def enqueue_publish(req: PublishRequest, request: Request) -> PublishResponse:
+    user = _get_current_user(request, required=True)
+    scheduled_at = req.scheduledAt.strip() if req.scheduledAt else None
+    job_id, status = store.create_job(
         "publish",
         {
             "draftId": req.draftId,
             "cardIds": req.cardIds or [],
             "acceptedOnly": req.acceptedOnly,
         },
+        user_id=int(user["id"]),
+        run_at=scheduled_at,
     )
-    return PublishResponse(jobId=job_id, status="queued")
+    return PublishResponse(jobId=job_id, status=status)
 
 
 @app.get("/api/jobs/{job_id}", response_model=JobResponse)
@@ -720,6 +793,11 @@ async def track_event(req: AnalyticsEventRequest, request: Request) -> Dict[str,
     if not event_type:
         raise HTTPException(status_code=400, detail="eventType is required")
 
+    user = _get_current_user(request, required=False)
+    meta = dict(req.meta or {})
+    if user:
+        meta["userId"] = int(user["id"])
+
     event_id = store.create_traffic_event(
         event_type=event_type,
         session_id=(req.sessionId or "").strip() or None,
@@ -727,7 +805,7 @@ async def track_event(req: AnalyticsEventRequest, request: Request) -> Dict[str,
         path=(req.path or "").strip() or None,
         user_agent=request.headers.get("user-agent"),
         referrer=(req.referrer or request.headers.get("referer") or "").strip() or None,
-        meta=req.meta,
+        meta=meta,
     )
     return {"ok": True, "eventId": event_id}
 
@@ -776,8 +854,275 @@ async def get_analytics_summary(
     )
 
 
+@app.get("/api/publish/logs", response_model=List[PublishLogItem])
+async def get_publish_logs(request: Request, limit: int = Query(100, ge=1, le=500)) -> List[PublishLogItem]:
+    user = _get_current_user(request, required=True)
+    rows = store.list_publish_logs(int(user["id"]), limit=limit)
+    return [
+        PublishLogItem(
+            id=row["id"],
+            draftId=row.get("draft_id"),
+            cardId=row.get("card_id"),
+            platform=row["platform"],
+            title=row.get("title"),
+            body=row.get("body"),
+            postId=row.get("post_id"),
+            postUrl=row.get("post_url"),
+            status=row.get("status", "unknown"),
+            errorText=row.get("error_text"),
+            createdAt=row.get("created_at", ""),
+        )
+        for row in rows
+    ]
+
+
+@app.get("/api/threads", response_model=List[PlatformThread])
+async def get_threads(request: Request, limitPerPlatform: int = Query(20, ge=1, le=100)) -> List[PlatformThread]:
+    user = _get_current_user(request, required=True)
+    grouped = store.list_threads_by_platform(int(user["id"]), limit_per_platform=limitPerPlatform)
+    result: List[PlatformThread] = []
+    for platform, items in grouped.items():
+        result.append(
+            PlatformThread(
+                platform=platform,
+                items=[
+                    PublishLogItem(
+                        id=row["id"],
+                        draftId=row.get("draft_id"),
+                        cardId=row.get("card_id"),
+                        platform=row["platform"],
+                        title=row.get("title"),
+                        body=row.get("body"),
+                        postId=row.get("post_id"),
+                        postUrl=row.get("post_url"),
+                        status=row.get("status", "unknown"),
+                        errorText=row.get("error_text"),
+                        createdAt=row.get("created_at", ""),
+                    )
+                    for row in items
+                ],
+            )
+        )
+    return result
+
+
+@app.get("/api/auth/me", response_model=Optional[UserInfo])
+async def auth_me(request: Request) -> Optional[UserInfo]:
+    user = _get_current_user(request, required=False)
+    if not user:
+        return None
+    return UserInfo(
+        id=int(user["id"]),
+        name=user.get("name"),
+        email=user.get("email"),
+        avatarUrl=user.get("avatar_url"),
+    )
+
+
+@app.post("/api/auth/logout")
+async def auth_logout(request: Request, response: Response) -> Dict[str, bool]:
+    token = request.cookies.get(SESSION_COOKIE_NAME, "")
+    if token:
+        store.delete_user_session(token)
+    response.delete_cookie(SESSION_COOKIE_NAME, path="/")
+    return {"ok": True}
+
+
+@app.get("/api/auth/{provider}/connect", response_model=OAuthConnectResponse)
+async def social_connect(provider: SocialProvider, redirectUri: str = Query(..., min_length=1)) -> OAuthConnectResponse:
+    state = secrets.token_urlsafe(24)
+    store.create_social_auth_state(state, provider.value, redirectUri)
+
+    if provider == SocialProvider.google:
+        client_id = os.getenv("GOOGLE_CLIENT_ID", "")
+        if not client_id:
+            raise HTTPException(status_code=400, detail="Missing GOOGLE_CLIENT_ID")
+        url = (
+            "https://accounts.google.com/o/oauth2/v2/auth?"
+            + urlencode(
+                {
+                    "client_id": client_id,
+                    "redirect_uri": redirectUri,
+                    "response_type": "code",
+                    "scope": "openid email profile",
+                    "state": state,
+                    "access_type": "offline",
+                    "prompt": "consent",
+                }
+            )
+        )
+        return OAuthConnectResponse(authUrl=url, state=state)
+
+    if provider == SocialProvider.kakao:
+        client_id = os.getenv("KAKAO_CLIENT_ID", "")
+        if not client_id:
+            raise HTTPException(status_code=400, detail="Missing KAKAO_CLIENT_ID")
+        url = (
+            "https://kauth.kakao.com/oauth/authorize?"
+            + urlencode(
+                {
+                    "client_id": client_id,
+                    "redirect_uri": redirectUri,
+                    "response_type": "code",
+                    "state": state,
+                    "scope": "profile_nickname profile_image account_email",
+                }
+            )
+        )
+        return OAuthConnectResponse(authUrl=url, state=state)
+
+    client_id = os.getenv("NAVER_CLIENT_ID", "")
+    if not client_id:
+        raise HTTPException(status_code=400, detail="Missing NAVER_CLIENT_ID")
+    url = (
+        "https://nid.naver.com/oauth2.0/authorize?"
+        + urlencode(
+            {
+                "client_id": client_id,
+                "redirect_uri": redirectUri,
+                "response_type": "code",
+                "state": state,
+            }
+        )
+    )
+    return OAuthConnectResponse(authUrl=url, state=state)
+
+
+@app.get("/api/auth/{provider}/callback")
+async def social_callback(
+    provider: SocialProvider,
+    code: str = Query(..., min_length=1),
+    state: str = Query(..., min_length=1),
+) -> RedirectResponse:
+    state_row = store.pop_social_auth_state(state)
+    if not state_row:
+        raise HTTPException(status_code=400, detail="Invalid or expired social auth state")
+    if state_row["provider"] != provider.value:
+        raise HTTPException(status_code=400, detail="Social auth state/provider mismatch")
+
+    redirect_uri = state_row["redirect_uri"]
+    provider_user_id = ""
+    name: Optional[str] = None
+    email: Optional[str] = None
+    avatar_url: Optional[str] = None
+
+    async with httpx.AsyncClient(timeout=20.0) as http:
+        if provider == SocialProvider.google:
+            client_id = os.getenv("GOOGLE_CLIENT_ID", "")
+            client_secret = os.getenv("GOOGLE_CLIENT_SECRET", "")
+            token_resp = await http.post(
+                "https://oauth2.googleapis.com/token",
+                data={
+                    "code": code,
+                    "client_id": client_id,
+                    "client_secret": client_secret,
+                    "redirect_uri": redirect_uri,
+                    "grant_type": "authorization_code",
+                },
+            )
+            token_data = token_resp.json()
+            access_token = token_data.get("access_token")
+            if not access_token:
+                raise HTTPException(status_code=400, detail=f"Google token exchange failed: {token_data}")
+
+            user_resp = await http.get(
+                "https://www.googleapis.com/oauth2/v2/userinfo",
+                headers={"Authorization": f"Bearer {access_token}"},
+            )
+            user_data = user_resp.json()
+            provider_user_id = str(user_data.get("id") or "")
+            name = user_data.get("name")
+            email = user_data.get("email")
+            avatar_url = user_data.get("picture")
+
+        elif provider == SocialProvider.kakao:
+            client_id = os.getenv("KAKAO_CLIENT_ID", "")
+            client_secret = os.getenv("KAKAO_CLIENT_SECRET", "")
+            token_resp = await http.post(
+                "https://kauth.kakao.com/oauth/token",
+                data={
+                    "grant_type": "authorization_code",
+                    "client_id": client_id,
+                    "client_secret": client_secret,
+                    "redirect_uri": redirect_uri,
+                    "code": code,
+                },
+                headers={"Content-Type": "application/x-www-form-urlencoded"},
+            )
+            token_data = token_resp.json()
+            access_token = token_data.get("access_token")
+            if not access_token:
+                raise HTTPException(status_code=400, detail=f"Kakao token exchange failed: {token_data}")
+
+            user_resp = await http.get(
+                "https://kapi.kakao.com/v2/user/me",
+                headers={"Authorization": f"Bearer {access_token}"},
+            )
+            user_data = user_resp.json()
+            provider_user_id = str(user_data.get("id") or "")
+            account = user_data.get("kakao_account") or {}
+            profile = account.get("profile") or {}
+            name = profile.get("nickname")
+            email = account.get("email")
+            avatar_url = profile.get("profile_image_url")
+
+        else:
+            client_id = os.getenv("NAVER_CLIENT_ID", "")
+            client_secret = os.getenv("NAVER_CLIENT_SECRET", "")
+            token_resp = await http.post(
+                "https://nid.naver.com/oauth2.0/token",
+                data={
+                    "grant_type": "authorization_code",
+                    "client_id": client_id,
+                    "client_secret": client_secret,
+                    "code": code,
+                    "state": state,
+                },
+            )
+            token_data = token_resp.json()
+            access_token = token_data.get("access_token")
+            if not access_token:
+                raise HTTPException(status_code=400, detail=f"Naver token exchange failed: {token_data}")
+
+            user_resp = await http.get(
+                "https://openapi.naver.com/v1/nid/me",
+                headers={"Authorization": f"Bearer {access_token}"},
+            )
+            user_data = user_resp.json()
+            resp = user_data.get("response") or {}
+            provider_user_id = str(resp.get("id") or "")
+            name = resp.get("name") or resp.get("nickname")
+            email = resp.get("email")
+            avatar_url = resp.get("profile_image")
+
+    if not provider_user_id:
+        raise HTTPException(status_code=400, detail="Failed to resolve provider user id")
+
+    user = store.create_or_get_user_by_identity(
+        provider=provider.value,
+        provider_user_id=provider_user_id,
+        name=name,
+        email=email,
+        avatar_url=avatar_url,
+    )
+    session_token = store.create_user_session(int(user["id"]), ttl_days=SESSION_TTL_DAYS)
+
+    res = RedirectResponse(url=f"{_normalize_frontend_redirect()}/?auth=success")
+    res.set_cookie(
+        key=SESSION_COOKIE_NAME,
+        value=session_token,
+        httponly=True,
+        secure=os.getenv("COOKIE_SECURE", "false").lower() == "true",
+        samesite=os.getenv("COOKIE_SAMESITE", "lax"),
+        max_age=SESSION_TTL_DAYS * 24 * 60 * 60,
+        path="/",
+    )
+    return res
+
+
 @app.get("/api/oauth/{platform}/connect", response_model=OAuthConnectResponse)
-async def oauth_connect(platform: Platform, redirectUri: str = Query(..., min_length=1)) -> OAuthConnectResponse:
+async def oauth_connect(platform: Platform, request: Request, redirectUri: str = Query(..., min_length=1)) -> OAuthConnectResponse:
+    _get_current_user(request, required=True)
     state = secrets.token_urlsafe(24)
     params: Dict[str, str] = {}
     base = ""
@@ -841,6 +1186,7 @@ async def oauth_connect(platform: Platform, redirectUri: str = Query(..., min_le
 @app.get("/api/oauth/{platform}/callback")
 async def oauth_callback(
     platform: Platform,
+    request: Request,
     code: str = Query(..., min_length=1),
     state: str = Query(..., min_length=1),
 ) -> Dict[str, str]:
@@ -945,6 +1291,9 @@ async def oauth_callback(
     expires_at = _expires_at_from_seconds(token_payload.get("expires_in"))
 
     store.upsert_oauth_token(platform.value, access_token, refresh_token, expires_at)
+    user = _get_current_user(request, required=False)
+    if user:
+        store.upsert_user_oauth_token(int(user["id"]), platform.value, access_token, refresh_token, expires_at)
     os.environ[f"{platform.value.upper()}_ACCESS_TOKEN"] = access_token
 
     return {"status": "connected", "platform": platform.value, "state": state}

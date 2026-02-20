@@ -7,10 +7,21 @@ import type {
   ModelOption,
   Platform,
   PublishJob,
+  PublishLogItem,
+  SocialProvider,
+  SocialThread,
+  UserInfo,
   UserProfile,
 } from "@/lib/types";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+
+async function apiFetch(input: string, init?: RequestInit): Promise<Response> {
+  return fetch(input, {
+    credentials: "include",
+    ...init,
+  });
+}
 
 export async function generatePosts(
   draft: string,
@@ -19,7 +30,7 @@ export async function generatePosts(
   platforms?: Platform[],
   language?: LanguageOption,
 ): Promise<GenerateResponse> {
-  const res = await fetch(`${API_URL}/api/generate`, {
+  const res = await apiFetch(`${API_URL}/api/generate`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ draft, userProfile, model, platforms, language }),
@@ -42,7 +53,7 @@ export async function refinePost(payload: {
   model?: ModelOption;
   language?: LanguageOption;
 }): Promise<GeneratedCard> {
-  const res = await fetch(`${API_URL}/api/refine`, {
+  const res = await apiFetch(`${API_URL}/api/refine`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
@@ -56,7 +67,7 @@ export async function refinePost(payload: {
 }
 
 export async function updateCardStatus(cardId: number, status: "draft" | "accepted" | "rejected"): Promise<GeneratedCard> {
-  const res = await fetch(`${API_URL}/api/cards/${cardId}/status`, {
+  const res = await apiFetch(`${API_URL}/api/cards/${cardId}/status`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ status }),
@@ -73,8 +84,9 @@ export async function enqueuePublish(payload: {
   draftId: number;
   cardIds?: number[];
   acceptedOnly?: boolean;
+  scheduledAt?: string;
 }): Promise<{ jobId: number; status: string }> {
-  const res = await fetch(`${API_URL}/api/publish`, {
+  const res = await apiFetch(`${API_URL}/api/publish`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
@@ -88,7 +100,7 @@ export async function enqueuePublish(payload: {
 }
 
 export async function getJob(jobId: number): Promise<PublishJob> {
-  const res = await fetch(`${API_URL}/api/jobs/${jobId}`);
+  const res = await apiFetch(`${API_URL}/api/jobs/${jobId}`);
   if (!res.ok) {
     throw new Error("작업 조회 실패");
   }
@@ -97,7 +109,7 @@ export async function getJob(jobId: number): Promise<PublishJob> {
 
 export async function getOAuthConnectUrl(platform: Platform, redirectUri: string): Promise<{ authUrl: string; state: string }> {
   const qp = new URLSearchParams({ redirectUri });
-  const res = await fetch(`${API_URL}/api/oauth/${platform}/connect?${qp.toString()}`);
+  const res = await apiFetch(`${API_URL}/api/oauth/${platform}/connect?${qp.toString()}`);
   if (!res.ok) {
     throw new Error("OAuth 연결 URL 생성 실패");
   }
@@ -108,7 +120,7 @@ export async function transcribeAudio(file: Blob): Promise<string> {
   const form = new FormData();
   form.append("file", file, "voice-feedback.webm");
 
-  const res = await fetch(`${API_URL}/api/stt`, {
+  const res = await apiFetch(`${API_URL}/api/stt`, {
     method: "POST",
     body: form,
   });
@@ -122,7 +134,7 @@ export async function transcribeAudio(file: Blob): Promise<string> {
 }
 
 export async function trackAnalyticsEvent(payload: AnalyticsEventPayload): Promise<void> {
-  await fetch(`${API_URL}/api/analytics/events`, {
+  await apiFetch(`${API_URL}/api/analytics/events`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
@@ -145,9 +157,44 @@ export async function getAnalyticsSummary(params?: {
   if (params?.fillRate !== undefined) qp.set("fillRate", String(params.fillRate));
   if (params?.slotsPerPage !== undefined) qp.set("slotsPerPage", String(params.slotsPerPage));
 
-  const res = await fetch(`${API_URL}/api/analytics/summary?${qp.toString()}`);
+  const res = await apiFetch(`${API_URL}/api/analytics/summary?${qp.toString()}`);
   if (!res.ok) {
     throw new Error("트래픽 요약 조회 실패");
   }
   return (await res.json()) as AnalyticsSummary;
+}
+
+export async function getMe(): Promise<UserInfo | null> {
+  const res = await apiFetch(`${API_URL}/api/auth/me`);
+  if (!res.ok) return null;
+  return (await res.json()) as UserInfo | null;
+}
+
+export async function logout(): Promise<void> {
+  await apiFetch(`${API_URL}/api/auth/logout`, { method: "POST" });
+}
+
+export async function getSocialAuthConnectUrl(provider: SocialProvider, redirectUri: string): Promise<{ authUrl: string; state: string }> {
+  const qp = new URLSearchParams({ redirectUri });
+  const res = await apiFetch(`${API_URL}/api/auth/${provider}/connect?${qp.toString()}`);
+  if (!res.ok) {
+    throw new Error("소셜 로그인 URL 생성 실패");
+  }
+  return (await res.json()) as { authUrl: string; state: string };
+}
+
+export async function getPublishLogs(limit = 100): Promise<PublishLogItem[]> {
+  const res = await apiFetch(`${API_URL}/api/publish/logs?limit=${limit}`);
+  if (!res.ok) {
+    throw new Error("발행 로그 조회 실패");
+  }
+  return (await res.json()) as PublishLogItem[];
+}
+
+export async function getThreads(limitPerPlatform = 20): Promise<SocialThread[]> {
+  const res = await apiFetch(`${API_URL}/api/threads?limitPerPlatform=${limitPerPlatform}`);
+  if (!res.ok) {
+    throw new Error("스레드 조회 실패");
+  }
+  return (await res.json()) as SocialThread[];
 }

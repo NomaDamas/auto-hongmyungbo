@@ -10,13 +10,32 @@ import {
   generatePosts,
   getAnalyticsSummary,
   getJob,
+  getMe,
   getOAuthConnectUrl,
+  getPublishLogs,
+  getSocialAuthConnectUrl,
+  getThreads,
+  logout,
   refinePost,
   trackAnalyticsEvent,
   transcribeAudio,
   updateCardStatus,
 } from "@/lib/api";
-import type { AnalyticsSummary, CardState, CardVersion, GeneratedCard, LanguageOption, ModelOption, Platform, PublishJob, UserProfile } from "@/lib/types";
+import type {
+  AnalyticsSummary,
+  CardState,
+  CardVersion,
+  GeneratedCard,
+  LanguageOption,
+  ModelOption,
+  Platform,
+  PublishJob,
+  PublishLogItem,
+  SocialThread,
+  SocialProvider,
+  UserInfo,
+  UserProfile,
+} from "@/lib/types";
 
 const PLATFORM_ORDER: Platform[] = ["reddit", "linkedin", "twitter", "instagram", "blog"];
 const MODEL_OPTIONS: ModelOption[] = ["gpt-4o-mini", "gpt-4o", "gpt-4.1-mini"];
@@ -104,6 +123,13 @@ export default function HomePage() {
   const [cpc, setCpc] = useState(0.18);
   const [fillRate, setFillRate] = useState(0.65);
   const [slotsPerPage, setSlotsPerPage] = useState(2);
+  const [user, setUser] = useState<UserInfo | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
+  const [logsLoading, setLogsLoading] = useState(false);
+  const [publishLogs, setPublishLogs] = useState<PublishLogItem[]>([]);
+  const [threads, setThreads] = useState<SocialThread[]>([]);
+  const [scheduleEnabled, setScheduleEnabled] = useState(false);
+  const [scheduledAt, setScheduledAt] = useState("");
 
   const carouselRef = useRef<HTMLDivElement | null>(null);
 
@@ -164,10 +190,39 @@ export default function HomePage() {
     }
   };
 
+  const refreshPublishData = async () => {
+    if (!user) {
+      setPublishLogs([]);
+      setThreads([]);
+      return;
+    }
+    try {
+      setLogsLoading(true);
+      const [logs, threadData] = await Promise.all([getPublishLogs(80), getThreads(20)]);
+      setPublishLogs(logs);
+      setThreads(threadData);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLogsLoading(false);
+    }
+  };
+
   useEffect(() => {
-    getOrCreateSessionId();
-    emitAnalytics("page_view");
-    void refreshAnalytics();
+    const init = async () => {
+      getOrCreateSessionId();
+      emitAnalytics("page_view");
+      await refreshAnalytics();
+      try {
+        const me = await getMe();
+        setUser(me);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setAuthLoading(false);
+      }
+    };
+    void init();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -175,6 +230,11 @@ export default function HomePage() {
     void refreshAnalytics();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cpm, ctr, cpc, fillRate, slotsPerPage]);
+
+  useEffect(() => {
+    void refreshPublishData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
 
   const setCardRefining = (platform: Platform, isRefining: boolean) => {
     setResultCards((prev) => prev.map((c) => (c.platform === platform ? { ...c, isRefining } : c)));
@@ -380,6 +440,10 @@ export default function HomePage() {
   };
 
   const handlePublish = async () => {
+    if (!user) {
+      alert("로그인 후 발행할 수 있습니다.");
+      return;
+    }
     if (!draftId) {
       alert("먼저 글을 생성하세요.");
       return;
@@ -388,7 +452,11 @@ export default function HomePage() {
     try {
       setPublishing(true);
       emitAnalytics("publish", { acceptedOnly: true, acceptedCount });
-      const queued = await enqueuePublish({ draftId, acceptedOnly: true });
+      const queued = await enqueuePublish({
+        draftId,
+        acceptedOnly: true,
+        scheduledAt: scheduleEnabled && scheduledAt ? new Date(scheduledAt).toISOString() : undefined,
+      });
 
       for (let i = 0; i < 20; i += 1) {
         const job = await getJob(queued.jobId);
@@ -397,6 +465,7 @@ export default function HomePage() {
         await new Promise((resolve) => setTimeout(resolve, 600));
       }
       await refreshAnalytics();
+      await refreshPublishData();
     } catch (err) {
       console.error(err);
       alert("발행 요청 중 오류가 발생했습니다.");
@@ -406,6 +475,10 @@ export default function HomePage() {
   };
 
   const handleOAuthConnect = async (platform: Platform) => {
+    if (!user) {
+      alert("소셜 로그인 후 플랫폼 OAuth를 연결하세요.");
+      return;
+    }
     try {
       setOauthBusyPlatform(platform);
       const apiBase = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
@@ -417,6 +490,29 @@ export default function HomePage() {
       alert("OAuth 연결 URL 생성 중 오류가 발생했습니다.");
     } finally {
       setOauthBusyPlatform(null);
+    }
+  };
+
+  const handleSocialLogin = async (provider: SocialProvider) => {
+    try {
+      const apiBase = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+      const redirectUri = `${apiBase}/api/auth/${provider}/callback`;
+      const { authUrl } = await getSocialAuthConnectUrl(provider, redirectUri);
+      window.location.href = authUrl;
+    } catch (err) {
+      console.error(err);
+      alert("소셜 로그인 연결 중 오류가 발생했습니다.");
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+      setUser(null);
+      setPublishLogs([]);
+      setThreads([]);
+    } catch (err) {
+      console.error(err);
     }
   };
 
@@ -461,6 +557,25 @@ export default function HomePage() {
             <h1 className="text-xl font-semibold text-zinc-900 dark:text-zinc-100">Social Content Studio</h1>
           </div>
           <div className="flex flex-wrap items-center gap-2">
+            {authLoading ? (
+              <span className="text-xs text-zinc-500 dark:text-zinc-400">로그인 확인 중...</span>
+            ) : user ? (
+              <div className="flex items-center gap-2 rounded-lg border border-zinc-300 px-2 py-1 dark:border-zinc-700">
+                <span className="text-xs text-zinc-700 dark:text-zinc-200">{user.name || user.email || `user#${user.id}`}</span>
+                <button
+                  onClick={() => void handleLogout()}
+                  className="rounded-md border border-zinc-300 px-2 py-1 text-[11px] dark:border-zinc-700 dark:text-zinc-100"
+                >
+                  로그아웃
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-1">
+                <button onClick={() => void handleSocialLogin("google")} className="rounded-md border border-zinc-300 px-2 py-1 text-[11px] dark:border-zinc-700 dark:text-zinc-100">Google</button>
+                <button onClick={() => void handleSocialLogin("kakao")} className="rounded-md border border-zinc-300 px-2 py-1 text-[11px] dark:border-zinc-700 dark:text-zinc-100">Kakao</button>
+                <button onClick={() => void handleSocialLogin("naver")} className="rounded-md border border-zinc-300 px-2 py-1 text-[11px] dark:border-zinc-700 dark:text-zinc-100">Naver</button>
+              </div>
+            )}
             <button
               onClick={() => setContextOpen(true)}
               className="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-xs font-medium dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
@@ -506,8 +621,21 @@ export default function HomePage() {
                 disabled={publishing || !draftId || acceptedCount === 0}
                 className="rounded-lg border border-zinc-300 px-3 py-2 text-xs font-medium disabled:opacity-50 dark:border-zinc-700 dark:text-zinc-100"
               >
-                {publishing ? "발행 중..." : `Queue 발행 (${acceptedCount})`}
+                {publishing ? "발행 중..." : scheduleEnabled ? `예약 발행 (${acceptedCount})` : `Queue 발행 (${acceptedCount})`}
               </button>
+            </div>
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <label className="flex items-center gap-1 text-xs text-zinc-600 dark:text-zinc-300">
+                <input type="checkbox" checked={scheduleEnabled} onChange={(e) => setScheduleEnabled(e.target.checked)} />
+                예약 발행
+              </label>
+              <input
+                type="datetime-local"
+                value={scheduledAt}
+                onChange={(e) => setScheduledAt(e.target.value)}
+                disabled={!scheduleEnabled}
+                className="rounded-lg border border-zinc-300 bg-white px-2 py-1 text-xs disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
+              />
             </div>
 
             <div className="mt-3 flex flex-wrap gap-1.5">
@@ -781,6 +909,52 @@ export default function HomePage() {
             </>
           ) : (
             <p className="text-xs text-zinc-500 dark:text-zinc-400">트래픽 데이터가 아직 없습니다.</p>
+          )}
+        </section>
+
+        <section className="mt-4 rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+          <div className="mb-3 flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Publish Logs & Platform Threads</h3>
+            <button onClick={() => void refreshPublishData()} className="rounded-lg border border-zinc-300 px-3 py-1.5 text-xs dark:border-zinc-700 dark:text-zinc-100">
+              {logsLoading ? "로딩..." : "새로고침"}
+            </button>
+          </div>
+          {!user && <p className="text-xs text-zinc-500 dark:text-zinc-400">로그인하면 내 발행 로그/플랫폼별 스레드를 볼 수 있습니다.</p>}
+          {user && (
+            <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+              <div className="rounded-xl border border-zinc-200 p-3 dark:border-zinc-800">
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Promotion Log</p>
+                <div className="max-h-64 space-y-2 overflow-y-auto">
+                  {publishLogs.map((log) => (
+                    <div key={log.id} className="rounded-lg border border-zinc-200 px-2 py-2 text-xs dark:border-zinc-700">
+                      <p className="font-semibold capitalize">{log.platform} · {log.status}</p>
+                      <p className="line-clamp-1 text-zinc-600 dark:text-zinc-300">{log.title || "-"}</p>
+                      <p className="text-[11px] text-zinc-500 dark:text-zinc-400">{new Date(log.createdAt).toLocaleString()}</p>
+                      {log.postUrl && (
+                        <a className="text-[11px] text-blue-600 underline" href={log.postUrl} target="_blank" rel="noreferrer">open</a>
+                      )}
+                    </div>
+                  ))}
+                  {!publishLogs.length && <p className="text-xs text-zinc-500 dark:text-zinc-400">로그가 없습니다.</p>}
+                </div>
+              </div>
+              <div className="rounded-xl border border-zinc-200 p-3 dark:border-zinc-800">
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Platform Threads</p>
+                <div className="max-h-64 space-y-2 overflow-y-auto">
+                  {threads.map((thread) => (
+                    <div key={thread.platform} className="rounded-lg border border-zinc-200 px-2 py-2 text-xs dark:border-zinc-700">
+                      <p className="mb-1 font-semibold capitalize">{thread.platform}</p>
+                      <div className="space-y-1">
+                        {thread.items.slice(0, 5).map((item) => (
+                          <p key={item.id} className="line-clamp-1 text-zinc-600 dark:text-zinc-300">{item.title || item.body || "-"}</p>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                  {!threads.length && <p className="text-xs text-zinc-500 dark:text-zinc-400">플랫폼 스레드가 없습니다.</p>}
+                </div>
+              </div>
+            </div>
           )}
         </section>
       </main>

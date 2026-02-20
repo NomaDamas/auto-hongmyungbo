@@ -1,4 +1,5 @@
 export type Platform = "reddit" | "linkedin" | "twitter" | "instagram" | "blog";
+export type SocialProvider = "google" | "kakao" | "naver";
 
 export type ModelOption = "gpt-4o-mini" | "gpt-4o" | "gpt-4.1-mini";
 export type LanguageOption = "auto" | "korean" | "english" | "japanese";
@@ -39,6 +40,32 @@ export type PublishJob = {
   payload: Record<string, unknown>;
   result: Record<string, unknown> | null;
   error: string | null;
+};
+
+export type UserInfo = {
+  id: number;
+  name?: string | null;
+  email?: string | null;
+  avatarUrl?: string | null;
+};
+
+export type PublishLogItem = {
+  id: number;
+  draftId?: number | null;
+  cardId?: number | null;
+  platform: string;
+  title?: string | null;
+  body?: string | null;
+  postId?: string | null;
+  postUrl?: string | null;
+  status: string;
+  errorText?: string | null;
+  createdAt: string;
+};
+
+export type SocialThread = {
+  platform: string;
+  items: PublishLogItem[];
 };
 
 export type UserProfile = {
