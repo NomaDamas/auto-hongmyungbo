@@ -85,7 +85,7 @@ class UserProfile(BaseModel):
 class GenerateRequest(BaseModel):
     draft: str
     userProfile: Optional[UserProfile] = None
-    model: Optional[str] = None
+    model: str
     platforms: Optional[List[Platform]] = None
     language: Optional[str] = None
 
@@ -111,7 +111,7 @@ class RefineRequest(BaseModel):
     currentContent: str
     feedback: str
     userProfile: Optional[UserProfile] = None
-    model: Optional[str] = None
+    model: str
     language: Optional[str] = None
 
 
@@ -122,7 +122,7 @@ class CardStatusRequest(BaseModel):
 class StyleExtractRequest(BaseModel):
     platform: Platform
     referencePosts: List[str]
-    model: Optional[str] = None
+    model: str
 
 
 class StyleExtractResponse(BaseModel):
@@ -260,10 +260,8 @@ if OPENROUTER_API_KEY:
         base_url="https://openrouter.ai/api/v1",
         api_key=OPENROUTER_API_KEY,
     )
-    DEFAULT_MODEL = os.getenv("LLM_MODEL", "openai/gpt-4o-mini")
 else:
     client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-    DEFAULT_MODEL = os.getenv("LLM_MODEL", os.getenv("OPENAI_MODEL", "gpt-4o-mini"))
 
 # STT always uses OpenAI directly (OpenRouter doesn't support audio)
 stt_client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
@@ -339,7 +337,7 @@ async def generate_for_platform(
     platform: Platform,
     draft: str,
     profile: Optional[UserProfile],
-    model: Optional[str],
+    model: str,
     language: Optional[str],
 ) -> GeneratedCard:
     system_prompt = PLATFORM_PROMPTS[platform]
@@ -356,7 +354,7 @@ async def generate_for_platform(
     )
 
     completion = await client.chat.completions.create(
-        model=model or DEFAULT_MODEL,
+        model=model,
         response_format={"type": "json_object"},
         temperature=0.7,
         messages=[
@@ -613,7 +611,7 @@ async def health() -> Dict[str, str]:
 async def get_provider_info() -> Dict[str, str]:
     return {
         "provider": "openrouter" if OPENROUTER_API_KEY else "openai",
-        "defaultModel": DEFAULT_MODEL,
+        "defaultModel": "openai/gpt-4o-mini" if OPENROUTER_API_KEY else "gpt-4o-mini",
     }
 
 
@@ -684,7 +682,7 @@ async def refine_content(req: RefineRequest) -> GeneratedCard:
     )
 
     completion = await client.chat.completions.create(
-        model=req.model or DEFAULT_MODEL,
+        model=req.model,
         response_format={"type": "json_object"},
         temperature=0.7,
         messages=[
@@ -732,7 +730,7 @@ async def extract_style(req: StyleExtractRequest) -> StyleExtractResponse:
     )
 
     completion = await client.chat.completions.create(
-        model=req.model or DEFAULT_MODEL,
+        model=req.model,
         response_format={"type": "json_object"},
         temperature=0.3,
         messages=[
