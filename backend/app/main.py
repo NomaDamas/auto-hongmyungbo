@@ -3,6 +3,7 @@ import base64
 import hashlib
 import json
 import os
+import re
 import secrets
 from datetime import datetime, timedelta, timezone
 from enum import Enum
@@ -85,7 +86,7 @@ class UserProfile(BaseModel):
 class GenerateRequest(BaseModel):
     draft: str
     userProfile: Optional[UserProfile] = None
-    model: Optional[str] = None
+    model: str
     platforms: Optional[List[Platform]] = None
     language: Optional[str] = None
 
@@ -111,7 +112,7 @@ class RefineRequest(BaseModel):
     currentContent: str
     feedback: str
     userProfile: Optional[UserProfile] = None
-    model: Optional[str] = None
+    model: str
     language: Optional[str] = None
 
 
@@ -122,7 +123,7 @@ class CardStatusRequest(BaseModel):
 class StyleExtractRequest(BaseModel):
     platform: Platform
     referencePosts: List[str]
-    model: Optional[str] = None
+    model: str
 
 
 class StyleExtractResponse(BaseModel):
@@ -253,8 +254,18 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-DEFAULT_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
+
+if OPENROUTER_API_KEY:
+    client = AsyncOpenAI(
+        base_url="https://openrouter.ai/api/v1",
+        api_key=OPENROUTER_API_KEY,
+    )
+else:
+    client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+
+# STT always uses OpenAI directly (OpenRouter doesn't support audio)
+stt_client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 DEFAULT_STT_MODEL = os.getenv("OPENAI_STT_MODEL", "gpt-4o-mini-transcribe")
 
 PUBLISH_WORKER_TASK: Optional[asyncio.Task] = None
@@ -327,7 +338,7 @@ async def generate_for_platform(
     platform: Platform,
     draft: str,
     profile: Optional[UserProfile],
-    model: Optional[str],
+    model: str,
     language: Optional[str],
 ) -> GeneratedCard:
     system_prompt = PLATFORM_PROMPTS[platform]
@@ -344,7 +355,7 @@ async def generate_for_platform(
     )
 
     completion = await client.chat.completions.create(
-        model=model or DEFAULT_MODEL,
+        model=model,
         response_format={"type": "json_object"},
         temperature=0.7,
         messages=[
@@ -353,13 +364,22 @@ async def generate_for_platform(
         ],
     )
 
-    payload = json.loads(completion.choices[0].message.content or "{}")
+    payload = _parse_llm_json(completion.choices[0].message.content)
     return GeneratedCard(
         platform=platform,
         title=payload.get("title", f"{platform.value.title()} Draft"),
         body=payload.get("body", ""),
         suggestions=payload.get("suggestions", ["Shorten opening line", "Clarify CTA"]),
     )
+
+
+def _parse_llm_json(raw: str | None) -> dict:
+    text = (raw or "").strip()
+    # Strip markdown code fences (```json ... ``` or ``` ... ```)
+    m = re.search(r"```(?:json)?\s*\n?(.*?)```", text, re.DOTALL)
+    if m:
+        text = m.group(1).strip()
+    return json.loads(text) if text else {}
 
 
 def _clip(value: str, max_len: int) -> str:
@@ -597,6 +617,14 @@ async def health() -> Dict[str, str]:
     return {"status": "ok"}
 
 
+@app.get("/api/provider")
+async def get_provider_info() -> Dict[str, str]:
+    return {
+        "provider": "openrouter" if OPENROUTER_API_KEY else "openai",
+        "defaultModel": "openai/gpt-4o-mini" if OPENROUTER_API_KEY else "gpt-4o-mini",
+    }
+
+
 @app.post("/api/generate", response_model=GenerateResponse)
 async def generate_content(req: GenerateRequest, request: Request) -> GenerateResponse:
     if not req.draft.strip():
@@ -664,7 +692,7 @@ async def refine_content(req: RefineRequest) -> GeneratedCard:
     )
 
     completion = await client.chat.completions.create(
-        model=req.model or DEFAULT_MODEL,
+        model=req.model,
         response_format={"type": "json_object"},
         temperature=0.7,
         messages=[
@@ -673,7 +701,7 @@ async def refine_content(req: RefineRequest) -> GeneratedCard:
         ],
     )
 
-    payload = json.loads(completion.choices[0].message.content or "{}")
+    payload = _parse_llm_json(completion.choices[0].message.content)
     updated = GeneratedCard(
         id=req.cardId,
         platform=req.platform,
@@ -712,7 +740,7 @@ async def extract_style(req: StyleExtractRequest) -> StyleExtractResponse:
     )
 
     completion = await client.chat.completions.create(
-        model=req.model or DEFAULT_MODEL,
+        model=req.model,
         response_format={"type": "json_object"},
         temperature=0.3,
         messages=[
@@ -721,7 +749,7 @@ async def extract_style(req: StyleExtractRequest) -> StyleExtractResponse:
         ],
     )
 
-    payload = json.loads(completion.choices[0].message.content or "{}")
+    payload = _parse_llm_json(completion.choices[0].message.content)
     extracted = payload.get("extractedTone", "Clear, concise, practical")
     instructions = payload.get("systemInstructions", "Use concise insight-first structure.")
 
@@ -742,7 +770,7 @@ async def transcribe_voice(file: UploadFile = File(...)) -> STTResponse:
         raise HTTPException(status_code=400, detail="No file uploaded")
 
     audio_bytes = await file.read()
-    transcription = await client.audio.transcriptions.create(
+    transcription = await stt_client.audio.transcriptions.create(
         model=DEFAULT_STT_MODEL,
         file=(file.filename, audio_bytes, file.content_type or "audio/webm"),
     )

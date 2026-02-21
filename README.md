@@ -1,4 +1,5 @@
 # AI Social Cross-Posting Agent (Prototype)
+<img width="1536" height="1024" alt="project preview" src="https://github.com/user-attachments/assets/5e88f6c0-8d65-4488-a36e-a1dbd0903685" />
 
 This project turns one draft into multiple platform-ready posts (Reddit, LinkedIn, X, Instagram, Blog), then supports review, refinement, scheduling, and publishing.
 
