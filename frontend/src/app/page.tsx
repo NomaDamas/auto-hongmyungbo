@@ -7,6 +7,7 @@ import { ContextPanel } from "@/components/context-panel";
 import { AdSlot } from "@/components/ad-slot";
 import {
   enqueuePublish,
+  fetchProvider,
   generatePosts,
   getAnalyticsSummary,
   getJob,
@@ -38,7 +39,19 @@ import type {
 } from "@/lib/types";
 
 const PLATFORM_ORDER: Platform[] = ["reddit", "linkedin", "twitter", "instagram", "blog"];
-const MODEL_OPTIONS: ModelOption[] = ["gpt-4o-mini", "gpt-4o", "gpt-4.1-mini"];
+
+const OPENAI_MODELS: ModelOption[] = ["gpt-4o-mini", "gpt-4o", "gpt-4.1-mini"];
+const OPENROUTER_MODELS: ModelOption[] = [
+  "openai/gpt-4o-mini",
+  "openai/gpt-4o",
+  "openai/gpt-4.1-mini",
+  "openai/gpt-5.2",
+  "anthropic/claude-sonnet-4.6",
+  "anthropic/claude-haiku-4.5",
+  "google/gemini-3-flash-preview",
+  "google/gemini-3.1-pro-preview",
+];
+
 const ANALYTICS_WINDOW_DAYS = 14;
 
 const EMPTY_CONTEXTS: Record<Platform, string> = {
@@ -101,6 +114,7 @@ function buildUserProfile(contexts: Record<Platform, string>): UserProfile {
 export default function HomePage() {
   const adsEnabled = process.env.NEXT_PUBLIC_ENABLE_ADS === "true";
   const [draft, setDraft] = useState("");
+  const [modelOptions, setModelOptions] = useState<ModelOption[]>(OPENAI_MODELS);
   const [selectedModel, setSelectedModel] = useState<ModelOption>("gpt-4o-mini");
   const [draftId, setDraftId] = useState<number | null>(null);
   const [resultCards, setResultCards] = useState<CardState[]>([]);
@@ -212,6 +226,19 @@ export default function HomePage() {
     const init = async () => {
       getOrCreateSessionId();
       emitAnalytics("page_view");
+
+      try {
+        const providerInfo = await fetchProvider();
+        if (providerInfo.provider === "openrouter") {
+          setModelOptions(OPENROUTER_MODELS);
+        } else {
+          setModelOptions(OPENAI_MODELS);
+        }
+        setSelectedModel(providerInfo.defaultModel);
+      } catch (err) {
+        console.error(err);
+      }
+
       await refreshAnalytics();
       try {
         const me = await getMe();
@@ -587,7 +614,7 @@ export default function HomePage() {
               onChange={(e) => setSelectedModel(e.target.value as ModelOption)}
               className="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-xs dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
             >
-              {MODEL_OPTIONS.map((model) => (
+              {modelOptions.map((model) => (
                 <option key={model} value={model}>
                   {model}
                 </option>
