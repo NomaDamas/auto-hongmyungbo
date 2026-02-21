@@ -3,6 +3,7 @@ import base64
 import hashlib
 import json
 import os
+import re
 import secrets
 from datetime import datetime, timedelta, timezone
 from enum import Enum
@@ -363,13 +364,22 @@ async def generate_for_platform(
         ],
     )
 
-    payload = json.loads(completion.choices[0].message.content or "{}")
+    payload = _parse_llm_json(completion.choices[0].message.content)
     return GeneratedCard(
         platform=platform,
         title=payload.get("title", f"{platform.value.title()} Draft"),
         body=payload.get("body", ""),
         suggestions=payload.get("suggestions", ["Shorten opening line", "Clarify CTA"]),
     )
+
+
+def _parse_llm_json(raw: str | None) -> dict:
+    text = (raw or "").strip()
+    # Strip markdown code fences (```json ... ``` or ``` ... ```)
+    m = re.search(r"```(?:json)?\s*\n?(.*?)```", text, re.DOTALL)
+    if m:
+        text = m.group(1).strip()
+    return json.loads(text) if text else {}
 
 
 def _clip(value: str, max_len: int) -> str:
@@ -691,7 +701,7 @@ async def refine_content(req: RefineRequest) -> GeneratedCard:
         ],
     )
 
-    payload = json.loads(completion.choices[0].message.content or "{}")
+    payload = _parse_llm_json(completion.choices[0].message.content)
     updated = GeneratedCard(
         id=req.cardId,
         platform=req.platform,
@@ -739,7 +749,7 @@ async def extract_style(req: StyleExtractRequest) -> StyleExtractResponse:
         ],
     )
 
-    payload = json.loads(completion.choices[0].message.content or "{}")
+    payload = _parse_llm_json(completion.choices[0].message.content)
     extracted = payload.get("extractedTone", "Clear, concise, practical")
     instructions = payload.get("systemInstructions", "Use concise insight-first structure.")
 
