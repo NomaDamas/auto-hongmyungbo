@@ -198,3 +198,9 @@ export async function getThreads(limitPerPlatform = 20): Promise<SocialThread[]>
   }
   return (await res.json()) as SocialThread[];
 }
+
+export async function fetchProvider(): Promise<{ provider: string; defaultModel: string }> {
+  const res = await apiFetch(`${API_URL}/api/provider`);
+  if (!res.ok) return { provider: "openai", defaultModel: "gpt-4o-mini" };
+  return res.json();
+}

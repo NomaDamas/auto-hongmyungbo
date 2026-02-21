@@ -1,7 +1,7 @@
 export type Platform = "reddit" | "linkedin" | "twitter" | "instagram" | "blog";
 export type SocialProvider = "google" | "kakao" | "naver";
 
-export type ModelOption = "gpt-4o-mini" | "gpt-4o" | "gpt-4.1-mini";
+export type ModelOption = string;
 export type LanguageOption = "auto" | "korean" | "english" | "japanese";
 
 export type GeneratedCard = {

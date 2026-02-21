@@ -253,8 +253,20 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-DEFAULT_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
+
+if OPENROUTER_API_KEY:
+    client = AsyncOpenAI(
+        base_url="https://openrouter.ai/api/v1",
+        api_key=OPENROUTER_API_KEY,
+    )
+    DEFAULT_MODEL = os.getenv("LLM_MODEL", "openai/gpt-4o-mini")
+else:
+    client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+    DEFAULT_MODEL = os.getenv("LLM_MODEL", os.getenv("OPENAI_MODEL", "gpt-4o-mini"))
+
+# STT always uses OpenAI directly (OpenRouter doesn't support audio)
+stt_client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 DEFAULT_STT_MODEL = os.getenv("OPENAI_STT_MODEL", "gpt-4o-mini-transcribe")
 
 PUBLISH_WORKER_TASK: Optional[asyncio.Task] = None
@@ -597,6 +609,14 @@ async def health() -> Dict[str, str]:
     return {"status": "ok"}
 
 
+@app.get("/api/provider")
+async def get_provider_info() -> Dict[str, str]:
+    return {
+        "provider": "openrouter" if OPENROUTER_API_KEY else "openai",
+        "defaultModel": DEFAULT_MODEL,
+    }
+
+
 @app.post("/api/generate", response_model=GenerateResponse)
 async def generate_content(req: GenerateRequest, request: Request) -> GenerateResponse:
     if not req.draft.strip():
@@ -742,7 +762,7 @@ async def transcribe_voice(file: UploadFile = File(...)) -> STTResponse:
         raise HTTPException(status_code=400, detail="No file uploaded")
 
     audio_bytes = await file.read()
-    transcription = await client.audio.transcriptions.create(
+    transcription = await stt_client.audio.transcriptions.create(
         model=DEFAULT_STT_MODEL,
         file=(file.filename, audio_bytes, file.content_type or "audio/webm"),
     )
