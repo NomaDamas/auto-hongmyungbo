@@ -1,8 +1,8 @@
 # dashboard
 
-collector API를 조회해 트래픽/수익 KPI를 표시하는 UI 서버입니다.
+UI server that reads collector API data and displays traffic/revenue KPI metrics.
 
-## 실행
+## Run
 
 ```bash
 cd apps/dashboard
@@ -10,9 +10,9 @@ npm install
 COLLECTOR_URL=http://localhost:8090 npm run dev
 ```
 
-접속: `http://localhost:8091`
+Open: `http://localhost:8091`
 
-## 배포
+## Deploy
 
 ```bash
 docker build -t hmb-dashboard .

@@ -1,5 +1,16 @@
 # Frontend (Next.js)
 
+The frontend handles draft input, platform card review, and publishing UX.
+
+## Recommended Data/Auth Setup
+
+Use Supabase from the frontend for:
+- User authentication
+- User profile and app data storage
+- File/image storage if needed
+
+Use FastAPI only for AI generation/publishing operations and provider OAuth flows.
+
 ## Run
 
 ```bash
@@ -16,41 +27,40 @@ cd frontend
 npm run build
 ```
 
-## 주요 UX
+## Main UX
 
-- Modern SNS style UI (light/dark 대응)
-- Platform Results 가로 스크롤 카드 트랙
-- Accept 시 왼쪽 Queue로 이동, Queue 클릭 시 Restore
-- 카드 버전 히스토리 + Undo/Redo
-- Preview 더보기/접기 + 필요 시 Preview Edit
-- 플랫폼별 스타일 Context 설정 패널
-- 모델 선택 (`gpt-4o-mini`, `gpt-4o`, `gpt-4.1-mini`)
-- 출력 언어 선택 (`auto`, `korean`, `english`, `japanese`)
-- 플랫폼 선택 후 선택된 플랫폼만 생성/자동게시 옵션
-- 간편 로그인 (Google/Kakao/Naver)
-- 예약 발행 시간 옵션
-- 내 발행 로그/플랫폼별 스레드 조회
-- AdSlot 컴포넌트 (AdSense, 기본 비활성 모듈)
-- Traffic & Revenue Monitor 패널 (이벤트 집계 + 예상 광고수익)
+- SNS-style responsive UI
+- Horizontal platform card track
+- Accept/Reject/Edit workflow
+- Card version history with Undo/Redo
+- Voice-based refine input
+- Platform style context panel
+- Model selector (`gpt-4o-mini`, `gpt-4o`, `gpt-4.1-mini`)
+- Output language selector (`auto`, `korean`, `english`, `japanese`)
+- OAuth social login (Google/Kakao/Naver)
+- Scheduled publish option
+- Publish logs and platform threads
+- AdSlot component (AdSense, disabled by default)
+- Traffic and revenue monitor panel
 
 ## Env
 
 - `NEXT_PUBLIC_API_URL=http://localhost:8000`
-- `NEXT_PUBLIC_ENABLE_ADS=false` (기본, 수익화 시 true)
-- `NEXT_PUBLIC_ADSENSE_CLIENT=ca-pub-...` (선택)
-- `NEXT_PUBLIC_ADSENSE_SLOT_SIDEBAR=...` (선택)
-- `NEXT_PUBLIC_ADSENSE_SLOT_FOOTER=...` (선택)
-- 선택: `NEXT_PUBLIC_HMB_IMAGE_URL=<image-url>`
+- `NEXT_PUBLIC_ENABLE_ADS=false`
+- `NEXT_PUBLIC_ADSENSE_CLIENT=ca-pub-...` (optional)
+- `NEXT_PUBLIC_ADSENSE_SLOT_SIDEBAR=...` (optional)
+- `NEXT_PUBLIC_ADSENSE_SLOT_FOOTER=...` (optional)
+- `NEXT_PUBLIC_HMB_IMAGE_URL=<image-url>` (optional)
 
-## 배포 (Vercel)
+## Deploy (Vercel)
 
-1. `auto_hongmyungbo_frontend` repo 연결
-2. Build Command: `npm run build`
-3. Env 변수 입력 후 배포
+1. Connect the repository
+2. Build command: `npm run build`
+3. Set env values:
    - `NEXT_PUBLIC_API_URL=https://<backend-domain>`
-   - `NEXT_PUBLIC_ENABLE_ADS=false` (기본)
+   - `NEXT_PUBLIC_ENABLE_ADS=false`
 
-## Docker 배포
+## Docker
 
 ```bash
 cd frontend

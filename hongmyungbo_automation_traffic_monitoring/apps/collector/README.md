@@ -1,8 +1,8 @@
 # collector
 
-이벤트 수집 및 집계 API 서버입니다.
+Event collection and aggregation API server.
 
-## 실행
+## Run
 
 ```bash
 cd apps/collector
@@ -10,14 +10,14 @@ npm install
 npm run dev
 ```
 
-## 배포
+## Deploy
 
 ```bash
 docker build -t hmb-collector .
 docker run --rm -p 8090:8090 -e PORT=8090 hmb-collector
 ```
 
-## 엔드포인트
+## Endpoints
 
 - `POST /api/events`
 - `GET /api/summary`

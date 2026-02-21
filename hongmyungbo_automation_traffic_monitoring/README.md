@@ -1,8 +1,8 @@
 # hongmyungbo_automation_traffic_monitoring
 
-트래픽 이벤트 수집과 광고 수익 추정을 위한 독립 모노레포입니다.
+Independent monorepo for traffic event collection and ad revenue estimation.
 
-## 구조
+## Structure
 
 ```text
 hongmyungbo_automation_traffic_monitoring
@@ -20,7 +20,7 @@ hongmyungbo_automation_traffic_monitoring
 └── pnpm-workspace.yaml
 ```
 
-## 실행
+## Run
 
 ```bash
 cd hongmyungbo_automation_traffic_monitoring
@@ -36,13 +36,13 @@ pnpm dev
 - `POST /api/events`
 - `GET /api/summary?days=14&cpm=1.8&ctr=0.012&cpc=0.18&fillRate=0.65&slotsPerPage=2`
 
-## 배포
+## Deployment
 
-1. collector -> Railway/Render/Fly.io
-2. dashboard -> Railway/Render/Vercel(Node 런타임)
-3. collector URL을 dashboard의 `COLLECTOR_URL`로 연결
+1. Deploy collector to Railway/Render/Fly.io
+2. Deploy dashboard to Railway/Render/Vercel (Node runtime)
+3. Set dashboard `COLLECTOR_URL` to your collector endpoint
 
-## Docker Compose (로컬/서버)
+## Docker Compose
 
 ```bash
 cd hongmyungbo_automation_traffic_monitoring
@@ -52,7 +52,7 @@ docker compose up --build
 - collector: `http://localhost:8090`
 - dashboard: `http://localhost:8091`
 
-## 단독 Docker 배포
+## Standalone Docker
 
 ```bash
 # collector
@@ -68,5 +68,4 @@ docker run --rm -p 8091:8091 -e PORT=8091 -e COLLECTOR_URL=http://host.docker.in
 
 ## GitHub
 
-원격 저장소:
 - `https://github.com/minsing-jin/hongmyungbo_automation_traffic_monitoring.git`

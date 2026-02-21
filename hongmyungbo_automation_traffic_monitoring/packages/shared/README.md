@@ -1,3 +1,3 @@
 # shared
 
-공통 수익 추정 로직 및 타입 유틸 패키지입니다.
+Shared revenue estimation logic and common type utility package.
