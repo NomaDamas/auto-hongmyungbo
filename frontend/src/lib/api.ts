@@ -5,6 +5,7 @@ import type {
   ModelOption,
   PerPlatformLanguageMap,
   Platform,
+  ProviderOption,
   PublishJob,
   PublishLogItem,
   SocialProvider,
@@ -29,11 +30,12 @@ export async function generatePosts(
   platforms?: Platform[],
   language?: LanguageOption,
   languageByPlatform?: PerPlatformLanguageMap,
+  provider?: ProviderOption,
 ): Promise<GenerateResponse> {
   const res = await apiFetch(`${API_URL}/api/generate`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ draft, userProfile, model, platforms, language, languageByPlatform }),
+    body: JSON.stringify({ draft, userProfile, model, platforms, language, languageByPlatform, provider }),
   });
 
   if (!res.ok) {
@@ -52,6 +54,7 @@ export async function refinePost(payload: {
   userProfile?: UserProfile;
   model?: ModelOption;
   language?: LanguageOption;
+  provider?: ProviderOption;
 }): Promise<GeneratedCard> {
   const res = await apiFetch(`${API_URL}/api/refine`, {
     method: "POST",
@@ -168,8 +171,8 @@ export async function getThreads(limitPerPlatform = 20): Promise<SocialThread[]>
   return (await res.json()) as SocialThread[];
 }
 
-export async function fetchProvider(): Promise<{ provider: string; defaultModel: string }> {
+export async function fetchProvider(): Promise<{ provider: ProviderOption; defaultModel: string; availableProviders: ProviderOption[] }> {
   const res = await apiFetch(`${API_URL}/api/provider`);
-  if (!res.ok) return { provider: "openai", defaultModel: "gpt-4o-mini" };
+  if (!res.ok) return { provider: "openai", defaultModel: "gpt-4o-mini", availableProviders: ["openai"] };
   return res.json();
 }

@@ -30,6 +30,7 @@ import type {
   Platform,
   PublishJob,
   PublishLogItem,
+  ProviderOption,
   SocialThread,
   SocialProvider,
   UserInfo,
@@ -125,8 +126,9 @@ function buildUserProfile(contexts: Record<Platform, string>, referencePosts: Re
 export default function HomePage() {
   const [draft, setDraft] = useState("");
   const [modelOptions, setModelOptions] = useState<ModelOption[]>(OPENAI_MODELS);
+  const [availableProviders, setAvailableProviders] = useState<ProviderOption[]>(["openai"]);
+  const [provider, setProvider] = useState<ProviderOption>("openai");
   const [selectedModel, setSelectedModel] = useState<ModelOption>("gpt-4o-mini");
-  const [providerName, setProviderName] = useState<"openai" | "openrouter">("openai");
   const [draftId, setDraftId] = useState<number | null>(null);
   const [resultCards, setResultCards] = useState<CardState[]>([]);
   const [queueCards, setQueueCards] = useState<CardState[]>([]);
@@ -187,12 +189,10 @@ export default function HomePage() {
     const init = async () => {
       try {
         const providerInfo = await fetchProvider();
-        setProviderName(providerInfo.provider === "openrouter" ? "openrouter" : "openai");
-        if (providerInfo.provider === "openrouter") {
-          setModelOptions(OPENROUTER_MODELS);
-        } else {
-          setModelOptions(OPENAI_MODELS);
-        }
+        const initialProvider = providerInfo.provider === "openrouter" ? "openrouter" : "openai";
+        setAvailableProviders(providerInfo.availableProviders?.length ? providerInfo.availableProviders : [initialProvider]);
+        setProvider(initialProvider);
+        setModelOptions(initialProvider === "openrouter" ? OPENROUTER_MODELS : OPENAI_MODELS);
         setSelectedModel(providerInfo.defaultModel);
       } catch (err) {
         console.error(err);
@@ -241,6 +241,7 @@ export default function HomePage() {
         selectedPlatforms,
         language === "per_platform" ? "auto" : language,
         language === "per_platform" ? perPlatformLanguages : undefined,
+        provider,
       );
       setDraftId(generated.draftId);
       const nextCards = generated.cards.map(toCardState);
@@ -346,6 +347,7 @@ export default function HomePage() {
         userProfile,
         model: selectedModel,
         language: language === "per_platform" ? perPlatformLanguages[platform] : language,
+        provider,
       });
 
       setResultCards((prev) =>
@@ -578,6 +580,10 @@ export default function HomePage() {
         autoPublish={autoPublish}
         language={language}
         perPlatformLanguages={perPlatformLanguages}
+        provider={provider}
+        availableProviders={availableProviders}
+        selectedModel={selectedModel}
+        modelOptionsByProvider={{ openai: OPENAI_MODELS, openrouter: OPENROUTER_MODELS }}
         onClose={() => setContextOpen(false)}
         onSave={({
           contexts: nextContexts,
@@ -586,6 +592,8 @@ export default function HomePage() {
           autoPublish: nextAutoPublish,
           language: nextLanguage,
           perPlatformLanguages: nextPerPlatformLanguages,
+          provider: nextProvider,
+          selectedModel: nextModel,
         }) => {
           setContexts(nextContexts);
           setReferencePosts(nextReferencePosts);
@@ -593,6 +601,10 @@ export default function HomePage() {
           setAutoPublish(nextAutoPublish);
           setLanguage(nextLanguage);
           setPerPlatformLanguages(nextPerPlatformLanguages);
+          setProvider(nextProvider);
+          const nextModels = nextProvider === "openrouter" ? OPENROUTER_MODELS : OPENAI_MODELS;
+          setModelOptions(nextModels);
+          setSelectedModel(nextModels.includes(nextModel) ? nextModel : nextModels[0]);
         }}
       />
 
@@ -627,21 +639,10 @@ export default function HomePage() {
               onClick={() => setContextOpen(true)}
               className="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-xs font-medium dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
             >
-              <Settings2 className="mr-1 inline h-3.5 w-3.5" /> 플랫폼별 스타일 설정
+              <Settings2 className="mr-1 inline h-3.5 w-3.5" /> Options
             </button>
-            <select
-              value={selectedModel}
-              onChange={(e) => setSelectedModel(e.target.value as ModelOption)}
-              className="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-xs dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
-            >
-              {modelOptions.map((model) => (
-                <option key={model} value={model}>
-                  {model}
-                </option>
-              ))}
-            </select>
             <span className="rounded-full bg-zinc-100 px-2 py-1 text-[11px] text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">
-              Provider: {providerName}
+              Provider: {provider} | Model: {selectedModel}
             </span>
           </div>
         </header>

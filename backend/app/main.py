@@ -100,6 +100,7 @@ class GenerateRequest(BaseModel):
     platforms: Optional[List[Platform]] = None
     language: Optional[str] = None
     languageByPlatform: Optional[Dict[Platform, str]] = None
+    provider: Optional[str] = None
     intent: Optional[IntentSpec] = None
     styleSample: Optional[str] = None
 
@@ -127,6 +128,7 @@ class RefineRequest(BaseModel):
     userProfile: Optional[UserProfile] = None
     model: str
     language: Optional[str] = None
+    provider: Optional[str] = None
     intent: Optional[IntentSpec] = None
     styleSample: Optional[str] = None
 
@@ -139,6 +141,7 @@ class StyleExtractRequest(BaseModel):
     platform: Platform
     referencePosts: List[str]
     model: str
+    provider: Optional[str] = None
 
 
 class StyleExtractResponse(BaseModel):
@@ -270,23 +273,47 @@ app.add_middleware(
 )
 
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
-if OPENROUTER_API_KEY:
-    client = AsyncOpenAI(
+openai_client: Optional[AsyncOpenAI] = AsyncOpenAI(api_key=OPENAI_API_KEY) if OPENAI_API_KEY else None
+openrouter_client: Optional[AsyncOpenAI] = (
+    AsyncOpenAI(
         base_url="https://openrouter.ai/api/v1",
         api_key=OPENROUTER_API_KEY,
     )
-else:
-    client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+    if OPENROUTER_API_KEY
+    else None
+)
 
 # STT always uses OpenAI directly (OpenRouter doesn't support audio)
-stt_client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+stt_client = AsyncOpenAI(api_key=OPENAI_API_KEY) if OPENAI_API_KEY else None
 DEFAULT_STT_MODEL = os.getenv("OPENAI_STT_MODEL", "gpt-4o-mini-transcribe")
 
 PUBLISH_WORKER_TASK: Optional[asyncio.Task] = None
 SESSION_COOKIE_NAME = "hmb_session"
 SESSION_TTL_DAYS = int(os.getenv("SESSION_TTL_DAYS", "30"))
 FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
+
+
+def _resolve_text_client(provider: Optional[str], model: str) -> AsyncOpenAI:
+    selected = (provider or "").strip().lower()
+    if selected == "openrouter":
+        if not openrouter_client:
+            raise HTTPException(status_code=400, detail="OpenRouter provider is not configured")
+        return openrouter_client
+    if selected == "openai":
+        if not openai_client:
+            raise HTTPException(status_code=400, detail="OpenAI provider is not configured")
+        return openai_client
+
+    # Auto selection fallback.
+    if "/" in (model or "") and openrouter_client:
+        return openrouter_client
+    if openai_client:
+        return openai_client
+    if openrouter_client:
+        return openrouter_client
+    raise HTTPException(status_code=500, detail="No text generation provider is configured")
 
 
 def _trim_for_prompt(text: str, limit: int = 900) -> str:
@@ -344,7 +371,11 @@ def build_intent_block(intent: Optional[IntentSpec]) -> str:
     return "\n".join(lines) if lines else "No explicit intent constraints."
 
 
-async def derive_style_blueprint(style_sample: Optional[str], model: str) -> str:
+async def derive_style_blueprint(
+    style_sample: Optional[str],
+    model: str,
+    selected_client: AsyncOpenAI,
+) -> str:
     sample = (style_sample or "").strip()
     if not sample:
         return ""
@@ -356,7 +387,7 @@ async def derive_style_blueprint(style_sample: Optional[str], model: str) -> str
         f"\n\nSample:\n{_trim_for_prompt(sample, 2200)}"
     )
     try:
-        completion = await client.chat.completions.create(
+        completion = await selected_client.chat.completions.create(
             model=model,
             response_format={"type": "json_object"},
             temperature=0.2,
@@ -429,6 +460,7 @@ async def generate_for_platform(
     profile: Optional[UserProfile],
     model: str,
     language: Optional[str],
+    selected_client: AsyncOpenAI,
     intent_block: str,
     style_blueprint: str,
     style_sample: Optional[str],
@@ -455,7 +487,7 @@ async def generate_for_platform(
         '{"title":"...","body":"...","suggestions":["..."]}'
     )
 
-    completion = await client.chat.completions.create(
+    completion = await selected_client.chat.completions.create(
         model=model,
         response_format={"type": "json_object"},
         temperature=0.7,
@@ -719,10 +751,21 @@ async def health() -> Dict[str, str]:
 
 
 @app.get("/api/provider")
-async def get_provider_info() -> Dict[str, str]:
+async def get_provider_info() -> Dict[str, Any]:
+    available: List[str] = []
+    if openai_client:
+        available.append("openai")
+    if openrouter_client:
+        available.append("openrouter")
+    if not available:
+        available = ["openai"]
+
+    default_provider = "openrouter" if openrouter_client else "openai"
+    default_model = "openai/gpt-4o-mini" if default_provider == "openrouter" else "gpt-4o-mini"
     return {
-        "provider": "openrouter" if OPENROUTER_API_KEY else "openai",
-        "defaultModel": "openai/gpt-4o-mini" if OPENROUTER_API_KEY else "gpt-4o-mini",
+        "provider": default_provider,
+        "defaultModel": default_model,
+        "availableProviders": available,
     }
 
 
@@ -735,8 +778,9 @@ async def generate_content(req: GenerateRequest, request: Request) -> GenerateRe
     if not selected_platforms:
         raise HTTPException(status_code=400, detail="At least one platform must be selected")
 
+    selected_client = _resolve_text_client(req.provider, req.model)
     intent_block = build_intent_block(req.intent)
-    style_blueprint = await derive_style_blueprint(req.styleSample, req.model)
+    style_blueprint = await derive_style_blueprint(req.styleSample, req.model, selected_client)
     tasks = [
         generate_for_platform(
             platform,
@@ -744,6 +788,7 @@ async def generate_content(req: GenerateRequest, request: Request) -> GenerateRe
             req.userProfile,
             req.model,
             (req.languageByPlatform or {}).get(platform) or req.language,
+            selected_client,
             intent_block,
             style_blueprint,
             req.styleSample,
@@ -791,10 +836,11 @@ async def update_card_status(card_id: int, req: CardStatusRequest) -> GeneratedC
 
 @app.post("/api/refine", response_model=GeneratedCard)
 async def refine_content(req: RefineRequest) -> GeneratedCard:
+    selected_client = _resolve_text_client(req.provider, req.model)
     system_prompt = PLATFORM_PROMPTS[req.platform]
     style_block = build_style_block(req.platform, req.userProfile)
     intent_block = build_intent_block(req.intent)
-    style_blueprint = await derive_style_blueprint(req.styleSample, req.model)
+    style_blueprint = await derive_style_blueprint(req.styleSample, req.model, selected_client)
 
     user_prompt = (
         "You are refining an already generated post while preserving platform fit.\n"
@@ -815,7 +861,7 @@ async def refine_content(req: RefineRequest) -> GeneratedCard:
         '{"title":"...","body":"...","suggestions":["..."]}'
     )
 
-    completion = await client.chat.completions.create(
+    completion = await selected_client.chat.completions.create(
         model=req.model,
         response_format={"type": "json_object"},
         temperature=0.7,
@@ -863,7 +909,8 @@ async def extract_style(req: StyleExtractRequest) -> StyleExtractResponse:
         + "\n---\n".join(req.referencePosts)
     )
 
-    completion = await client.chat.completions.create(
+    selected_client = _resolve_text_client(req.provider, req.model)
+    completion = await selected_client.chat.completions.create(
         model=req.model,
         response_format={"type": "json_object"},
         temperature=0.3,
@@ -890,6 +937,8 @@ async def extract_style(req: StyleExtractRequest) -> StyleExtractResponse:
 
 @app.post("/api/stt", response_model=STTResponse)
 async def transcribe_voice(file: UploadFile = File(...)) -> STTResponse:
+    if not stt_client:
+        raise HTTPException(status_code=400, detail="OPENAI_API_KEY is required for STT")
     if not file.filename:
         raise HTTPException(status_code=400, detail="No file uploaded")
 

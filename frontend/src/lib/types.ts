@@ -2,6 +2,7 @@ export type Platform = "reddit" | "linkedin" | "twitter" | "instagram" | "blog";
 export type SocialProvider = "google" | "kakao" | "naver";
 
 export type ModelOption = string;
+export type ProviderOption = "openai" | "openrouter";
 export type LanguageOption = "auto" | "korean" | "english" | "japanese";
 export type LanguageSettingOption = LanguageOption | "per_platform";
 export type PerPlatformLanguageMap = Record<Platform, LanguageOption>;
