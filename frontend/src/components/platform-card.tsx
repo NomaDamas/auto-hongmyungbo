@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Check, Copy, Expand, Loader2, Mic, Pencil, RotateCcw, RotateCw, X } from "lucide-react";
 import type { CardState, Platform } from "@/lib/types";
 
 type Props = {
   card: CardState;
+  isCollapsing?: boolean;
   onAccept: () => void;
   onReject: () => void;
   onRefine: (feedback: string) => Promise<void>;
@@ -48,6 +49,7 @@ function PreviewFrame({ platform, title }: { platform: Platform; title: string }
 
 export function PlatformCard({
   card,
+  isCollapsing = false,
   onAccept,
   onReject,
   onRefine,
@@ -69,6 +71,7 @@ export function PlatformCard({
 
   const [draftTitle, setDraftTitle] = useState(current.title);
   const [draftBody, setDraftBody] = useState(current.body);
+  const editBodyRef = useRef<HTMLTextAreaElement | null>(null);
 
   useEffect(() => {
     setDraftTitle(current.title);
@@ -76,6 +79,12 @@ export function PlatformCard({
     setViewMode("preview");
     setExpandedPreview(false);
   }, [current.title, current.body]);
+
+  useEffect(() => {
+    if (viewMode !== "edit" || !editBodyRef.current) return;
+    editBodyRef.current.style.height = "auto";
+    editBodyRef.current.style.height = `${editBodyRef.current.scrollHeight}px`;
+  }, [draftBody, viewMode]);
 
   useEffect(() => {
     if (!fullViewOpen) return;
@@ -98,7 +107,11 @@ export function PlatformCard({
   };
 
   return (
-    <article className="relative h-full rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+    <article
+      className={`relative h-full rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm transition-all dark:border-zinc-800 dark:bg-zinc-900 ${
+        isCollapsing ? "scale-95 opacity-0" : ""
+      }`}
+    >
       {card.isRefining && (
         <div className="absolute inset-0 z-10 grid place-items-center rounded-2xl bg-white/70 backdrop-blur-sm dark:bg-zinc-900/70">
           <div className="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-xs font-semibold dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100">
@@ -230,9 +243,10 @@ export function PlatformCard({
               className="w-full rounded-md border border-zinc-300 bg-white px-2 py-1 text-sm font-semibold text-zinc-900 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
             />
             <textarea
+              ref={editBodyRef}
               value={draftBody}
               onChange={(e) => setDraftBody(e.target.value)}
-              className="h-24 w-full rounded-md border border-zinc-300 bg-white px-2 py-1 text-sm text-zinc-800 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-200"
+              className="min-h-[40vh] w-full resize-y overflow-hidden rounded-md border border-zinc-300 bg-white px-2 py-1 text-sm text-zinc-800 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-200"
             />
             <div className="flex justify-end gap-2">
               <button

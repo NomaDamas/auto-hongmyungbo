@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { ArchiveRestore, CheckCheck, Settings2, Sparkles } from "lucide-react";
 import { PlatformCard } from "@/components/platform-card";
 import { ContextPanel } from "@/components/context-panel";
+import { OptionsPanel } from "@/components/options-panel";
 import {
   enqueuePublish,
   fetchProvider,
@@ -142,6 +143,7 @@ export default function HomePage() {
   const [oauthBusyPlatform, setOauthBusyPlatform] = useState<Platform | null>(null);
 
   const [contextOpen, setContextOpen] = useState(false);
+  const [optionsOpen, setOptionsOpen] = useState(false);
   const [contexts, setContexts] = useState<Record<Platform, string>>(EMPTY_CONTEXTS);
   const [referencePosts, setReferencePosts] = useState<Record<Platform, string[]>>(EMPTY_REFERENCE_POSTS);
   const [enabledPlatforms, setEnabledPlatforms] = useState<Record<Platform, boolean>>(DEFAULT_ENABLED_PLATFORMS);
@@ -587,10 +589,6 @@ export default function HomePage() {
         autoPublish={autoPublish}
         language={language}
         perPlatformLanguages={perPlatformLanguages}
-        provider={provider}
-        availableProviders={availableProviders}
-        selectedModel={selectedModel}
-        modelOptionsByProvider={{ openai: OPENAI_MODELS, openrouter: OPENROUTER_MODELS }}
         onClose={() => setContextOpen(false)}
         onSave={({
           contexts: nextContexts,
@@ -599,8 +597,6 @@ export default function HomePage() {
           autoPublish: nextAutoPublish,
           language: nextLanguage,
           perPlatformLanguages: nextPerPlatformLanguages,
-          provider: nextProvider,
-          selectedModel: nextModel,
         }) => {
           setContexts(nextContexts);
           setReferencePosts(nextReferencePosts);
@@ -608,10 +604,18 @@ export default function HomePage() {
           setAutoPublish(nextAutoPublish);
           setLanguage(nextLanguage);
           setPerPlatformLanguages(nextPerPlatformLanguages);
+        }}
+      />
+      <OptionsPanel
+        open={optionsOpen}
+        provider={provider}
+        availableProviders={availableProviders}
+        onClose={() => setOptionsOpen(false)}
+        onSave={(nextProvider) => {
           setProvider(nextProvider);
           const nextModels = nextProvider === "openrouter" ? OPENROUTER_MODELS : OPENAI_MODELS;
           setModelOptions(nextModels);
-          setSelectedModel(nextModels.includes(nextModel) ? nextModel : nextModels[0]);
+          setSelectedModel(nextModels[0]);
         }}
       />
 
@@ -646,11 +650,14 @@ export default function HomePage() {
               onClick={() => setContextOpen(true)}
               className="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-xs font-medium dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
             >
-              <Settings2 className="mr-1 inline h-3.5 w-3.5" /> Options
+              <Settings2 className="mr-1 inline h-3.5 w-3.5" /> Platform Writing Style
             </button>
-            <span className="rounded-full bg-zinc-100 px-2 py-1 text-[11px] text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">
-              Provider: {provider} | Model: {selectedModel}
-            </span>
+            <button
+              onClick={() => setOptionsOpen(true)}
+              className="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-xs font-medium dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
+            >
+              Options
+            </button>
           </div>
         </header>
 
@@ -754,10 +761,13 @@ export default function HomePage() {
           <section className="min-w-0 rounded-2xl border border-zinc-200 bg-white p-3 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
             <div className="mb-2 flex items-center justify-between">
               <h2 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Platform Results</h2>
-              <label className="flex items-center gap-2 rounded-md border border-zinc-300 px-2 py-1 text-xs text-zinc-700 dark:border-zinc-700 dark:text-zinc-200">
-                <input type="checkbox" checked={compareMode} onChange={(e) => setCompareMode(e.target.checked)} />
-                Compare mode
-              </label>
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] text-zinc-500 dark:text-zinc-400">model: {selectedModel}</span>
+                <label className="flex items-center gap-2 rounded-md border border-zinc-300 px-2 py-1 text-xs text-zinc-700 dark:border-zinc-700 dark:text-zinc-200">
+                  <input type="checkbox" checked={compareMode} onChange={(e) => setCompareMode(e.target.checked)} />
+                  Compare mode
+                </label>
+              </div>
             </div>
 
             {!compareMode && cardsByOrder.length > 0 && (
@@ -778,50 +788,45 @@ export default function HomePage() {
               </div>
             )}
 
-            <div className="rounded-xl border border-zinc-200 p-3 dark:border-zinc-800">
-              {compareMode ? (
-                <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-                  {cardsByOrder.map((card) => {
-                    const isCollapsing = collapsingKeys.has(cardKey(card));
-                    return (
-                      <div key={cardKey(card)} className={isCollapsing ? "scale-95 opacity-0 transition-all" : "transition-all"}>
-                        <PlatformCard
-                          card={card}
-                          onAccept={() => void handleAccept(card)}
-                          onReject={() => void handleReject(card)}
-                          onRefine={(feedback) => handleRefine(card.platform, feedback)}
-                          onVoiceRefine={() => handleVoiceRefine(card.platform)}
-                          onUndo={() => patchCard(card.platform, { versionIndex: Math.max(0, card.versionIndex - 1) })}
-                          onRedo={() => patchCard(card.platform, { versionIndex: Math.min(card.versions.length - 1, card.versionIndex + 1) })}
-                          onSelectVersion={(index) => patchCard(card.platform, { versionIndex: index })}
-                          onPreviewChange={(title, body) => handlePreviewEdit(card.platform, title, body)}
-                        />
-                      </div>
-                    );
-                  })}
-                </div>
-              ) : activeCard ? (
-                <PlatformCard
-                  card={activeCard}
-                  onAccept={() => void handleAccept(activeCard)}
-                  onReject={() => void handleReject(activeCard)}
-                  onRefine={(feedback) => handleRefine(activeCard.platform, feedback)}
-                  onVoiceRefine={() => handleVoiceRefine(activeCard.platform)}
-                  onUndo={() => patchCard(activeCard.platform, { versionIndex: Math.max(0, activeCard.versionIndex - 1) })}
-                  onRedo={() =>
-                    patchCard(activeCard.platform, {
-                      versionIndex: Math.min(activeCard.versions.length - 1, activeCard.versionIndex + 1),
-                    })
-                  }
-                  onSelectVersion={(index) => patchCard(activeCard.platform, { versionIndex: index })}
-                  onPreviewChange={(title, body) => handlePreviewEdit(activeCard.platform, title, body)}
-                />
-              ) : (
-                <div className="grid h-[360px] place-items-center rounded-xl border border-dashed border-zinc-300 text-sm text-zinc-500 dark:border-zinc-700 dark:text-zinc-400">
-                  결과 카드가 비어 있습니다. Draft 생성 후 Accept로 Queue에 보관할 수 있습니다.
-                </div>
-              )}
-            </div>
+            {compareMode ? (
+              <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+                {cardsByOrder.map((card) => (
+                  <PlatformCard
+                    key={cardKey(card)}
+                    card={card}
+                    isCollapsing={collapsingKeys.has(cardKey(card))}
+                    onAccept={() => void handleAccept(card)}
+                    onReject={() => void handleReject(card)}
+                    onRefine={(feedback) => handleRefine(card.platform, feedback)}
+                    onVoiceRefine={() => handleVoiceRefine(card.platform)}
+                    onUndo={() => patchCard(card.platform, { versionIndex: Math.max(0, card.versionIndex - 1) })}
+                    onRedo={() => patchCard(card.platform, { versionIndex: Math.min(card.versions.length - 1, card.versionIndex + 1) })}
+                    onSelectVersion={(index) => patchCard(card.platform, { versionIndex: index })}
+                    onPreviewChange={(title, body) => handlePreviewEdit(card.platform, title, body)}
+                  />
+                ))}
+              </div>
+            ) : activeCard ? (
+              <PlatformCard
+                card={activeCard}
+                onAccept={() => void handleAccept(activeCard)}
+                onReject={() => void handleReject(activeCard)}
+                onRefine={(feedback) => handleRefine(activeCard.platform, feedback)}
+                onVoiceRefine={() => handleVoiceRefine(activeCard.platform)}
+                onUndo={() => patchCard(activeCard.platform, { versionIndex: Math.max(0, activeCard.versionIndex - 1) })}
+                onRedo={() =>
+                  patchCard(activeCard.platform, {
+                    versionIndex: Math.min(activeCard.versions.length - 1, activeCard.versionIndex + 1),
+                  })
+                }
+                onSelectVersion={(index) => patchCard(activeCard.platform, { versionIndex: index })}
+                onPreviewChange={(title, body) => handlePreviewEdit(activeCard.platform, title, body)}
+              />
+            ) : (
+              <div className="grid h-[360px] place-items-center rounded-xl border border-dashed border-zinc-300 text-sm text-zinc-500 dark:border-zinc-700 dark:text-zinc-400">
+                결과 카드가 비어 있습니다. Draft 생성 후 Accept로 Queue에 보관할 수 있습니다.
+              </div>
+            )}
           </section>
         </section>
 

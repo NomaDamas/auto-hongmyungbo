@@ -55,7 +55,6 @@ export function ContextPanel({
 
   const currentValue = useMemo(() => draftContexts[tab] ?? "", [draftContexts, tab]);
   const currentReferencePosts = useMemo(() => (draftReferencePosts[tab] ?? []).join("\n---\n"), [draftReferencePosts, tab]);
-  const languageMode = draftLanguage === "per_platform" ? "per_platform" : "unified";
 
   if (!open) return null;
 
@@ -83,12 +82,12 @@ export function ContextPanel({
             onClick={onClose}
             className="rounded-lg border border-zinc-300 px-3 py-1 text-xs dark:border-zinc-700 dark:text-zinc-200"
           >
-            Close
+            닫기
           </button>
         </header>
 
         <div className="mb-4 rounded-xl border border-zinc-200 p-3 dark:border-zinc-700">
-          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-600 dark:text-zinc-300">Target Platforms</p>
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-600 dark:text-zinc-300">게시 대상 플랫폼</p>
           <div className="grid grid-cols-2 gap-2">
             {PLATFORM_ORDER.map((p) => (
               <label key={p} className="flex items-center gap-2 rounded-lg border border-zinc-200 px-2 py-1.5 text-xs capitalize dark:border-zinc-700">
@@ -103,66 +102,39 @@ export function ContextPanel({
           </div>
           <label className="mt-3 flex items-center gap-2 text-xs text-zinc-700 dark:text-zinc-200">
             <input type="checkbox" checked={draftAutoPublish} onChange={(e) => setDraftAutoPublish(e.target.checked)} />
-            Auto-publish after generation
+            생성 후 자동 게시
           </label>
           <div className="mt-3">
-            <label className="mb-2 block text-[11px] font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Output Language</label>
-            <div className="mb-2 inline-flex rounded-md border border-zinc-300 p-0.5 dark:border-zinc-700">
-              <button
-                onClick={() => setDraftLanguage("auto")}
-                className={`rounded px-2 py-1 text-[11px] font-medium ${
-                  languageMode === "unified"
-                    ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
-                    : "text-zinc-600 dark:text-zinc-300"
-                }`}
-              >
-                Unified
-              </button>
-              <button
-                onClick={() => setDraftLanguage("per_platform")}
-                className={`rounded px-2 py-1 text-[11px] font-medium ${
-                  languageMode === "per_platform"
-                    ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
-                    : "text-zinc-600 dark:text-zinc-300"
-                }`}
-              >
-                Per Platform
-              </button>
-            </div>
+            <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">출력 언어</label>
+            <select
+              value={draftLanguage}
+              onChange={(e) => setDraftLanguage(e.target.value as LanguageOption)}
+              className="w-full rounded-md border border-zinc-300 bg-white px-2 py-1.5 text-xs dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
+            >
+              <option value="auto">Auto (입력과 동일)</option>
+              <option value="korean">Korean</option>
+              <option value="english">English</option>
+              <option value="japanese">Japanese</option>
+              <option value="per_platform">Per SNS platform</option>
+            </select>
           </div>
-          {languageMode === "unified" ? (
+          {draftLanguage === "per_platform" && (
             <div className="mt-3">
-              <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Unified Language</label>
+              <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                {tab} language
+              </label>
               <select
-                value={draftLanguage === "per_platform" ? "auto" : draftLanguage}
-                onChange={(e) => setDraftLanguage(e.target.value as LanguageOption)}
+                value={draftPerPlatformLanguages[tab]}
+                onChange={(e) =>
+                  setDraftPerPlatformLanguages((prev) => ({ ...prev, [tab]: e.target.value as LanguageOption }))
+                }
                 className="w-full rounded-md border border-zinc-300 bg-white px-2 py-1.5 text-xs dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
               >
-                <option value="auto">Auto (same as input)</option>
+                <option value="auto">Auto</option>
                 <option value="korean">Korean</option>
                 <option value="english">English</option>
                 <option value="japanese">Japanese</option>
               </select>
-            </div>
-          ) : (
-            <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
-              {PLATFORM_ORDER.map((platform) => (
-                <label key={platform} className="rounded-md border border-zinc-200 p-2 text-xs dark:border-zinc-700">
-                  <span className="mb-1 block capitalize text-zinc-700 dark:text-zinc-200">{platform}</span>
-                  <select
-                    value={draftPerPlatformLanguages[platform]}
-                    onChange={(e) =>
-                      setDraftPerPlatformLanguages((prev) => ({ ...prev, [platform]: e.target.value as LanguageOption }))
-                    }
-                    className="w-full rounded-md border border-zinc-300 bg-white px-2 py-1.5 text-xs dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
-                  >
-                    <option value="auto">Auto</option>
-                    <option value="korean">Korean</option>
-                    <option value="english">English</option>
-                    <option value="japanese">Japanese</option>
-                  </select>
-                </label>
-              ))}
             </div>
           )}
         </div>
@@ -221,13 +193,13 @@ export function ContextPanel({
             }}
             className="rounded-lg border border-zinc-300 px-3 py-2 text-xs dark:border-zinc-700 dark:text-zinc-200"
           >
-            Reset
+            초기화
           </button>
           <button
             onClick={handleSave}
             className="rounded-lg bg-zinc-900 px-3 py-2 text-xs font-semibold text-white dark:bg-zinc-100 dark:text-zinc-900"
           >
-            Save
+            저장
           </button>
         </div>
       </aside>
