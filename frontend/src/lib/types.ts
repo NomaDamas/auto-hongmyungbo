@@ -3,6 +3,8 @@ export type SocialProvider = "google" | "kakao" | "naver";
 
 export type ModelOption = string;
 export type LanguageOption = "auto" | "korean" | "english" | "japanese";
+export type LanguageSettingOption = LanguageOption | "per_platform";
+export type PerPlatformLanguageMap = Record<Platform, LanguageOption>;
 
 export type GeneratedCard = {
   id?: number;

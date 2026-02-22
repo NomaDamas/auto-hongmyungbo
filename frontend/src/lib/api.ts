@@ -3,6 +3,7 @@ import type {
   GeneratedCard,
   LanguageOption,
   ModelOption,
+  PerPlatformLanguageMap,
   Platform,
   PublishJob,
   PublishLogItem,
@@ -27,11 +28,12 @@ export async function generatePosts(
   model?: ModelOption,
   platforms?: Platform[],
   language?: LanguageOption,
+  languageByPlatform?: PerPlatformLanguageMap,
 ): Promise<GenerateResponse> {
   const res = await apiFetch(`${API_URL}/api/generate`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ draft, userProfile, model, platforms, language }),
+    body: JSON.stringify({ draft, userProfile, model, platforms, language, languageByPlatform }),
   });
 
   if (!res.ok) {

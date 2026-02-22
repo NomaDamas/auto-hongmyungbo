@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import type { LanguageOption, Platform } from "@/lib/types";
+import type { LanguageOption, LanguageSettingOption, PerPlatformLanguageMap, Platform } from "@/lib/types";
 
 const PLATFORM_ORDER: Platform[] = ["instagram", "twitter", "linkedin", "reddit", "blog"];
 
@@ -11,14 +11,16 @@ type Props = {
   referencePosts: Record<Platform, string[]>;
   enabledPlatforms: Record<Platform, boolean>;
   autoPublish: boolean;
-  language: LanguageOption;
+  language: LanguageSettingOption;
+  perPlatformLanguages: PerPlatformLanguageMap;
   onClose: () => void;
   onSave: (payload: {
     contexts: Record<Platform, string>;
     referencePosts: Record<Platform, string[]>;
     enabledPlatforms: Record<Platform, boolean>;
     autoPublish: boolean;
-    language: LanguageOption;
+    language: LanguageSettingOption;
+    perPlatformLanguages: PerPlatformLanguageMap;
   }) => void;
 };
 
@@ -29,6 +31,7 @@ export function ContextPanel({
   enabledPlatforms,
   autoPublish,
   language,
+  perPlatformLanguages,
   onClose,
   onSave,
 }: Props) {
@@ -37,7 +40,8 @@ export function ContextPanel({
   const [draftReferencePosts, setDraftReferencePosts] = useState<Record<Platform, string[]>>(referencePosts);
   const [draftEnabled, setDraftEnabled] = useState<Record<Platform, boolean>>(enabledPlatforms);
   const [draftAutoPublish, setDraftAutoPublish] = useState(autoPublish);
-  const [draftLanguage, setDraftLanguage] = useState<LanguageOption>(language);
+  const [draftLanguage, setDraftLanguage] = useState<LanguageSettingOption>(language);
+  const [draftPerPlatformLanguages, setDraftPerPlatformLanguages] = useState<PerPlatformLanguageMap>(perPlatformLanguages);
 
   useEffect(() => {
     if (!open) return;
@@ -46,7 +50,8 @@ export function ContextPanel({
     setDraftEnabled(enabledPlatforms);
     setDraftAutoPublish(autoPublish);
     setDraftLanguage(language);
-  }, [autoPublish, contexts, enabledPlatforms, language, open, referencePosts]);
+    setDraftPerPlatformLanguages(perPlatformLanguages);
+  }, [autoPublish, contexts, enabledPlatforms, language, open, perPlatformLanguages, referencePosts]);
 
   const currentValue = useMemo(() => draftContexts[tab] ?? "", [draftContexts, tab]);
   const currentReferencePosts = useMemo(() => (draftReferencePosts[tab] ?? []).join("\n---\n"), [draftReferencePosts, tab]);
@@ -60,6 +65,7 @@ export function ContextPanel({
       enabledPlatforms: draftEnabled,
       autoPublish: draftAutoPublish,
       language: draftLanguage,
+      perPlatformLanguages: draftPerPlatformLanguages,
     });
     onClose();
   };
@@ -110,8 +116,28 @@ export function ContextPanel({
               <option value="korean">Korean</option>
               <option value="english">English</option>
               <option value="japanese">Japanese</option>
+              <option value="per_platform">Per SNS platform</option>
             </select>
           </div>
+          {draftLanguage === "per_platform" && (
+            <div className="mt-3">
+              <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                {tab} language
+              </label>
+              <select
+                value={draftPerPlatformLanguages[tab]}
+                onChange={(e) =>
+                  setDraftPerPlatformLanguages((prev) => ({ ...prev, [tab]: e.target.value as LanguageOption }))
+                }
+                className="w-full rounded-md border border-zinc-300 bg-white px-2 py-1.5 text-xs dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
+              >
+                <option value="auto">Auto</option>
+                <option value="korean">Korean</option>
+                <option value="english">English</option>
+                <option value="japanese">Japanese</option>
+              </select>
+            </div>
+          )}
         </div>
 
         <div className="mb-4 flex gap-2 overflow-x-auto pb-1">
@@ -164,6 +190,7 @@ export function ContextPanel({
               setDraftEnabled(enabledPlatforms);
               setDraftAutoPublish(autoPublish);
               setDraftLanguage(language);
+              setDraftPerPlatformLanguages(perPlatformLanguages);
             }}
             className="rounded-lg border border-zinc-300 px-3 py-2 text-xs dark:border-zinc-700 dark:text-zinc-200"
           >

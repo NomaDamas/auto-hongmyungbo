@@ -24,7 +24,9 @@ import type {
   CardVersion,
   GeneratedCard,
   LanguageOption,
+  LanguageSettingOption,
   ModelOption,
+  PerPlatformLanguageMap,
   Platform,
   PublishJob,
   PublishLogItem,
@@ -61,6 +63,13 @@ const EMPTY_REFERENCE_POSTS: Record<Platform, string[]> = {
   twitter: [],
   instagram: [],
   blog: [],
+};
+const DEFAULT_PER_PLATFORM_LANGUAGES: PerPlatformLanguageMap = {
+  reddit: "auto",
+  linkedin: "auto",
+  twitter: "auto",
+  instagram: "auto",
+  blog: "auto",
 };
 const DEFAULT_ENABLED_PLATFORMS: Record<Platform, boolean> = {
   reddit: true,
@@ -132,7 +141,8 @@ export default function HomePage() {
   const [referencePosts, setReferencePosts] = useState<Record<Platform, string[]>>(EMPTY_REFERENCE_POSTS);
   const [enabledPlatforms, setEnabledPlatforms] = useState<Record<Platform, boolean>>(DEFAULT_ENABLED_PLATFORMS);
   const [autoPublish, setAutoPublish] = useState(false);
-  const [language, setLanguage] = useState<LanguageOption>("auto");
+  const [language, setLanguage] = useState<LanguageSettingOption>("auto");
+  const [perPlatformLanguages, setPerPlatformLanguages] = useState<PerPlatformLanguageMap>(DEFAULT_PER_PLATFORM_LANGUAGES);
   const [user, setUser] = useState<UserInfo | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [logsLoading, setLogsLoading] = useState(false);
@@ -229,7 +239,8 @@ export default function HomePage() {
         userProfile,
         selectedModel,
         selectedPlatforms,
-        language,
+        language === "per_platform" ? "auto" : language,
+        language === "per_platform" ? perPlatformLanguages : undefined,
       );
       setDraftId(generated.draftId);
       const nextCards = generated.cards.map(toCardState);
@@ -334,7 +345,7 @@ export default function HomePage() {
         feedback,
         userProfile,
         model: selectedModel,
-        language,
+        language: language === "per_platform" ? perPlatformLanguages[platform] : language,
       });
 
       setResultCards((prev) =>
@@ -566,6 +577,7 @@ export default function HomePage() {
         enabledPlatforms={enabledPlatforms}
         autoPublish={autoPublish}
         language={language}
+        perPlatformLanguages={perPlatformLanguages}
         onClose={() => setContextOpen(false)}
         onSave={({
           contexts: nextContexts,
@@ -573,19 +585,21 @@ export default function HomePage() {
           enabledPlatforms: nextEnabled,
           autoPublish: nextAutoPublish,
           language: nextLanguage,
+          perPlatformLanguages: nextPerPlatformLanguages,
         }) => {
           setContexts(nextContexts);
           setReferencePosts(nextReferencePosts);
           setEnabledPlatforms(nextEnabled);
           setAutoPublish(nextAutoPublish);
           setLanguage(nextLanguage);
+          setPerPlatformLanguages(nextPerPlatformLanguages);
         }}
       />
 
       <main className="mx-auto min-h-screen w-full max-w-7xl px-4 py-6 md:px-6">
         <header className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-zinc-200 bg-white/80 p-4 shadow-sm backdrop-blur dark:border-zinc-800 dark:bg-zinc-900/70">
           <div>
-            <h1 className="text-2xl font-semibold text-zinc-900 dark:text-zinc-100">Auto-HongMyungBO</h1>
+            <h1 className="text-2xl font-semibold text-zinc-900 dark:text-zinc-100">Auto-HongMyungbo</h1>
             <p className="text-xs font-medium lowercase tracking-wide text-zinc-500 dark:text-zinc-400">ai cross posting social content studio</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">

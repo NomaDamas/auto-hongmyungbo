@@ -99,6 +99,7 @@ class GenerateRequest(BaseModel):
     model: str
     platforms: Optional[List[Platform]] = None
     language: Optional[str] = None
+    languageByPlatform: Optional[Dict[Platform, str]] = None
     intent: Optional[IntentSpec] = None
     styleSample: Optional[str] = None
 
@@ -742,7 +743,7 @@ async def generate_content(req: GenerateRequest, request: Request) -> GenerateRe
             req.draft,
             req.userProfile,
             req.model,
-            req.language,
+            (req.languageByPlatform or {}).get(platform) or req.language,
             intent_block,
             style_blueprint,
             req.styleSample,
