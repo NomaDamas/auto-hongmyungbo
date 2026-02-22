@@ -10,7 +10,6 @@ import type {
   PublishLogItem,
   SocialProvider,
   SocialThread,
-  IntentSpec,
   UserInfo,
   UserProfile,
 } from "@/lib/types";
@@ -30,13 +29,11 @@ export async function generatePosts(
   model?: ModelOption,
   platforms?: Platform[],
   language?: LanguageOption,
-  intent?: IntentSpec,
-  styleSample?: string,
 ): Promise<GenerateResponse> {
   const res = await apiFetch(`${API_URL}/api/generate`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ draft, userProfile, model, platforms, language, intent, styleSample }),
+    body: JSON.stringify({ draft, userProfile, model, platforms, language }),
   });
 
   if (!res.ok) {
@@ -55,8 +52,6 @@ export async function refinePost(payload: {
   userProfile?: UserProfile;
   model?: ModelOption;
   language?: LanguageOption;
-  intent?: IntentSpec;
-  styleSample?: string;
 }): Promise<GeneratedCard> {
   const res = await apiFetch(`${API_URL}/api/refine`, {
     method: "POST",

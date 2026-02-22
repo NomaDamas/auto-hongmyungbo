@@ -8,21 +8,33 @@ const PLATFORM_ORDER: Platform[] = ["instagram", "twitter", "linkedin", "reddit"
 type Props = {
   open: boolean;
   contexts: Record<Platform, string>;
+  referencePosts: Record<Platform, string[]>;
   enabledPlatforms: Record<Platform, boolean>;
   autoPublish: boolean;
   language: LanguageOption;
   onClose: () => void;
   onSave: (payload: {
     contexts: Record<Platform, string>;
+    referencePosts: Record<Platform, string[]>;
     enabledPlatforms: Record<Platform, boolean>;
     autoPublish: boolean;
     language: LanguageOption;
   }) => void;
 };
 
-export function ContextPanel({ open, contexts, enabledPlatforms, autoPublish, language, onClose, onSave }: Props) {
+export function ContextPanel({
+  open,
+  contexts,
+  referencePosts,
+  enabledPlatforms,
+  autoPublish,
+  language,
+  onClose,
+  onSave,
+}: Props) {
   const [tab, setTab] = useState<Platform>("instagram");
   const [draftContexts, setDraftContexts] = useState<Record<Platform, string>>(contexts);
+  const [draftReferencePosts, setDraftReferencePosts] = useState<Record<Platform, string[]>>(referencePosts);
   const [draftEnabled, setDraftEnabled] = useState<Record<Platform, boolean>>(enabledPlatforms);
   const [draftAutoPublish, setDraftAutoPublish] = useState(autoPublish);
   const [draftLanguage, setDraftLanguage] = useState<LanguageOption>(language);
@@ -30,18 +42,21 @@ export function ContextPanel({ open, contexts, enabledPlatforms, autoPublish, la
   useEffect(() => {
     if (!open) return;
     setDraftContexts(contexts);
+    setDraftReferencePosts(referencePosts);
     setDraftEnabled(enabledPlatforms);
     setDraftAutoPublish(autoPublish);
     setDraftLanguage(language);
-  }, [autoPublish, contexts, enabledPlatforms, language, open]);
+  }, [autoPublish, contexts, enabledPlatforms, language, open, referencePosts]);
 
   const currentValue = useMemo(() => draftContexts[tab] ?? "", [draftContexts, tab]);
+  const currentReferencePosts = useMemo(() => (draftReferencePosts[tab] ?? []).join("\n---\n"), [draftReferencePosts, tab]);
 
   if (!open) return null;
 
   const handleSave = () => {
     onSave({
       contexts: draftContexts,
+      referencePosts: draftReferencePosts,
       enabledPlatforms: draftEnabled,
       autoPublish: draftAutoPublish,
       language: draftLanguage,
@@ -119,14 +134,33 @@ export function ContextPanel({ open, contexts, enabledPlatforms, autoPublish, la
         <textarea
           value={currentValue}
           onChange={(e) => setDraftContexts((prev) => ({ ...prev, [tab]: e.target.value }))}
-          placeholder="예: 문장 길이는 짧게, 이모지 금지, 해시태그는 마지막에 3개"
-          className="h-[40vh] w-full rounded-2xl border border-zinc-300 bg-white px-3 py-3 text-sm outline-none focus:ring-2 focus:ring-zinc-300 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100 dark:focus:ring-zinc-700"
+          placeholder="Optional: additional style constraints for this platform"
+          className="mb-3 h-28 w-full rounded-2xl border border-zinc-300 bg-white px-3 py-3 text-sm outline-none focus:ring-2 focus:ring-zinc-300 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100 dark:focus:ring-zinc-700"
+        />
+
+        <label className="mb-2 block text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+          {tab} Reference Posts (auto style transfer)
+        </label>
+        <textarea
+          value={currentReferencePosts}
+          onChange={(e) =>
+            setDraftReferencePosts((prev) => ({
+              ...prev,
+              [tab]: e.target.value
+                .split(/\n\s*---+\s*\n/g)
+                .map((part) => part.trim())
+                .filter(Boolean),
+            }))
+          }
+          placeholder={"Paste multiple posts and separate each with:\n---"}
+          className="h-[28vh] w-full rounded-2xl border border-zinc-300 bg-white px-3 py-3 text-sm outline-none focus:ring-2 focus:ring-zinc-300 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100 dark:focus:ring-zinc-700"
         />
 
         <div className="mt-4 flex items-center justify-end gap-2">
           <button
             onClick={() => {
               setDraftContexts(contexts);
+              setDraftReferencePosts(referencePosts);
               setDraftEnabled(enabledPlatforms);
               setDraftAutoPublish(autoPublish);
               setDraftLanguage(language);

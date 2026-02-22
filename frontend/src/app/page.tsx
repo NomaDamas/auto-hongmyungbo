@@ -32,7 +32,6 @@ import type {
   Platform,
   PublishJob,
   PublishLogItem,
-  IntentSpec,
   SocialThread,
   SocialProvider,
   UserInfo,
@@ -61,6 +60,13 @@ const EMPTY_CONTEXTS: Record<Platform, string> = {
   twitter: "",
   instagram: "",
   blog: "",
+};
+const EMPTY_REFERENCE_POSTS: Record<Platform, string[]> = {
+  reddit: [],
+  linkedin: [],
+  twitter: [],
+  instagram: [],
+  blog: [],
 };
 const DEFAULT_ENABLED_PLATFORMS: Record<Platform, boolean> = {
   reddit: true,
@@ -95,17 +101,18 @@ function toCardState(card: GeneratedCard): CardState {
   };
 }
 
-function buildUserProfile(contexts: Record<Platform, string>): UserProfile {
+function buildUserProfile(contexts: Record<Platform, string>, referencePosts: Record<Platform, string[]>): UserProfile {
   const styles: UserProfile["styles"] = {};
 
   for (const platform of PLATFORM_ORDER) {
     const text = contexts[platform]?.trim();
-    if (!text) continue;
+    const refs = referencePosts[platform] ?? [];
+    if (!text && refs.length === 0) continue;
 
     styles[platform] = {
-      mode: "manual",
-      customInstructions: text,
-      referencePosts: [],
+      mode: refs.length > 0 ? "auto" : "manual",
+      customInstructions: text || undefined,
+      referencePosts: refs,
     };
   }
 
@@ -128,17 +135,10 @@ export default function HomePage() {
 
   const [contextOpen, setContextOpen] = useState(false);
   const [contexts, setContexts] = useState<Record<Platform, string>>(EMPTY_CONTEXTS);
+  const [referencePosts, setReferencePosts] = useState<Record<Platform, string[]>>(EMPTY_REFERENCE_POSTS);
   const [enabledPlatforms, setEnabledPlatforms] = useState<Record<Platform, boolean>>(DEFAULT_ENABLED_PLATFORMS);
   const [autoPublish, setAutoPublish] = useState(false);
   const [language, setLanguage] = useState<LanguageOption>("auto");
-  const [styleSample, setStyleSample] = useState("");
-  const [intentObjective, setIntentObjective] = useState("");
-  const [intentAudience, setIntentAudience] = useState("");
-  const [intentCoreMessage, setIntentCoreMessage] = useState("");
-  const [intentAction, setIntentAction] = useState("");
-  const [intentMustInclude, setIntentMustInclude] = useState("");
-  const [intentMustAvoid, setIntentMustAvoid] = useState("");
-  const [intentNotes, setIntentNotes] = useState("");
   const [analytics, setAnalytics] = useState<AnalyticsSummary | null>(null);
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
   const [cpm, setCpm] = useState(1.8);
@@ -162,37 +162,11 @@ export default function HomePage() {
   const cardsByOrder = useMemo(() => insertByPlatformOrder(resultCards), [resultCards]);
   const queueByOrder = useMemo(() => insertByPlatformOrder(queueCards), [queueCards]);
   const acceptedCount = queueByOrder.length;
-  const userProfile = useMemo(() => buildUserProfile(contexts), [contexts]);
+  const userProfile = useMemo(() => buildUserProfile(contexts, referencePosts), [contexts, referencePosts]);
   const selectedPlatforms = useMemo(
     () => PLATFORM_ORDER.filter((platform) => enabledPlatforms[platform]),
     [enabledPlatforms],
   );
-  const intentSpec = useMemo<IntentSpec | undefined>(() => {
-    const mustInclude = intentMustInclude
-      .split(",")
-      .map((item) => item.trim())
-      .filter(Boolean);
-    const mustAvoid = intentMustAvoid
-      .split(",")
-      .map((item) => item.trim())
-      .filter(Boolean);
-
-    const payload: IntentSpec = {
-      objective: intentObjective.trim() || undefined,
-      targetAudience: intentAudience.trim() || undefined,
-      coreMessage: intentCoreMessage.trim() || undefined,
-      desiredAction: intentAction.trim() || undefined,
-      mustInclude: mustInclude.length ? mustInclude : undefined,
-      mustAvoid: mustAvoid.length ? mustAvoid : undefined,
-      extraNotes: intentNotes.trim() || undefined,
-    };
-
-    const hasValue = Object.values(payload).some((value) => {
-      if (Array.isArray(value)) return value.length > 0;
-      return typeof value === "string" && value.length > 0;
-    });
-    return hasValue ? payload : undefined;
-  }, [intentAction, intentAudience, intentCoreMessage, intentMustAvoid, intentMustInclude, intentNotes, intentObjective]);
   const sessionIdRef = useRef<string>("");
 
   const getOrCreateSessionId = () => {
@@ -322,8 +296,6 @@ export default function HomePage() {
         selectedModel,
         selectedPlatforms,
         language,
-        intentSpec,
-        styleSample.trim() || undefined,
       );
       emitAnalytics("generate", { model: selectedModel, platformCount: selectedPlatforms.length, language });
       setDraftId(generated.draftId);
@@ -436,8 +408,6 @@ export default function HomePage() {
         userProfile,
         model: selectedModel,
         language,
-        intent: intentSpec,
-        styleSample: styleSample.trim() || undefined,
       });
       emitAnalytics("refine", { cardId: current.id, feedbackLength: feedback.length }, platform);
 
@@ -610,12 +580,20 @@ export default function HomePage() {
       <ContextPanel
         open={contextOpen}
         contexts={contexts}
+        referencePosts={referencePosts}
         enabledPlatforms={enabledPlatforms}
         autoPublish={autoPublish}
         language={language}
         onClose={() => setContextOpen(false)}
-        onSave={({ contexts: nextContexts, enabledPlatforms: nextEnabled, autoPublish: nextAutoPublish, language: nextLanguage }) => {
+        onSave={({
+          contexts: nextContexts,
+          referencePosts: nextReferencePosts,
+          enabledPlatforms: nextEnabled,
+          autoPublish: nextAutoPublish,
+          language: nextLanguage,
+        }) => {
           setContexts(nextContexts);
+          setReferencePosts(nextReferencePosts);
           setEnabledPlatforms(nextEnabled);
           setAutoPublish(nextAutoPublish);
           setLanguage(nextLanguage);
@@ -680,57 +658,6 @@ export default function HomePage() {
               placeholder="초안을 입력하세요..."
               className="mb-3 h-44 w-full rounded-xl border border-zinc-300 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-zinc-300 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100 dark:focus:ring-zinc-700"
             />
-            <div className="mb-3 space-y-2 rounded-xl border border-zinc-200 p-2.5 dark:border-zinc-800">
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Intent + Style Transfer</p>
-              <input
-                value={intentObjective}
-                onChange={(e) => setIntentObjective(e.target.value)}
-                placeholder="Objective (e.g., announce product launch with trust)"
-                className="w-full rounded-lg border border-zinc-300 bg-white px-2 py-1.5 text-xs dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
-              />
-              <input
-                value={intentAudience}
-                onChange={(e) => setIntentAudience(e.target.value)}
-                placeholder="Target audience"
-                className="w-full rounded-lg border border-zinc-300 bg-white px-2 py-1.5 text-xs dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
-              />
-              <input
-                value={intentCoreMessage}
-                onChange={(e) => setIntentCoreMessage(e.target.value)}
-                placeholder="Core message"
-                className="w-full rounded-lg border border-zinc-300 bg-white px-2 py-1.5 text-xs dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
-              />
-              <input
-                value={intentAction}
-                onChange={(e) => setIntentAction(e.target.value)}
-                placeholder="Desired action (what readers should do)"
-                className="w-full rounded-lg border border-zinc-300 bg-white px-2 py-1.5 text-xs dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
-              />
-              <input
-                value={intentMustInclude}
-                onChange={(e) => setIntentMustInclude(e.target.value)}
-                placeholder="Must include keywords (comma-separated)"
-                className="w-full rounded-lg border border-zinc-300 bg-white px-2 py-1.5 text-xs dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
-              />
-              <input
-                value={intentMustAvoid}
-                onChange={(e) => setIntentMustAvoid(e.target.value)}
-                placeholder="Must avoid expressions (comma-separated)"
-                className="w-full rounded-lg border border-zinc-300 bg-white px-2 py-1.5 text-xs dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
-              />
-              <input
-                value={intentNotes}
-                onChange={(e) => setIntentNotes(e.target.value)}
-                placeholder="Extra intent notes"
-                className="w-full rounded-lg border border-zinc-300 bg-white px-2 py-1.5 text-xs dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
-              />
-              <textarea
-                value={styleSample}
-                onChange={(e) => setStyleSample(e.target.value)}
-                placeholder="Paste a writing sample to mimic style (tone, rhythm, phrasing)."
-                className="h-28 w-full rounded-lg border border-zinc-300 bg-white px-2 py-1.5 text-xs outline-none focus:ring-2 focus:ring-zinc-300 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100 dark:focus:ring-zinc-700"
-              />
-            </div>
             <div className="flex gap-2">
               <button
                 onClick={handleGenerate}
