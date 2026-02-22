@@ -131,6 +131,9 @@ export default function HomePage() {
   const [selectedModel, setSelectedModel] = useState<ModelOption>("gpt-4o-mini");
   const [draftId, setDraftId] = useState<number | null>(null);
   const [resultCards, setResultCards] = useState<CardState[]>([]);
+  // Default OFF: single focused platform. ON: side-by-side comparison grid.
+  const [compareMode, setCompareMode] = useState(false);
+  const [activePlatform, setActivePlatform] = useState<Platform>("reddit");
   const [queueCards, setQueueCards] = useState<CardState[]>([]);
   const [collapsingKeys, setCollapsingKeys] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
@@ -153,8 +156,6 @@ export default function HomePage() {
   const [scheduleEnabled, setScheduleEnabled] = useState(false);
   const [scheduledAt, setScheduledAt] = useState("");
 
-  const carouselRef = useRef<HTMLDivElement | null>(null);
-
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
 
@@ -166,6 +167,17 @@ export default function HomePage() {
     () => PLATFORM_ORDER.filter((platform) => enabledPlatforms[platform]),
     [enabledPlatforms],
   );
+  const activeCard = useMemo(
+    () => cardsByOrder.find((card) => card.platform === activePlatform) ?? cardsByOrder[0] ?? null,
+    [activePlatform, cardsByOrder],
+  );
+
+  useEffect(() => {
+    if (!cardsByOrder.length) return;
+    if (!cardsByOrder.some((card) => card.platform === activePlatform)) {
+      setActivePlatform(cardsByOrder[0].platform);
+    }
+  }, [activePlatform, cardsByOrder]);
 
   const refreshPublishData = async () => {
     if (!user) {
@@ -246,6 +258,7 @@ export default function HomePage() {
       setDraftId(generated.draftId);
       const nextCards = generated.cards.map(toCardState);
       setResultCards(nextCards);
+      if (nextCards.length) setActivePlatform(nextCards[0].platform);
       setQueueCards([]);
       setPublishJob(null);
       setCollapsingKeys(new Set());
@@ -553,12 +566,6 @@ export default function HomePage() {
     }
   };
 
-  const scrollResults = (dir: "left" | "right") => {
-    if (!carouselRef.current) return;
-    const amount = Math.max(280, Math.floor(carouselRef.current.clientWidth * 0.82));
-    carouselRef.current.scrollBy({ left: dir === "left" ? -amount : amount, behavior: "smooth" });
-  };
-
   const handlePreviewEdit = (platform: Platform, title: string, body: string) => {
     setResultCards((prev) =>
       prev.map((c) => {
@@ -747,35 +754,37 @@ export default function HomePage() {
           <section className="min-w-0 rounded-2xl border border-zinc-200 bg-white p-3 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
             <div className="mb-2 flex items-center justify-between">
               <h2 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Platform Results</h2>
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-zinc-500 dark:text-zinc-400">좌우 버튼으로 탐색</span>
-                <button
-                  onClick={() => scrollResults("left")}
-                  className="rounded-md border border-zinc-300 px-2 py-1 text-xs dark:border-zinc-700 dark:text-zinc-200"
-                >
-                  ←
-                </button>
-                <button
-                  onClick={() => scrollResults("right")}
-                  className="rounded-md border border-zinc-300 px-2 py-1 text-xs dark:border-zinc-700 dark:text-zinc-200"
-                >
-                  →
-                </button>
-              </div>
+              <label className="flex items-center gap-2 rounded-md border border-zinc-300 px-2 py-1 text-xs text-zinc-700 dark:border-zinc-700 dark:text-zinc-200">
+                <input type="checkbox" checked={compareMode} onChange={(e) => setCompareMode(e.target.checked)} />
+                Compare mode
+              </label>
             </div>
 
-            <div className="relative w-full overflow-hidden rounded-xl border border-zinc-200 dark:border-zinc-800">
-              <div ref={carouselRef} className="w-full min-w-0 overflow-x-auto p-3 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
-                <div className="flex w-max min-w-full gap-4">
+            {!compareMode && cardsByOrder.length > 0 && (
+              <div className="mb-2 flex gap-1 overflow-x-auto pb-1">
+                {cardsByOrder.map((card) => (
+                  <button
+                    key={cardKey(card)}
+                    onClick={() => setActivePlatform(card.platform)}
+                    className={`shrink-0 rounded-full px-3 py-1 text-xs capitalize ${
+                      activePlatform === card.platform
+                        ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
+                        : "border border-zinc-300 text-zinc-700 dark:border-zinc-700 dark:text-zinc-200"
+                    }`}
+                  >
+                    {card.platform}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            <div className="rounded-xl border border-zinc-200 p-3 dark:border-zinc-800">
+              {compareMode ? (
+                <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
                   {cardsByOrder.map((card) => {
                     const isCollapsing = collapsingKeys.has(cardKey(card));
                     return (
-                      <div
-                        key={cardKey(card)}
-                        className={`overflow-hidden transition-all duration-300 ease-out ${
-                          isCollapsing ? "w-0 scale-95 opacity-0" : "w-[350px] flex-shrink-0 scale-100 opacity-100"
-                        }`}
-                      >
+                      <div key={cardKey(card)} className={isCollapsing ? "scale-95 opacity-0 transition-all" : "transition-all"}>
                         <PlatformCard
                           card={card}
                           onAccept={() => void handleAccept(card)}
@@ -790,18 +799,28 @@ export default function HomePage() {
                       </div>
                     );
                   })}
-
-                  {!cardsByOrder.length && (
-                    <div className="grid h-[600px] w-[350px] flex-shrink-0 place-items-center rounded-xl border border-dashed border-zinc-300 text-sm text-zinc-500 dark:border-zinc-700 dark:text-zinc-400">
-                      결과 카드가 비어 있습니다. Draft 생성 후 Accept로 Queue에 보관할 수 있습니다.
-                    </div>
-                  )}
-                  <div className="w-2 flex-shrink-0" />
                 </div>
-              </div>
-              <div className="px-3 pb-2 text-[11px] text-zinc-500 dark:text-zinc-400">
-                박스 바깥 카드는 숨겨지고, 내부 스크롤/버튼으로만 탐색됩니다.
-              </div>
+              ) : activeCard ? (
+                <PlatformCard
+                  card={activeCard}
+                  onAccept={() => void handleAccept(activeCard)}
+                  onReject={() => void handleReject(activeCard)}
+                  onRefine={(feedback) => handleRefine(activeCard.platform, feedback)}
+                  onVoiceRefine={() => handleVoiceRefine(activeCard.platform)}
+                  onUndo={() => patchCard(activeCard.platform, { versionIndex: Math.max(0, activeCard.versionIndex - 1) })}
+                  onRedo={() =>
+                    patchCard(activeCard.platform, {
+                      versionIndex: Math.min(activeCard.versions.length - 1, activeCard.versionIndex + 1),
+                    })
+                  }
+                  onSelectVersion={(index) => patchCard(activeCard.platform, { versionIndex: index })}
+                  onPreviewChange={(title, body) => handlePreviewEdit(activeCard.platform, title, body)}
+                />
+              ) : (
+                <div className="grid h-[360px] place-items-center rounded-xl border border-dashed border-zinc-300 text-sm text-zinc-500 dark:border-zinc-700 dark:text-zinc-400">
+                  결과 카드가 비어 있습니다. Draft 생성 후 Accept로 Queue에 보관할 수 있습니다.
+                </div>
+              )}
             </div>
           </section>
         </section>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Check, Loader2, Mic, Pencil, RotateCcw, RotateCw, X } from "lucide-react";
+import { Check, Copy, Expand, Loader2, Mic, Pencil, RotateCcw, RotateCw, X } from "lucide-react";
 import type { CardState, Platform } from "@/lib/types";
 
 type Props = {
@@ -58,10 +58,14 @@ export function PlatformCard({
   onPreviewChange,
 }: Props) {
   const [feedback, setFeedback] = useState("");
+  // Keeps Preview (read-only) and Edit (editable) clearly separated.
+  const [viewMode, setViewMode] = useState<"preview" | "edit">("preview");
   const [expandedPreview, setExpandedPreview] = useState(false);
-  const [editingPreview, setEditingPreview] = useState(false);
+  const [fullViewOpen, setFullViewOpen] = useState(false);
+  const [copyLabel, setCopyLabel] = useState("Copy");
   const current = useMemo(() => card.versions[card.versionIndex], [card.versionIndex, card.versions]);
-  const canExpand = current.body.length > 180 || current.body.split("\n").length > 5;
+  const charCount = current.body.length;
+  const canExpand = current.body.length > 320 || current.body.split("\n").length > 8;
 
   const [draftTitle, setDraftTitle] = useState(current.title);
   const [draftBody, setDraftBody] = useState(current.body);
@@ -69,8 +73,29 @@ export function PlatformCard({
   useEffect(() => {
     setDraftTitle(current.title);
     setDraftBody(current.body);
-    setEditingPreview(false);
+    setViewMode("preview");
+    setExpandedPreview(false);
   }, [current.title, current.body]);
+
+  useEffect(() => {
+    if (!fullViewOpen) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setFullViewOpen(false);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [fullViewOpen]);
+
+  const copyFullContent = async () => {
+    try {
+      await navigator.clipboard.writeText(`${current.title}\n\n${current.body}`);
+      setCopyLabel("Copied");
+      window.setTimeout(() => setCopyLabel("Copy"), 1200);
+    } catch {
+      setCopyLabel("Failed");
+      window.setTimeout(() => setCopyLabel("Copy"), 1200);
+    }
+  };
 
   return (
     <article className="relative h-full rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
@@ -89,7 +114,10 @@ export function PlatformCard({
             {card.status} · version {card.versionIndex + 1}
           </p>
         </div>
-        <div className="flex gap-1">
+        <div className="flex items-center gap-1">
+          <span className="rounded-full bg-zinc-100 px-2 py-1 text-[10px] font-medium text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">
+            {charCount} chars
+          </span>
           <button onClick={onUndo} disabled={card.versionIndex === 0} className="rounded-md border px-2 py-1 text-[11px] disabled:opacity-40 dark:text-zinc-100">
             <RotateCcw className="mr-1 inline h-3 w-3" />
           </button>
@@ -128,35 +156,73 @@ export function PlatformCard({
       <PreviewFrame platform={card.platform} title={current.title} />
 
       <div className="mt-2 rounded-lg border border-zinc-200 bg-zinc-50 p-2 dark:border-zinc-700 dark:bg-zinc-800/60">
-        <div className="mb-1 flex items-center justify-between">
-          <p className="text-[11px] text-zinc-500 dark:text-zinc-400">본문 Preview</p>
-          <button
-            onClick={() => setEditingPreview((v) => !v)}
-            className="rounded-md px-2 py-1 text-[11px] font-medium text-zinc-600 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-700"
-          >
-            {editingPreview ? "닫기" : "Preview Edit"}
-          </button>
+        <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+          <div className="flex gap-1">
+            <button
+              onClick={() => setViewMode("preview")}
+              className={`rounded-md px-2 py-1 text-[11px] font-medium ${
+                viewMode === "preview"
+                  ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
+                  : "border border-zinc-300 text-zinc-600 dark:border-zinc-700 dark:text-zinc-300"
+              }`}
+            >
+              Preview
+            </button>
+            <button
+              onClick={() => setViewMode("edit")}
+              className={`rounded-md px-2 py-1 text-[11px] font-medium ${
+                viewMode === "edit"
+                  ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
+                  : "border border-zinc-300 text-zinc-600 dark:border-zinc-700 dark:text-zinc-300"
+              }`}
+            >
+              Edit
+            </button>
+          </div>
+          <div className="flex gap-1">
+            <button
+              onClick={() => void copyFullContent()}
+              className="rounded-md border border-zinc-300 px-2 py-1 text-[11px] font-medium text-zinc-700 dark:border-zinc-700 dark:text-zinc-200"
+            >
+              <Copy className="mr-1 inline h-3 w-3" />
+              {copyLabel}
+            </button>
+            <button
+              onClick={() => setFullViewOpen(true)}
+              className="rounded-md border border-zinc-300 px-2 py-1 text-[11px] font-medium text-zinc-700 dark:border-zinc-700 dark:text-zinc-200"
+            >
+              <Expand className="mr-1 inline h-3 w-3" />
+              Full view
+            </button>
+          </div>
         </div>
 
-        <div className={`overflow-hidden transition-all duration-300 ease-out ${expandedPreview ? "max-h-[340px]" : "max-h-[7.8rem]"}`}>
-          <p
-            className={`break-words whitespace-pre-wrap text-sm text-zinc-700 dark:text-zinc-200 ${
-              expandedPreview ? "" : "[display:-webkit-box] [-webkit-line-clamp:5] [-webkit-box-orient:vertical] overflow-hidden"
-            }`}
-          >
-            {current.body}
-          </p>
-        </div>
-        {canExpand && (
-          <button
-            onClick={() => setExpandedPreview((v) => !v)}
-            className="mt-1 rounded-md px-1 py-1 text-[11px] font-medium text-zinc-600 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-700"
-          >
-            {expandedPreview ? "접기" : "더보기"}
-          </button>
+        {viewMode === "preview" && (
+          <>
+            <div className="relative">
+              <p
+                className={`break-words whitespace-pre-wrap text-sm text-zinc-700 dark:text-zinc-200 ${
+                  expandedPreview ? "" : "[display:-webkit-box] [-webkit-line-clamp:8] [-webkit-box-orient:vertical] overflow-hidden"
+                }`}
+              >
+                {current.body}
+              </p>
+              {!expandedPreview && canExpand && (
+                <div className="pointer-events-none absolute inset-x-0 bottom-0 h-8 bg-gradient-to-t from-zinc-50 to-transparent dark:from-zinc-800/60" />
+              )}
+            </div>
+            {canExpand && (
+              <button
+                onClick={() => setExpandedPreview((v) => !v)}
+                className="mt-1 rounded-md px-1 py-1 text-[11px] font-medium text-zinc-600 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-700"
+              >
+                {expandedPreview ? "Collapse" : "Read more"}
+              </button>
+            )}
+          </>
         )}
 
-        {editingPreview && (
+        {viewMode === "edit" && (
           <div className="mt-2 space-y-2 rounded-lg border border-zinc-200 bg-white p-2 dark:border-zinc-700 dark:bg-zinc-900">
             <input
               value={draftTitle}
@@ -173,7 +239,7 @@ export function PlatformCard({
                 onClick={() => {
                   setDraftTitle(current.title);
                   setDraftBody(current.body);
-                  setEditingPreview(false);
+                  setViewMode("preview");
                 }}
                 className="rounded-md border border-zinc-300 px-2 py-1 text-[11px] dark:border-zinc-700 dark:text-zinc-200"
               >
@@ -182,7 +248,7 @@ export function PlatformCard({
               <button
                 onClick={() => {
                   onPreviewChange(draftTitle, draftBody);
-                  setEditingPreview(false);
+                  setViewMode("preview");
                 }}
                 className="rounded-md bg-zinc-900 px-2 py-1 text-[11px] font-semibold text-white dark:bg-zinc-100 dark:text-zinc-900"
               >
@@ -229,6 +295,38 @@ export function PlatformCard({
           </button>
         </div>
       </div>
+
+      {fullViewOpen && (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-black/50 p-4">
+          <div className="w-full max-w-3xl rounded-2xl border border-zinc-200 bg-white p-4 shadow-xl dark:border-zinc-800 dark:bg-zinc-900">
+            <div className="mb-2 flex items-start justify-between gap-2">
+              <div>
+                <p className="text-sm font-semibold capitalize text-zinc-900 dark:text-zinc-100">{card.platform} full preview</p>
+                <p className="text-xs text-zinc-500 dark:text-zinc-400">{charCount} chars</p>
+              </div>
+              <div className="flex gap-1">
+                <button
+                  onClick={() => void copyFullContent()}
+                  className="rounded-md border border-zinc-300 px-2 py-1 text-[11px] dark:border-zinc-700 dark:text-zinc-200"
+                >
+                  <Copy className="mr-1 inline h-3 w-3" />
+                  {copyLabel}
+                </button>
+                <button
+                  onClick={() => setFullViewOpen(false)}
+                  className="rounded-md border border-zinc-300 px-2 py-1 text-[11px] dark:border-zinc-700 dark:text-zinc-200"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+            <div className="max-h-[68vh] overflow-y-auto rounded-xl border border-zinc-200 bg-zinc-50 p-3 dark:border-zinc-700 dark:bg-zinc-800/50">
+              <p className="mb-2 break-words whitespace-pre-wrap text-sm font-semibold text-zinc-900 dark:text-zinc-100">{current.title}</p>
+              <p className="break-words whitespace-pre-wrap text-sm text-zinc-700 dark:text-zinc-200">{current.body}</p>
+            </div>
+          </div>
+        </div>
+      )}
     </article>
   );
 }
