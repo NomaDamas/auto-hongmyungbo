@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { ArchiveRestore, CheckCheck, Settings2, Sparkles } from "lucide-react";
 import { PlatformCard } from "@/components/platform-card";
 import { ContextPanel } from "@/components/context-panel";
+import { OptionsPanel } from "@/components/options-panel";
 import {
   enqueuePublish,
   fetchProvider,
@@ -131,6 +132,9 @@ export default function HomePage() {
   const [selectedModel, setSelectedModel] = useState<ModelOption>("gpt-4o-mini");
   const [draftId, setDraftId] = useState<number | null>(null);
   const [resultCards, setResultCards] = useState<CardState[]>([]);
+  // Default OFF: single focused platform. ON: side-by-side comparison grid.
+  const [compareMode, setCompareMode] = useState(false);
+  const [activePlatform, setActivePlatform] = useState<Platform>("reddit");
   const [queueCards, setQueueCards] = useState<CardState[]>([]);
   const [collapsingKeys, setCollapsingKeys] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
@@ -139,6 +143,7 @@ export default function HomePage() {
   const [oauthBusyPlatform, setOauthBusyPlatform] = useState<Platform | null>(null);
 
   const [contextOpen, setContextOpen] = useState(false);
+  const [optionsOpen, setOptionsOpen] = useState(false);
   const [contexts, setContexts] = useState<Record<Platform, string>>(EMPTY_CONTEXTS);
   const [referencePosts, setReferencePosts] = useState<Record<Platform, string[]>>(EMPTY_REFERENCE_POSTS);
   const [enabledPlatforms, setEnabledPlatforms] = useState<Record<Platform, boolean>>(DEFAULT_ENABLED_PLATFORMS);
@@ -153,8 +158,6 @@ export default function HomePage() {
   const [scheduleEnabled, setScheduleEnabled] = useState(false);
   const [scheduledAt, setScheduledAt] = useState("");
 
-  const carouselRef = useRef<HTMLDivElement | null>(null);
-
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
 
@@ -166,6 +169,17 @@ export default function HomePage() {
     () => PLATFORM_ORDER.filter((platform) => enabledPlatforms[platform]),
     [enabledPlatforms],
   );
+  const activeCard = useMemo(
+    () => cardsByOrder.find((card) => card.platform === activePlatform) ?? cardsByOrder[0] ?? null,
+    [activePlatform, cardsByOrder],
+  );
+
+  useEffect(() => {
+    if (!cardsByOrder.length) return;
+    if (!cardsByOrder.some((card) => card.platform === activePlatform)) {
+      setActivePlatform(cardsByOrder[0].platform);
+    }
+  }, [activePlatform, cardsByOrder]);
 
   const refreshPublishData = async () => {
     if (!user) {
@@ -229,7 +243,7 @@ export default function HomePage() {
     try {
       setLoading(true);
       if (!selectedPlatforms.length) {
-        alert("최소 1개 플랫폼을 선택하세요.");
+        alert("Select at least one platform.");
         setLoading(false);
         return;
       }
@@ -246,6 +260,7 @@ export default function HomePage() {
       setDraftId(generated.draftId);
       const nextCards = generated.cards.map(toCardState);
       setResultCards(nextCards);
+      if (nextCards.length) setActivePlatform(nextCards[0].platform);
       setQueueCards([]);
       setPublishJob(null);
       setCollapsingKeys(new Set());
@@ -267,7 +282,7 @@ export default function HomePage() {
       }
     } catch (err) {
       console.error(err);
-      alert("생성 중 오류가 발생했습니다.");
+      alert("Generation failed.");
     } finally {
       setLoading(false);
     }
@@ -296,7 +311,7 @@ export default function HomePage() {
       moveToQueue(card);
     } catch (err) {
       console.error(err);
-      alert("Accept 처리 중 오류가 발생했습니다.");
+      alert("Accept failed.");
     }
   };
 
@@ -311,7 +326,7 @@ export default function HomePage() {
       setResultCards((prev) => insertByPlatformOrder([...prev, { ...card, status: "draft" }]));
     } catch (err) {
       console.error(err);
-      alert("복원 중 오류가 발생했습니다.");
+      alert("Restore failed.");
     }
   };
 
@@ -326,7 +341,7 @@ export default function HomePage() {
       patchCard(card.platform, { status: updated.status });
     } catch (err) {
       console.error(err);
-      alert("Reject 처리 중 오류가 발생했습니다.");
+      alert("Reject failed.");
     }
   };
 
@@ -380,14 +395,14 @@ export default function HomePage() {
       );
     } catch (err) {
       console.error(err);
-      alert("수정 중 오류가 발생했습니다.");
+      alert("Refine failed.");
       setCardRefining(platform, false);
     }
   };
 
   const handleVoiceRefine = async (platform: Platform) => {
     if (!navigator.mediaDevices?.getUserMedia) {
-      alert("이 브라우저는 음성 입력을 지원하지 않습니다.");
+      alert("This browser does not support voice input.");
       return;
     }
 
@@ -415,17 +430,17 @@ export default function HomePage() {
       setTimeout(() => recorder.stop(), 4500);
     } catch (err) {
       console.error(err);
-      alert("음성 수정 중 오류가 발생했습니다.");
+      alert("Voice refine failed.");
     }
   };
 
   const handlePublish = async () => {
     if (!user) {
-      alert("로그인 후 발행할 수 있습니다.");
+      alert("Login required before publishing.");
       return;
     }
     if (!draftId) {
-      alert("먼저 글을 생성하세요.");
+      alert("Generate posts first.");
       return;
     }
 
@@ -446,7 +461,7 @@ export default function HomePage() {
       await refreshPublishData();
     } catch (err) {
       console.error(err);
-      alert("발행 요청 중 오류가 발생했습니다.");
+      alert("Publish request failed.");
     } finally {
       setPublishing(false);
     }
@@ -454,7 +469,7 @@ export default function HomePage() {
 
   const handleOAuthConnect = async (platform: Platform) => {
     if (!user) {
-      alert("소셜 로그인 후 플랫폼 OAuth를 연결하세요.");
+      alert("Login first, then connect platform OAuth.");
       return;
     }
     try {
@@ -465,7 +480,7 @@ export default function HomePage() {
       window.open(authUrl, "_blank", "noopener,noreferrer");
     } catch (err) {
       console.error(err);
-      alert("OAuth 연결 URL 생성 중 오류가 발생했습니다.");
+      alert("Failed to create OAuth connect URL.");
     } finally {
       setOauthBusyPlatform(null);
     }
@@ -479,14 +494,14 @@ export default function HomePage() {
       targetWindow.location.href = authUrl;
     } catch (err) {
       console.error(err);
-      alert("소셜 로그인 연결 중 오류가 발생했습니다.");
+      alert("Social login connection failed.");
     }
   };
 
   const openLoginPopup = () => {
     const popup = window.open("", "social-login-popup", "width=440,height=560,resizable=yes,scrollbars=yes");
     if (!popup) {
-      alert("팝업이 차단되었습니다. 팝업 허용 후 다시 시도해 주세요.");
+      alert("Popup blocked. Allow popups and try again.");
       return;
     }
 
@@ -553,12 +568,6 @@ export default function HomePage() {
     }
   };
 
-  const scrollResults = (dir: "left" | "right") => {
-    if (!carouselRef.current) return;
-    const amount = Math.max(280, Math.floor(carouselRef.current.clientWidth * 0.82));
-    carouselRef.current.scrollBy({ left: dir === "left" ? -amount : amount, behavior: "smooth" });
-  };
-
   const handlePreviewEdit = (platform: Platform, title: string, body: string) => {
     setResultCards((prev) =>
       prev.map((c) => {
@@ -580,10 +589,6 @@ export default function HomePage() {
         autoPublish={autoPublish}
         language={language}
         perPlatformLanguages={perPlatformLanguages}
-        provider={provider}
-        availableProviders={availableProviders}
-        selectedModel={selectedModel}
-        modelOptionsByProvider={{ openai: OPENAI_MODELS, openrouter: OPENROUTER_MODELS }}
         onClose={() => setContextOpen(false)}
         onSave={({
           contexts: nextContexts,
@@ -592,8 +597,6 @@ export default function HomePage() {
           autoPublish: nextAutoPublish,
           language: nextLanguage,
           perPlatformLanguages: nextPerPlatformLanguages,
-          provider: nextProvider,
-          selectedModel: nextModel,
         }) => {
           setContexts(nextContexts);
           setReferencePosts(nextReferencePosts);
@@ -601,10 +604,18 @@ export default function HomePage() {
           setAutoPublish(nextAutoPublish);
           setLanguage(nextLanguage);
           setPerPlatformLanguages(nextPerPlatformLanguages);
+        }}
+      />
+      <OptionsPanel
+        open={optionsOpen}
+        provider={provider}
+        availableProviders={availableProviders}
+        onClose={() => setOptionsOpen(false)}
+        onSave={(nextProvider) => {
           setProvider(nextProvider);
           const nextModels = nextProvider === "openrouter" ? OPENROUTER_MODELS : OPENAI_MODELS;
           setModelOptions(nextModels);
-          setSelectedModel(nextModels.includes(nextModel) ? nextModel : nextModels[0]);
+          setSelectedModel(nextModels[0]);
         }}
       />
 
@@ -616,7 +627,7 @@ export default function HomePage() {
           </div>
           <div className="flex flex-wrap items-center gap-2">
             {authLoading ? (
-              <span className="text-xs text-zinc-500 dark:text-zinc-400">로그인 확인 중...</span>
+              <span className="text-xs text-zinc-500 dark:text-zinc-400">Checking login...</span>
             ) : user ? (
               <div className="flex items-center gap-2 rounded-lg border border-zinc-300 px-2 py-1 dark:border-zinc-700">
                 <span className="text-xs text-zinc-700 dark:text-zinc-200">{user.name || user.email || `user#${user.id}`}</span>
@@ -624,7 +635,7 @@ export default function HomePage() {
                   onClick={() => void handleLogout()}
                   className="rounded-md border border-zinc-300 px-2 py-1 text-[11px] dark:border-zinc-700 dark:text-zinc-100"
                 >
-                  로그아웃
+                  Logout
                 </button>
               </div>
             ) : (
@@ -639,11 +650,14 @@ export default function HomePage() {
               onClick={() => setContextOpen(true)}
               className="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-xs font-medium dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
             >
-              <Settings2 className="mr-1 inline h-3.5 w-3.5" /> Options
+              <Settings2 className="mr-1 inline h-3.5 w-3.5" /> Platform Writing Style
             </button>
-            <span className="rounded-full bg-zinc-100 px-2 py-1 text-[11px] text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">
-              Provider: {provider} | Model: {selectedModel}
-            </span>
+            <button
+              onClick={() => setOptionsOpen(true)}
+              className="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-xs font-medium dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
+            >
+              Options
+            </button>
           </div>
         </header>
 
@@ -656,29 +670,29 @@ export default function HomePage() {
             <textarea
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
-              placeholder="초안을 입력하세요..."
+              placeholder="Write your draft..."
               className="mb-3 h-44 w-full rounded-xl border border-zinc-300 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-zinc-300 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100 dark:focus:ring-zinc-700"
             />
             <div className="flex gap-2">
               <button
                 onClick={handleGenerate}
-                disabled={loading || !draft.trim()}
+                disabled={loading || !draft.trim() || selectedPlatforms.length === 0}
                 className="rounded-lg bg-zinc-900 px-3 py-2 text-xs font-semibold text-white disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900"
               >
-                <Sparkles className="mr-1 inline h-3.5 w-3.5" /> {loading ? "생성 중..." : "5개 플랫폼 생성"}
+                <Sparkles className="mr-1 inline h-3.5 w-3.5" /> {loading ? "Generating..." : `Generate ${selectedPlatforms.length} Platform${selectedPlatforms.length === 1 ? "" : "s"}`}
               </button>
               <button
                 onClick={handlePublish}
                 disabled={publishing || !draftId || acceptedCount === 0}
                 className="rounded-lg border border-zinc-300 px-3 py-2 text-xs font-medium disabled:opacity-50 dark:border-zinc-700 dark:text-zinc-100"
               >
-                {publishing ? "발행 중..." : scheduleEnabled ? `예약 발행 (${acceptedCount})` : `Queue 발행 (${acceptedCount})`}
+                {publishing ? "Publishing..." : scheduleEnabled ? `Scheduled Publish (${acceptedCount})` : `Queue Publish (${acceptedCount})`}
               </button>
             </div>
             <div className="mt-2 flex flex-wrap items-center gap-2">
               <label className="flex items-center gap-1 text-xs text-zinc-600 dark:text-zinc-300">
                 <input type="checkbox" checked={scheduleEnabled} onChange={(e) => setScheduleEnabled(e.target.checked)} />
-                예약 발행
+                Schedule publish
               </label>
               <input
                 type="datetime-local"
@@ -691,13 +705,13 @@ export default function HomePage() {
 
             <div className="mt-3 flex flex-wrap gap-1.5">
               <span className="rounded-full bg-zinc-100 px-2 py-1 text-[11px] text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">
-                선택 플랫폼: {selectedPlatforms.join(", ") || "없음"}
+                Platforms: {selectedPlatforms.join(", ") || "none"}
               </span>
               <span className="rounded-full bg-zinc-100 px-2 py-1 text-[11px] text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">
-                자동 게시: {autoPublish ? "ON" : "OFF"}
+                Auto publish: {autoPublish ? "ON" : "OFF"}
               </span>
               <span className="rounded-full bg-zinc-100 px-2 py-1 text-[11px] text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">
-                언어: {language}
+                Language: {language}
               </span>
               {(["linkedin", "twitter", "instagram", "reddit"] as Platform[]).map((platform) => (
                 <button
@@ -732,7 +746,7 @@ export default function HomePage() {
                     </span>
                   </button>
                 ))}
-                {!queueByOrder.length && <p className="text-xs text-zinc-500 dark:text-zinc-400">Accept한 카드가 여기에 보관됩니다.</p>}
+                {!queueByOrder.length && <p className="text-xs text-zinc-500 dark:text-zinc-400">Accepted cards are stored here.</p>}
               </div>
             </section>
 
@@ -744,70 +758,80 @@ export default function HomePage() {
 
           </aside>
 
-          <section className="min-w-0 rounded-2xl border border-zinc-200 bg-white p-3 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+          <section className="min-w-0 overflow-visible rounded-2xl border border-zinc-200 bg-white p-3 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
             <div className="mb-2 flex items-center justify-between">
               <h2 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Platform Results</h2>
               <div className="flex items-center gap-2">
-                <span className="text-xs text-zinc-500 dark:text-zinc-400">좌우 버튼으로 탐색</span>
-                <button
-                  onClick={() => scrollResults("left")}
-                  className="rounded-md border border-zinc-300 px-2 py-1 text-xs dark:border-zinc-700 dark:text-zinc-200"
-                >
-                  ←
-                </button>
-                <button
-                  onClick={() => scrollResults("right")}
-                  className="rounded-md border border-zinc-300 px-2 py-1 text-xs dark:border-zinc-700 dark:text-zinc-200"
-                >
-                  →
-                </button>
+                <span className="text-[11px] text-zinc-500 dark:text-zinc-400">model: {selectedModel}</span>
+                <label className="flex items-center gap-2 rounded-md border border-zinc-300 px-2 py-1 text-xs text-zinc-700 dark:border-zinc-700 dark:text-zinc-200">
+                  <input type="checkbox" checked={compareMode} onChange={(e) => setCompareMode(e.target.checked)} />
+                  Compare mode
+                </label>
               </div>
             </div>
 
-            <div className="relative w-full overflow-hidden rounded-xl border border-zinc-200 dark:border-zinc-800">
-              <div ref={carouselRef} className="w-full min-w-0 overflow-x-auto p-3 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
-                <div className="flex w-max min-w-full gap-4">
-                  {cardsByOrder.map((card) => {
-                    const isCollapsing = collapsingKeys.has(cardKey(card));
-                    return (
-                      <div
-                        key={cardKey(card)}
-                        className={`overflow-hidden transition-all duration-300 ease-out ${
-                          isCollapsing ? "w-0 scale-95 opacity-0" : "w-[350px] flex-shrink-0 scale-100 opacity-100"
-                        }`}
-                      >
-                        <PlatformCard
-                          card={card}
-                          onAccept={() => void handleAccept(card)}
-                          onReject={() => void handleReject(card)}
-                          onRefine={(feedback) => handleRefine(card.platform, feedback)}
-                          onVoiceRefine={() => handleVoiceRefine(card.platform)}
-                          onUndo={() => patchCard(card.platform, { versionIndex: Math.max(0, card.versionIndex - 1) })}
-                          onRedo={() => patchCard(card.platform, { versionIndex: Math.min(card.versions.length - 1, card.versionIndex + 1) })}
-                          onSelectVersion={(index) => patchCard(card.platform, { versionIndex: index })}
-                          onPreviewChange={(title, body) => handlePreviewEdit(card.platform, title, body)}
-                        />
-                      </div>
-                    );
-                  })}
+            {!compareMode && cardsByOrder.length > 0 && (
+              <div className="mb-2 flex gap-1 overflow-x-auto pb-1">
+                {cardsByOrder.map((card) => (
+                  <button
+                    key={cardKey(card)}
+                    onClick={() => setActivePlatform(card.platform)}
+                    className={`shrink-0 rounded-full px-3 py-1 text-xs capitalize ${
+                      activePlatform === card.platform
+                        ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
+                        : "border border-zinc-300 text-zinc-700 dark:border-zinc-700 dark:text-zinc-200"
+                    }`}
+                  >
+                    {card.platform}
+                  </button>
+                ))}
+              </div>
+            )}
 
-                  {!cardsByOrder.length && (
-                    <div className="grid h-[600px] w-[350px] flex-shrink-0 place-items-center rounded-xl border border-dashed border-zinc-300 text-sm text-zinc-500 dark:border-zinc-700 dark:text-zinc-400">
-                      결과 카드가 비어 있습니다. Draft 생성 후 Accept로 Queue에 보관할 수 있습니다.
-                    </div>
-                  )}
-                  <div className="w-2 flex-shrink-0" />
-                </div>
+            {compareMode ? (
+              <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-2">
+                {cardsByOrder.map((card) => (
+                  <PlatformCard
+                    key={cardKey(card)}
+                    card={card}
+                    isCollapsing={collapsingKeys.has(cardKey(card))}
+                    onAccept={() => void handleAccept(card)}
+                    onReject={() => void handleReject(card)}
+                    onRefine={(feedback) => handleRefine(card.platform, feedback)}
+                    onVoiceRefine={() => handleVoiceRefine(card.platform)}
+                    onUndo={() => patchCard(card.platform, { versionIndex: Math.max(0, card.versionIndex - 1) })}
+                    onRedo={() => patchCard(card.platform, { versionIndex: Math.min(card.versions.length - 1, card.versionIndex + 1) })}
+                    onSelectVersion={(index) => patchCard(card.platform, { versionIndex: index })}
+                    onPreviewChange={(title, body) => handlePreviewEdit(card.platform, title, body)}
+                  />
+                ))}
               </div>
-              <div className="px-3 pb-2 text-[11px] text-zinc-500 dark:text-zinc-400">
-                박스 바깥 카드는 숨겨지고, 내부 스크롤/버튼으로만 탐색됩니다.
+            ) : activeCard ? (
+              <PlatformCard
+                card={activeCard}
+                onAccept={() => void handleAccept(activeCard)}
+                onReject={() => void handleReject(activeCard)}
+                onRefine={(feedback) => handleRefine(activeCard.platform, feedback)}
+                onVoiceRefine={() => handleVoiceRefine(activeCard.platform)}
+                onUndo={() => patchCard(activeCard.platform, { versionIndex: Math.max(0, activeCard.versionIndex - 1) })}
+                onRedo={() =>
+                  patchCard(activeCard.platform, {
+                    versionIndex: Math.min(activeCard.versions.length - 1, activeCard.versionIndex + 1),
+                  })
+                }
+                onSelectVersion={(index) => patchCard(activeCard.platform, { versionIndex: index })}
+                onPreviewChange={(title, body) => handlePreviewEdit(activeCard.platform, title, body)}
+              />
+            ) : (
+              <div className="grid h-[360px] place-items-center rounded-xl border border-dashed border-zinc-300 text-sm text-zinc-500 dark:border-zinc-700 dark:text-zinc-400">
+                No result cards yet. Generate from Draft, then Accept to move cards into Queue.
               </div>
-            </div>
+            )}
           </section>
         </section>
 
         <footer className="text-center text-[11px] text-zinc-500 dark:text-zinc-400">
-          Accept: 오른쪽 Results → 왼쪽 Queue | Queue 클릭: Restore
+          Accept: Results -&gt; Queue | Click a Queue item to restore
           <CheckCheck className="ml-1 inline h-3.5 w-3.5" />
         </footer>
 
@@ -815,10 +839,10 @@ export default function HomePage() {
           <div className="mb-3 flex items-center justify-between">
             <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Publish Logs & Platform Threads</h3>
             <button onClick={() => void refreshPublishData()} className="rounded-lg border border-zinc-300 px-3 py-1.5 text-xs dark:border-zinc-700 dark:text-zinc-100">
-              {logsLoading ? "로딩..." : "새로고침"}
+              {logsLoading ? "Loading..." : "Refresh"}
             </button>
           </div>
-          {!user && <p className="text-xs text-zinc-500 dark:text-zinc-400">로그인하면 내 발행 로그/플랫폼별 스레드를 볼 수 있습니다.</p>}
+          {!user && <p className="text-xs text-zinc-500 dark:text-zinc-400">Login to view your publish logs and platform threads.</p>}
           {user && (
             <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
               <div className="rounded-xl border border-zinc-200 p-3 dark:border-zinc-800">
@@ -834,7 +858,7 @@ export default function HomePage() {
                       )}
                     </div>
                   ))}
-                  {!publishLogs.length && <p className="text-xs text-zinc-500 dark:text-zinc-400">로그가 없습니다.</p>}
+                  {!publishLogs.length && <p className="text-xs text-zinc-500 dark:text-zinc-400">No logs yet.</p>}
                 </div>
               </div>
               <div className="rounded-xl border border-zinc-200 p-3 dark:border-zinc-800">
@@ -850,7 +874,7 @@ export default function HomePage() {
                       </div>
                     </div>
                   ))}
-                  {!threads.length && <p className="text-xs text-zinc-500 dark:text-zinc-400">플랫폼 스레드가 없습니다.</p>}
+                  {!threads.length && <p className="text-xs text-zinc-500 dark:text-zinc-400">No platform threads yet.</p>}
                 </div>
               </div>
             </div>

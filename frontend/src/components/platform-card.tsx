@@ -1,11 +1,14 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { Check, Loader2, Mic, Pencil, RotateCcw, RotateCw, X } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Check, Copy, Expand, Loader2, Mic, Pencil, RotateCcw, RotateCw, X } from "lucide-react";
+import { PlatformPreview } from "@/components/platform-preview";
+import { transformPreviewText } from "@/lib/preview-transform";
 import type { CardState, Platform } from "@/lib/types";
 
 type Props = {
   card: CardState;
+  isCollapsing?: boolean;
   onAccept: () => void;
   onReject: () => void;
   onRefine: (feedback: string) => Promise<void>;
@@ -16,38 +19,9 @@ type Props = {
   onPreviewChange: (title: string, body: string) => void;
 };
 
-function PreviewFrame({ platform, title }: { platform: Platform; title: string }) {
-  const cls =
-    platform === "twitter"
-      ? "rounded-xl border border-zinc-200 bg-black p-3 text-white dark:border-zinc-700"
-      : platform === "instagram"
-        ? "rounded-xl border border-zinc-200 bg-gradient-to-b from-fuchsia-50 to-rose-50 p-3 dark:border-zinc-700 dark:from-zinc-900 dark:to-zinc-800"
-        : platform === "reddit"
-          ? "rounded-xl border border-zinc-200 bg-orange-50 p-3 dark:border-zinc-700 dark:bg-zinc-800"
-          : "rounded-xl border border-zinc-200 bg-white p-3 dark:border-zinc-700 dark:bg-zinc-800";
-
-  const label =
-    platform === "twitter"
-      ? "X Preview"
-      : platform === "instagram"
-        ? "Instagram Preview"
-        : platform === "linkedin"
-          ? "LinkedIn Preview"
-          : platform === "reddit"
-            ? "Reddit Preview"
-            : "Blog Preview";
-
-  return (
-    <div className={cls}>
-      <p className="mb-2 text-[11px] text-zinc-500 dark:text-zinc-300">{label}</p>
-      {platform === "instagram" && <div className="mb-2 h-20 rounded-lg bg-white/75 dark:bg-zinc-700/50" />}
-      <p className="text-sm font-semibold break-words whitespace-normal text-zinc-900 dark:text-zinc-100">{title}</p>
-    </div>
-  );
-}
-
 export function PlatformCard({
   card,
+  isCollapsing = false,
   onAccept,
   onReject,
   onRefine,
@@ -58,26 +32,64 @@ export function PlatformCard({
   onPreviewChange,
 }: Props) {
   const [feedback, setFeedback] = useState("");
+  // Keeps Preview (read-only) and Edit (editable) clearly separated.
+  const [viewMode, setViewMode] = useState<"preview" | "edit">("preview");
   const [expandedPreview, setExpandedPreview] = useState(false);
-  const [editingPreview, setEditingPreview] = useState(false);
+  const [fullViewOpen, setFullViewOpen] = useState(false);
+  const [fullViewWidth, setFullViewWidth] = useState<"desktop" | "mobile">("desktop");
+  const [copyLabel, setCopyLabel] = useState("Copy");
   const current = useMemo(() => card.versions[card.versionIndex], [card.versionIndex, card.versions]);
-  const canExpand = current.body.length > 180 || current.body.split("\n").length > 5;
+  const transformed = useMemo(() => transformPreviewText(card.platform, current.body), [card.platform, current.body]);
+  const charCount = transformed.charCount;
+  const canExpand = transformed.charCount > 320 || transformed.lineCount > 8;
 
   const [draftTitle, setDraftTitle] = useState(current.title);
   const [draftBody, setDraftBody] = useState(current.body);
+  const editBodyRef = useRef<HTMLTextAreaElement | null>(null);
 
   useEffect(() => {
     setDraftTitle(current.title);
     setDraftBody(current.body);
-    setEditingPreview(false);
+    setViewMode("preview");
+    setExpandedPreview(false);
   }, [current.title, current.body]);
 
+  useEffect(() => {
+    if (viewMode !== "edit" || !editBodyRef.current) return;
+    editBodyRef.current.style.height = "auto";
+    editBodyRef.current.style.height = `${editBodyRef.current.scrollHeight}px`;
+  }, [draftBody, viewMode]);
+
+  useEffect(() => {
+    if (!fullViewOpen) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setFullViewOpen(false);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [fullViewOpen]);
+
+  const copyFullContent = async () => {
+    try {
+      await navigator.clipboard.writeText(`${current.title}\n\n${current.body}`);
+      setCopyLabel("Copied");
+      window.setTimeout(() => setCopyLabel("Copy"), 1200);
+    } catch {
+      setCopyLabel("Failed");
+      window.setTimeout(() => setCopyLabel("Copy"), 1200);
+    }
+  };
+
   return (
-    <article className="relative h-full rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+    <article
+      className={`relative rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm transition-all dark:border-zinc-800 dark:bg-zinc-900 ${
+        isCollapsing ? "scale-95 opacity-0" : ""
+      }`}
+    >
       {card.isRefining && (
         <div className="absolute inset-0 z-10 grid place-items-center rounded-2xl bg-white/70 backdrop-blur-sm dark:bg-zinc-900/70">
           <div className="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-xs font-semibold dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100">
-            <Loader2 className="mr-1 inline h-3.5 w-3.5 animate-spin" /> 반영 중
+            <Loader2 className="mr-1 inline h-3.5 w-3.5 animate-spin" /> Refining
           </div>
         </div>
       )}
@@ -89,7 +101,25 @@ export function PlatformCard({
             {card.status} · version {card.versionIndex + 1}
           </p>
         </div>
-        <div className="flex gap-1">
+        <div className="flex flex-wrap items-center gap-1 justify-end">
+          <span className="rounded-full bg-zinc-100 px-2 py-1 text-[10px] font-medium text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">
+            {charCount} chars
+          </span>
+          {transformed.limitState === "near" && (
+            <span className="rounded-full bg-amber-100 px-2 py-1 text-[10px] font-medium text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
+              Near platform limit
+            </span>
+          )}
+          {transformed.limitState === "over" && (
+            <span className="rounded-full bg-rose-100 px-2 py-1 text-[10px] font-medium text-rose-700 dark:bg-rose-900/40 dark:text-rose-300">
+              Platform limit exceeded
+            </span>
+          )}
+          {!expandedPreview && canExpand && (
+            <span className="rounded-full bg-blue-100 px-2 py-1 text-[10px] font-medium text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
+              Preview truncated
+            </span>
+          )}
           <button onClick={onUndo} disabled={card.versionIndex === 0} className="rounded-md border px-2 py-1 text-[11px] disabled:opacity-40 dark:text-zinc-100">
             <RotateCcw className="mr-1 inline h-3 w-3" />
           </button>
@@ -125,38 +155,69 @@ export function PlatformCard({
         ))}
       </div>
 
-      <PreviewFrame platform={card.platform} title={current.title} />
-
       <div className="mt-2 rounded-lg border border-zinc-200 bg-zinc-50 p-2 dark:border-zinc-700 dark:bg-zinc-800/60">
-        <div className="mb-1 flex items-center justify-between">
-          <p className="text-[11px] text-zinc-500 dark:text-zinc-400">본문 Preview</p>
-          <button
-            onClick={() => setEditingPreview((v) => !v)}
-            className="rounded-md px-2 py-1 text-[11px] font-medium text-zinc-600 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-700"
-          >
-            {editingPreview ? "닫기" : "Preview Edit"}
-          </button>
+        <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+          <div className="flex gap-1">
+            <button
+              onClick={() => setViewMode("preview")}
+              className={`rounded-md px-2 py-1 text-[11px] font-medium ${
+                viewMode === "preview"
+                  ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
+                  : "border border-zinc-300 text-zinc-600 dark:border-zinc-700 dark:text-zinc-300"
+              }`}
+            >
+              Preview
+            </button>
+            <button
+              onClick={() => setViewMode("edit")}
+              className={`rounded-md px-2 py-1 text-[11px] font-medium ${
+                viewMode === "edit"
+                  ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
+                  : "border border-zinc-300 text-zinc-600 dark:border-zinc-700 dark:text-zinc-300"
+              }`}
+            >
+              Edit
+            </button>
+          </div>
+          <div className="flex gap-1">
+            <button
+              onClick={() => void copyFullContent()}
+              className="rounded-md border border-zinc-300 px-2 py-1 text-[11px] font-medium text-zinc-700 dark:border-zinc-700 dark:text-zinc-200"
+            >
+              <Copy className="mr-1 inline h-3 w-3" />
+              {copyLabel}
+            </button>
+            <button
+              onClick={() => setFullViewOpen(true)}
+              className="rounded-md border border-zinc-300 px-2 py-1 text-[11px] font-medium text-zinc-700 dark:border-zinc-700 dark:text-zinc-200"
+            >
+              <Expand className="mr-1 inline h-3 w-3" />
+              Full view
+            </button>
+          </div>
         </div>
 
-        <div className={`overflow-hidden transition-all duration-300 ease-out ${expandedPreview ? "max-h-[340px]" : "max-h-[7.8rem]"}`}>
-          <p
-            className={`break-words whitespace-pre-wrap text-sm text-zinc-700 dark:text-zinc-200 ${
-              expandedPreview ? "" : "[display:-webkit-box] [-webkit-line-clamp:5] [-webkit-box-orient:vertical] overflow-hidden"
-            }`}
-          >
-            {current.body}
-          </p>
-        </div>
-        {canExpand && (
-          <button
-            onClick={() => setExpandedPreview((v) => !v)}
-            className="mt-1 rounded-md px-1 py-1 text-[11px] font-medium text-zinc-600 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-700"
-          >
-            {expandedPreview ? "접기" : "더보기"}
-          </button>
+        {viewMode === "preview" && (
+          <>
+            <PlatformPreview
+              platform={card.platform}
+              title={current.title}
+              text={transformed.normalizedText}
+              expanded={expandedPreview}
+              canExpand={canExpand}
+            />
+            {canExpand && (
+              <button
+                onClick={() => setExpandedPreview((v) => !v)}
+                className="mt-1 rounded-md px-1 py-1 text-[11px] font-medium text-zinc-600 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-700"
+              >
+                {expandedPreview ? "Collapse" : "Read more"}
+              </button>
+            )}
+          </>
         )}
 
-        {editingPreview && (
+        {viewMode === "edit" && (
           <div className="mt-2 space-y-2 rounded-lg border border-zinc-200 bg-white p-2 dark:border-zinc-700 dark:bg-zinc-900">
             <input
               value={draftTitle}
@@ -164,29 +225,30 @@ export function PlatformCard({
               className="w-full rounded-md border border-zinc-300 bg-white px-2 py-1 text-sm font-semibold text-zinc-900 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
             />
             <textarea
+              ref={editBodyRef}
               value={draftBody}
               onChange={(e) => setDraftBody(e.target.value)}
-              className="h-24 w-full rounded-md border border-zinc-300 bg-white px-2 py-1 text-sm text-zinc-800 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-200"
+              className="min-h-[40vh] w-full resize-y overflow-hidden rounded-md border border-zinc-300 bg-white px-2 py-1 text-sm text-zinc-800 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-200"
             />
             <div className="flex justify-end gap-2">
               <button
                 onClick={() => {
                   setDraftTitle(current.title);
                   setDraftBody(current.body);
-                  setEditingPreview(false);
+                  setViewMode("preview");
                 }}
                 className="rounded-md border border-zinc-300 px-2 py-1 text-[11px] dark:border-zinc-700 dark:text-zinc-200"
               >
-                취소
+                Cancel
               </button>
               <button
                 onClick={() => {
                   onPreviewChange(draftTitle, draftBody);
-                  setEditingPreview(false);
+                  setViewMode("preview");
                 }}
                 className="rounded-md bg-zinc-900 px-2 py-1 text-[11px] font-semibold text-white dark:bg-zinc-100 dark:text-zinc-900"
               >
-                적용
+                Apply
               </button>
             </div>
           </div>
@@ -209,7 +271,7 @@ export function PlatformCard({
         <textarea
           value={feedback}
           onChange={(e) => setFeedback(e.target.value)}
-          placeholder="수정 프롬프트 입력"
+          placeholder="Enter refinement prompt"
           className="h-20 w-full rounded-xl border border-zinc-300 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-zinc-300 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100 dark:focus:ring-zinc-700"
         />
         <div className="flex gap-2">
@@ -229,6 +291,44 @@ export function PlatformCard({
           </button>
         </div>
       </div>
+
+      {fullViewOpen && (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-black/50 p-4">
+          <div className={`w-full rounded-2xl border border-zinc-200 bg-white p-4 shadow-xl dark:border-zinc-800 dark:bg-zinc-900 ${fullViewWidth === "mobile" ? "max-w-md" : "max-w-3xl"}`}>
+            <div className="mb-2 flex items-start justify-between gap-2">
+              <div>
+                <p className="text-sm font-semibold capitalize text-zinc-900 dark:text-zinc-100">{card.platform} full preview</p>
+                <p className="text-xs text-zinc-500 dark:text-zinc-400">{charCount} chars</p>
+              </div>
+              <div className="flex gap-1">
+                <button
+                  onClick={() => setFullViewWidth((v) => (v === "desktop" ? "mobile" : "desktop"))}
+                  className="rounded-md border border-zinc-300 px-2 py-1 text-[11px] dark:border-zinc-700 dark:text-zinc-200"
+                >
+                  {fullViewWidth === "desktop" ? "Mobile width" : "Desktop width"}
+                </button>
+                <button
+                  onClick={() => void copyFullContent()}
+                  className="rounded-md border border-zinc-300 px-2 py-1 text-[11px] dark:border-zinc-700 dark:text-zinc-200"
+                >
+                  <Copy className="mr-1 inline h-3 w-3" />
+                  {copyLabel}
+                </button>
+                <button
+                  onClick={() => setFullViewOpen(false)}
+                  className="rounded-md border border-zinc-300 px-2 py-1 text-[11px] dark:border-zinc-700 dark:text-zinc-200"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+            <div className="max-h-[68vh] overflow-y-auto rounded-xl border border-zinc-200 bg-zinc-50 p-3 dark:border-zinc-700 dark:bg-zinc-800/50">
+              <p className="mb-2 break-words whitespace-pre-wrap text-sm font-semibold text-zinc-900 dark:text-zinc-100">{current.title}</p>
+              <p className="break-words whitespace-pre-wrap text-sm text-zinc-700 dark:text-zinc-200">{transformed.normalizedText}</p>
+            </div>
+          </div>
+        </div>
+      )}
     </article>
   );
 }

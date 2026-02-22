@@ -6,12 +6,18 @@ The frontend provides the full draft-to-publish user flow.
 
 - Draft input and multi-platform generation
 - Per-platform style transfer using reference posts
+- Result navigation modes:
+  - Default: platform tabs with one focused card (no horizontal scrolling required)
+  - Compare mode: side-by-side multi-column layout
 - Card-level accept/reject/edit workflow
 - Version history with undo/redo
 - Voice-to-text refine input
 - OAuth-based social login and account connection
 - Scheduled publish trigger
 - Publish logs and per-platform thread view
+- Long preview readability without entering Edit:
+  - Read more / Collapse in Preview
+  - Full view modal with Copy action
 
 ## Data/Auth Guidance
 
