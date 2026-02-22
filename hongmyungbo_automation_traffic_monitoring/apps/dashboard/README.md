@@ -1,6 +1,6 @@
 # dashboard
 
-UI server that reads collector API data and displays traffic/revenue KPI metrics.
+UI server that visualizes collector metrics and revenue estimates.
 
 ## Run
 
@@ -10,9 +10,9 @@ npm install
 COLLECTOR_URL=http://localhost:8090 npm run dev
 ```
 
-Open: `http://localhost:8091`
+Open `http://localhost:8091`.
 
-## Deploy
+## Docker
 
 ```bash
 docker build -t hmb-dashboard .

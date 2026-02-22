@@ -1,15 +1,27 @@
 # Frontend (Next.js)
 
-The frontend handles draft input, platform card review, and publishing UX.
+The frontend provides the full draft-to-publish user flow.
 
-## Recommended Data/Auth Setup
+## Features
 
-Use Supabase from the frontend for:
-- User authentication
-- User profile and app data storage
-- File/image storage if needed
+- Draft input and multi-platform generation
+- Card-level accept/reject/edit workflow
+- Version history with undo/redo
+- Voice-to-text refine input
+- OAuth-based social login and account connection
+- Scheduled publish trigger
+- Publish logs and per-platform thread view
+- Analytics/revenue monitor panel
 
-Use FastAPI only for AI generation/publishing operations and provider OAuth flows.
+## Data/Auth Guidance
+
+Use Supabase directly in the frontend for:
+
+- User identity/session handling
+- Product data CRUD
+- File storage
+
+Use FastAPI for AI generation and publish orchestration APIs.
 
 ## Run
 
@@ -27,38 +39,14 @@ cd frontend
 npm run build
 ```
 
-## Main UX
-
-- SNS-style responsive UI
-- Horizontal platform card track
-- Accept/Reject/Edit workflow
-- Card version history with Undo/Redo
-- Voice-based refine input
-- Platform style context panel
-- Model selector (`gpt-4o-mini`, `gpt-4o`, `gpt-4.1-mini`)
-- Output language selector (`auto`, `korean`, `english`, `japanese`)
-- OAuth social login (Google/Kakao/Naver)
-- Scheduled publish option
-- Publish logs and platform threads
-- AdSlot component (AdSense, disabled by default)
-- Traffic and revenue monitor panel
-
-## Env
+## Environment Variables
 
 - `NEXT_PUBLIC_API_URL=http://localhost:8000`
 - `NEXT_PUBLIC_ENABLE_ADS=false`
-- `NEXT_PUBLIC_ADSENSE_CLIENT=ca-pub-...` (optional)
-- `NEXT_PUBLIC_ADSENSE_SLOT_SIDEBAR=...` (optional)
-- `NEXT_PUBLIC_ADSENSE_SLOT_FOOTER=...` (optional)
-- `NEXT_PUBLIC_HMB_IMAGE_URL=<image-url>` (optional)
-
-## Deploy (Vercel)
-
-1. Connect the repository
-2. Build command: `npm run build`
-3. Set env values:
-   - `NEXT_PUBLIC_API_URL=https://<backend-domain>`
-   - `NEXT_PUBLIC_ENABLE_ADS=false`
+- `NEXT_PUBLIC_ADSENSE_CLIENT=` (optional)
+- `NEXT_PUBLIC_ADSENSE_SLOT_SIDEBAR=` (optional)
+- `NEXT_PUBLIC_ADSENSE_SLOT_FOOTER=` (optional)
+- `NEXT_PUBLIC_HMB_IMAGE_URL=` (optional)
 
 ## Docker
 

@@ -1,3 +1,3 @@
 # shared
 
-Shared revenue estimation logic and common type utility package.
+Shared package for KPI calculations and revenue estimation helpers used by collector/dashboard.

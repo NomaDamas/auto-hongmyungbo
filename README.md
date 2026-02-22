@@ -1,59 +1,45 @@
-# AI Social Cross-Posting Agent (Prototype)
-<img width="1536" height="1024" alt="project preview" src="https://github.com/user-attachments/assets/5e88f6c0-8d65-4488-a36e-a1dbd0903685" />
+# AI Social Cross-Posting Agent
 
-This project turns one draft into multiple platform-ready posts (Reddit, LinkedIn, X, Instagram, Blog), then supports review, refinement, scheduling, and publishing.
+This repository contains a prototype cross-posting product that generates and publishes platform-specific content from one draft.
 
-## Recommended Stack
+## Architecture
 
-- Frontend: Next.js
-- Product data and auth: Supabase (Postgres + Auth + Storage)
-- AI and publishing orchestration: FastAPI service
+- `frontend/` (Next.js): user-facing app for drafting, review, approval, and publish actions
+- `backend/` (FastAPI): AI generation, OAuth callbacks, publish queue worker, and external API orchestration
+- `hongmyungbo_automation_traffic_monitoring/`: optional standalone traffic collector and KPI dashboard
 
-Why FastAPI still exists:
-- It securely handles OpenAI and social platform secrets.
-- It centralizes provider OAuth callbacks and publish jobs.
-- It runs async server-side workflows that are not safe to expose in browser code.
+## Stack Decision
 
-If you only need auth/data CRUD, use Supabase directly from the frontend.
+- Use **Supabase** for product data, auth, and storage.
+- Keep **FastAPI** for server-only workflows:
+  - OpenAI calls and secret management
+  - Social OAuth token exchange/callback handling
+  - Scheduled/queued publishing jobs
+  - Unified analytics/publish APIs
 
-## Project Structure
+## Repository Layout
 
 ```text
 .
-├── backend
-│   ├── app
-│   │   ├── main.py
-│   │   └── store.py
-│   ├── pyproject.toml
-│   └── .env.example
-├── docs
-│   ├── MONOREPO_GITHUB.md
-│   ├── PUBLISH_ENV_CHECKLIST.md
-│   └── WORKLOG.md
-├── hongmyungbo_automation_traffic_monitoring
-│   ├── apps
-│   │   ├── collector
-│   │   └── dashboard
-│   └── packages
-│       └── shared
-└── frontend
-    ├── src
-    ├── package.json
-    └── .env.local.example
+├── backend/
+├── frontend/
+├── hongmyungbo_automation_traffic_monitoring/
+├── docs/
+└── scripts/
 ```
 
-## Quick Start
+## Local Development
 
-### 1) Backend (FastAPI)
+### 1) Backend
 
 ```bash
 cd backend
-uv sync
 cp .env.example .env
+uv sync
 uv run uvicorn app.main:app --reload --port 8000
 ```
 
-### 2) Frontend (Next.js)
+### 2) Frontend
 
 ```bash
 cd frontend
@@ -62,39 +48,20 @@ npm install
 npm run dev
 ```
 
-Open: `http://localhost:3000`
+Open `http://localhost:3000`.
 
-## Core APIs
+## Key API Endpoints
 
-- `POST /api/generate`: generate cards for selected platforms
-- `POST /api/refine`: rewrite one card with feedback
-- `POST /api/stt`: speech-to-text input
-- `POST /api/publish`: enqueue publishing jobs
-- `GET /api/jobs/{job_id}`: check publish job status
-- `GET /api/publish/logs`: user publish history
-- `GET /api/threads`: platform thread history
-- `POST /api/analytics/events`: traffic event ingest
-- `GET /api/analytics/summary`: traffic + revenue estimation
+- `POST /api/generate`
+- `POST /api/refine`
+- `POST /api/publish`
+- `GET /api/jobs/{job_id}`
+- `POST /api/analytics/events`
+- `GET /api/analytics/summary`
+- `GET /api/auth/me`
 
-## Deployment
+## Deployment Notes
 
-### Frontend (Vercel)
-
-- Set `NEXT_PUBLIC_API_URL=https://<backend-domain>`
-
-### Backend (Railway/Render)
-
-- Start command:
-
-```bash
-uv sync && uv run uvicorn app.main:app --host 0.0.0.0 --port $PORT
-```
-
-- Required envs:
-  - `OPENAI_API_KEY`
-  - OAuth/publish envs from `backend/.env.example`
-  - `ALLOWED_ORIGIN` or `ALLOWED_ORIGINS`
-
-### Traffic Monitoring Monorepo
-
-`hongmyungbo_automation_traffic_monitoring` can be deployed independently for event collection and KPI dashboarding.
+- Frontend: Vercel (set `NEXT_PUBLIC_API_URL`)
+- Backend: Railway/Render (set `DATABASE_URL`, `OPENAI_API_KEY`, OAuth envs)
+- Optional monitoring monorepo: deploy collector + dashboard separately
