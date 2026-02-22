@@ -5,6 +5,8 @@ The frontend provides the full draft-to-publish user flow.
 ## Features
 
 - Draft input and multi-platform generation
+- Structured intent controls (objective/audience/core message/action)
+- Style sample input for stronger style transfer
 - Card-level accept/reject/edit workflow
 - Version history with undo/redo
 - Voice-to-text refine input

@@ -5,6 +5,7 @@ The backend is the orchestration service for AI, OAuth, and publishing workflows
 ## Responsibilities
 
 - Generate/refine platform-specific content via OpenAI/OpenRouter
+- Apply structured intent constraints and style-sample-based transfer during generation/refinement
 - Handle social login callbacks (`google`, `kakao`, `naver`)
 - Handle platform OAuth callbacks (`linkedin`, `twitter`, `instagram`, `reddit`)
 - Queue and execute publish jobs in the background worker

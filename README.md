@@ -60,6 +60,8 @@ Open `http://localhost:3000`.
 - `GET /api/analytics/summary`
 - `GET /api/auth/me`
 
+`/api/generate` and `/api/refine` now support structured intent fields and a style sample input, so users can transfer writing style without manual prompt engineering.
+
 ## Deployment Notes
 
 - Frontend: Vercel (set `NEXT_PUBLIC_API_URL`)

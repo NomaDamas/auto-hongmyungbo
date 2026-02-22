@@ -82,6 +82,16 @@ export type UserProfile = {
   >;
 };
 
+export type IntentSpec = {
+  objective?: string;
+  targetAudience?: string;
+  coreMessage?: string;
+  desiredAction?: string;
+  mustInclude?: string[];
+  mustAvoid?: string[];
+  extraNotes?: string;
+};
+
 export type AnalyticsEventPayload = {
   eventType: string;
   sessionId?: string;
