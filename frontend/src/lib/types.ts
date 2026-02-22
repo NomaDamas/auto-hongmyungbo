@@ -2,7 +2,10 @@ export type Platform = "reddit" | "linkedin" | "twitter" | "instagram" | "blog";
 export type SocialProvider = "google" | "kakao" | "naver";
 
 export type ModelOption = string;
+export type ProviderOption = "openai" | "openrouter";
 export type LanguageOption = "auto" | "korean" | "english" | "japanese";
+export type LanguageSettingOption = LanguageOption | "per_platform";
+export type PerPlatformLanguageMap = Record<Platform, LanguageOption>;
 
 export type GeneratedCard = {
   id?: number;
@@ -80,54 +83,4 @@ export type UserProfile = {
       }
     >
   >;
-};
-
-export type AnalyticsEventPayload = {
-  eventType: string;
-  sessionId?: string;
-  platform?: Platform;
-  path?: string;
-  referrer?: string;
-  meta?: Record<string, unknown>;
-};
-
-export type DailyTrafficPoint = {
-  day: string;
-  totalEvents: number;
-  pageViews: number;
-  generateCount: number;
-  refineCount: number;
-  acceptCount: number;
-  rejectCount: number;
-  publishCount: number;
-};
-
-export type AnalyticsSummary = {
-  windowDays: number;
-  totals: {
-    totalEvents: number;
-    pageViews: number;
-    generateCount: number;
-    refineCount: number;
-    acceptCount: number;
-    rejectCount: number;
-    publishCount: number;
-  };
-  daily: DailyTrafficPoint[];
-  revenueEstimate: {
-    impressions: number;
-    estimatedClicks: number;
-    cpmBasedRevenue: number;
-    cpcBasedRevenue: number;
-    estimatedRevenue: number;
-    avgDailyRevenue: number;
-    projectedMonthlyRevenue: number;
-    assumptions: {
-      cpm: number;
-      ctr: number;
-      cpc: number;
-      fillRate: number;
-      slotsPerPage: number;
-    };
-  };
 };

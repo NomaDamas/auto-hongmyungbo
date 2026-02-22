@@ -1,3 +1,3 @@
 # shared
 
-공통 수익 추정 로직 및 타입 유틸 패키지입니다.
+Shared package for KPI calculations and revenue estimation helpers used by collector/dashboard.

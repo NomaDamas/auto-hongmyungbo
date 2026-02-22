@@ -1,11 +1,11 @@
 import type {
-  AnalyticsEventPayload,
-  AnalyticsSummary,
   GenerateResponse,
   GeneratedCard,
   LanguageOption,
   ModelOption,
+  PerPlatformLanguageMap,
   Platform,
+  ProviderOption,
   PublishJob,
   PublishLogItem,
   SocialProvider,
@@ -29,11 +29,13 @@ export async function generatePosts(
   model?: ModelOption,
   platforms?: Platform[],
   language?: LanguageOption,
+  languageByPlatform?: PerPlatformLanguageMap,
+  provider?: ProviderOption,
 ): Promise<GenerateResponse> {
   const res = await apiFetch(`${API_URL}/api/generate`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ draft, userProfile, model, platforms, language }),
+    body: JSON.stringify({ draft, userProfile, model, platforms, language, languageByPlatform, provider }),
   });
 
   if (!res.ok) {
@@ -52,6 +54,7 @@ export async function refinePost(payload: {
   userProfile?: UserProfile;
   model?: ModelOption;
   language?: LanguageOption;
+  provider?: ProviderOption;
 }): Promise<GeneratedCard> {
   const res = await apiFetch(`${API_URL}/api/refine`, {
     method: "POST",
@@ -133,37 +136,6 @@ export async function transcribeAudio(file: Blob): Promise<string> {
   return data.text as string;
 }
 
-export async function trackAnalyticsEvent(payload: AnalyticsEventPayload): Promise<void> {
-  await apiFetch(`${API_URL}/api/analytics/events`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
-}
-
-export async function getAnalyticsSummary(params?: {
-  days?: number;
-  cpm?: number;
-  ctr?: number;
-  cpc?: number;
-  fillRate?: number;
-  slotsPerPage?: number;
-}): Promise<AnalyticsSummary> {
-  const qp = new URLSearchParams();
-  if (params?.days !== undefined) qp.set("days", String(params.days));
-  if (params?.cpm !== undefined) qp.set("cpm", String(params.cpm));
-  if (params?.ctr !== undefined) qp.set("ctr", String(params.ctr));
-  if (params?.cpc !== undefined) qp.set("cpc", String(params.cpc));
-  if (params?.fillRate !== undefined) qp.set("fillRate", String(params.fillRate));
-  if (params?.slotsPerPage !== undefined) qp.set("slotsPerPage", String(params.slotsPerPage));
-
-  const res = await apiFetch(`${API_URL}/api/analytics/summary?${qp.toString()}`);
-  if (!res.ok) {
-    throw new Error("트래픽 요약 조회 실패");
-  }
-  return (await res.json()) as AnalyticsSummary;
-}
-
 export async function getMe(): Promise<UserInfo | null> {
   const res = await apiFetch(`${API_URL}/api/auth/me`);
   if (!res.ok) return null;
@@ -199,8 +171,8 @@ export async function getThreads(limitPerPlatform = 20): Promise<SocialThread[]>
   return (await res.json()) as SocialThread[];
 }
 
-export async function fetchProvider(): Promise<{ provider: string; defaultModel: string }> {
+export async function fetchProvider(): Promise<{ provider: ProviderOption; defaultModel: string; availableProviders: ProviderOption[] }> {
   const res = await apiFetch(`${API_URL}/api/provider`);
-  if (!res.ok) return { provider: "openai", defaultModel: "gpt-4o-mini" };
+  if (!res.ok) return { provider: "openai", defaultModel: "gpt-4o-mini", availableProviders: ["openai"] };
   return res.json();
 }
