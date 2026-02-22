@@ -1,15 +1,13 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ArchiveRestore, BarChart3, CheckCheck, Settings2, Sparkles } from "lucide-react";
+import { ArchiveRestore, CheckCheck, Settings2, Sparkles } from "lucide-react";
 import { PlatformCard } from "@/components/platform-card";
 import { ContextPanel } from "@/components/context-panel";
-import { AdSlot } from "@/components/ad-slot";
 import {
   enqueuePublish,
   fetchProvider,
   generatePosts,
-  getAnalyticsSummary,
   getJob,
   getMe,
   getOAuthConnectUrl,
@@ -18,12 +16,10 @@ import {
   getThreads,
   logout,
   refinePost,
-  trackAnalyticsEvent,
   transcribeAudio,
   updateCardStatus,
 } from "@/lib/api";
 import type {
-  AnalyticsSummary,
   CardState,
   CardVersion,
   GeneratedCard,
@@ -51,8 +47,6 @@ const OPENROUTER_MODELS: ModelOption[] = [
   "google/gemini-3-flash-preview",
   "google/gemini-3.1-pro-preview",
 ];
-
-const ANALYTICS_WINDOW_DAYS = 14;
 
 const EMPTY_CONTEXTS: Record<Platform, string> = {
   reddit: "",
@@ -120,10 +114,10 @@ function buildUserProfile(contexts: Record<Platform, string>, referencePosts: Re
 }
 
 export default function HomePage() {
-  const adsEnabled = process.env.NEXT_PUBLIC_ENABLE_ADS === "true";
   const [draft, setDraft] = useState("");
   const [modelOptions, setModelOptions] = useState<ModelOption[]>(OPENAI_MODELS);
   const [selectedModel, setSelectedModel] = useState<ModelOption>("gpt-4o-mini");
+  const [providerName, setProviderName] = useState<"openai" | "openrouter">("openai");
   const [draftId, setDraftId] = useState<number | null>(null);
   const [resultCards, setResultCards] = useState<CardState[]>([]);
   const [queueCards, setQueueCards] = useState<CardState[]>([]);
@@ -139,13 +133,6 @@ export default function HomePage() {
   const [enabledPlatforms, setEnabledPlatforms] = useState<Record<Platform, boolean>>(DEFAULT_ENABLED_PLATFORMS);
   const [autoPublish, setAutoPublish] = useState(false);
   const [language, setLanguage] = useState<LanguageOption>("auto");
-  const [analytics, setAnalytics] = useState<AnalyticsSummary | null>(null);
-  const [analyticsLoading, setAnalyticsLoading] = useState(false);
-  const [cpm, setCpm] = useState(1.8);
-  const [ctr, setCtr] = useState(0.012);
-  const [cpc, setCpc] = useState(0.18);
-  const [fillRate, setFillRate] = useState(0.65);
-  const [slotsPerPage, setSlotsPerPage] = useState(2);
   const [user, setUser] = useState<UserInfo | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [logsLoading, setLogsLoading] = useState(false);
@@ -167,51 +154,6 @@ export default function HomePage() {
     () => PLATFORM_ORDER.filter((platform) => enabledPlatforms[platform]),
     [enabledPlatforms],
   );
-  const sessionIdRef = useRef<string>("");
-
-  const getOrCreateSessionId = () => {
-    if (sessionIdRef.current) return sessionIdRef.current;
-    const key = "cross-posting-session-id";
-    const existing = window.localStorage.getItem(key);
-    if (existing) {
-      sessionIdRef.current = existing;
-      return existing;
-    }
-    const next = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
-    window.localStorage.setItem(key, next);
-    sessionIdRef.current = next;
-    return next;
-  };
-
-  const emitAnalytics = (eventType: string, meta?: Record<string, unknown>, platform?: Platform) => {
-    void trackAnalyticsEvent({
-      eventType,
-      platform,
-      path: window.location.pathname,
-      referrer: document.referrer || undefined,
-      sessionId: getOrCreateSessionId(),
-      meta,
-    });
-  };
-
-  const refreshAnalytics = async () => {
-    try {
-      setAnalyticsLoading(true);
-      const data = await getAnalyticsSummary({
-        days: ANALYTICS_WINDOW_DAYS,
-        cpm,
-        ctr,
-        cpc,
-        fillRate,
-        slotsPerPage,
-      });
-      setAnalytics(data);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setAnalyticsLoading(false);
-    }
-  };
 
   const refreshPublishData = async () => {
     if (!user) {
@@ -233,11 +175,9 @@ export default function HomePage() {
 
   useEffect(() => {
     const init = async () => {
-      getOrCreateSessionId();
-      emitAnalytics("page_view");
-
       try {
         const providerInfo = await fetchProvider();
+        setProviderName(providerInfo.provider === "openrouter" ? "openrouter" : "openai");
         if (providerInfo.provider === "openrouter") {
           setModelOptions(OPENROUTER_MODELS);
         } else {
@@ -248,7 +188,6 @@ export default function HomePage() {
         console.error(err);
       }
 
-      await refreshAnalytics();
       try {
         const me = await getMe();
         setUser(me);
@@ -261,11 +200,6 @@ export default function HomePage() {
     void init();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  useEffect(() => {
-    void refreshAnalytics();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cpm, ctr, cpc, fillRate, slotsPerPage]);
 
   useEffect(() => {
     void refreshPublishData();
@@ -297,14 +231,12 @@ export default function HomePage() {
         selectedPlatforms,
         language,
       );
-      emitAnalytics("generate", { model: selectedModel, platformCount: selectedPlatforms.length, language });
       setDraftId(generated.draftId);
       const nextCards = generated.cards.map(toCardState);
       setResultCards(nextCards);
       setQueueCards([]);
       setPublishJob(null);
       setCollapsingKeys(new Set());
-      await refreshAnalytics();
 
       if (autoPublish && generated.cards.length > 0) {
         const cardIds = generated.cards.map((c) => c.id).filter((id): id is number => typeof id === "number");
@@ -349,9 +281,7 @@ export default function HomePage() {
       if (card.id) {
         await updateCardStatus(card.id, "accepted");
       }
-      emitAnalytics("accept", { cardId: card.id }, card.platform);
       moveToQueue(card);
-      await refreshAnalytics();
     } catch (err) {
       console.error(err);
       alert("Accept 처리 중 오류가 발생했습니다.");
@@ -376,15 +306,12 @@ export default function HomePage() {
   const handleReject = async (card: CardState) => {
     if (!card.id) {
       patchCard(card.platform, { status: "rejected" });
-      emitAnalytics("reject", { hasCardId: false }, card.platform);
       return;
     }
 
     try {
       const updated = await updateCardStatus(card.id, "rejected");
       patchCard(card.platform, { status: updated.status });
-      emitAnalytics("reject", { cardId: card.id }, card.platform);
-      await refreshAnalytics();
     } catch (err) {
       console.error(err);
       alert("Reject 처리 중 오류가 발생했습니다.");
@@ -409,7 +336,6 @@ export default function HomePage() {
         model: selectedModel,
         language,
       });
-      emitAnalytics("refine", { cardId: current.id, feedbackLength: feedback.length }, platform);
 
       setResultCards((prev) =>
         prev.map((c) => {
@@ -439,7 +365,6 @@ export default function HomePage() {
           };
         }),
       );
-      await refreshAnalytics();
     } catch (err) {
       console.error(err);
       alert("수정 중 오류가 발생했습니다.");
@@ -493,7 +418,6 @@ export default function HomePage() {
 
     try {
       setPublishing(true);
-      emitAnalytics("publish", { acceptedOnly: true, acceptedCount });
       const queued = await enqueuePublish({
         draftId,
         acceptedOnly: true,
@@ -506,7 +430,6 @@ export default function HomePage() {
         if (job.status === "done" || job.status === "failed") break;
         await new Promise((resolve) => setTimeout(resolve, 600));
       }
-      await refreshAnalytics();
       await refreshPublishData();
     } catch (err) {
       console.error(err);
@@ -535,17 +458,76 @@ export default function HomePage() {
     }
   };
 
-  const handleSocialLogin = async (provider: SocialProvider) => {
+  const handleSocialLogin = async (provider: SocialProvider, targetWindow: Window = window) => {
     try {
       const apiBase = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
       const redirectUri = `${apiBase}/api/auth/${provider}/callback`;
       const { authUrl } = await getSocialAuthConnectUrl(provider, redirectUri);
-      window.location.href = authUrl;
+      targetWindow.location.href = authUrl;
     } catch (err) {
       console.error(err);
       alert("소셜 로그인 연결 중 오류가 발생했습니다.");
     }
   };
+
+  const openLoginPopup = () => {
+    const popup = window.open("", "social-login-popup", "width=440,height=560,resizable=yes,scrollbars=yes");
+    if (!popup) {
+      alert("팝업이 차단되었습니다. 팝업 허용 후 다시 시도해 주세요.");
+      return;
+    }
+
+    const html = `
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Social Login</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; margin: 0; background: #f5f5f4; color: #18181b; }
+    .wrap { max-width: 360px; margin: 28px auto; background: white; border: 1px solid #e4e4e7; border-radius: 14px; padding: 18px; }
+    h1 { margin: 0 0 6px; font-size: 18px; }
+    p { margin: 0 0 16px; font-size: 12px; color: #52525b; }
+    button { width: 100%; margin: 6px 0; padding: 10px 12px; border-radius: 10px; border: 1px solid #d4d4d8; background: #fafafa; cursor: pointer; font-weight: 600; }
+    button:hover { background: #f4f4f5; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Login</h1>
+    <p>Select a social provider.</p>
+    <button data-provider="google">Continue with Google</button>
+    <button data-provider="kakao">Continue with Kakao</button>
+    <button data-provider="naver">Continue with Naver</button>
+  </div>
+  <script>
+    document.querySelectorAll("button[data-provider]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        const provider = btn.getAttribute("data-provider");
+        window.opener.postMessage({ type: "social-login", provider }, window.location.origin);
+      });
+    });
+  </script>
+</body>
+</html>`;
+    popup.document.open();
+    popup.document.write(html);
+    popup.document.close();
+  };
+
+  useEffect(() => {
+    const onMessage = (event: MessageEvent) => {
+      if (event.origin !== window.location.origin) return;
+      if (!event.data || event.data.type !== "social-login") return;
+      const provider = event.data.provider as SocialProvider;
+      if (!["google", "kakao", "naver"].includes(provider)) return;
+      const popupWindow = event.source as Window | null;
+      void handleSocialLogin(provider, popupWindow || window);
+    };
+    window.addEventListener("message", onMessage);
+    return () => window.removeEventListener("message", onMessage);
+  }, []);
 
   const handleLogout = async () => {
     try {
@@ -603,8 +585,8 @@ export default function HomePage() {
       <main className="mx-auto min-h-screen w-full max-w-7xl px-4 py-6 md:px-6">
         <header className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-zinc-200 bg-white/80 p-4 shadow-sm backdrop-blur dark:border-zinc-800 dark:bg-zinc-900/70">
           <div>
-            <p className="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">AI Cross Posting</p>
-            <h1 className="text-xl font-semibold text-zinc-900 dark:text-zinc-100">Social Content Studio</h1>
+            <h1 className="text-2xl font-semibold text-zinc-900 dark:text-zinc-100">Auto-HongMyungBO</h1>
+            <p className="text-xs font-medium lowercase tracking-wide text-zinc-500 dark:text-zinc-400">ai cross posting social content studio</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             {authLoading ? (
@@ -620,11 +602,12 @@ export default function HomePage() {
                 </button>
               </div>
             ) : (
-              <div className="flex items-center gap-1">
-                <button onClick={() => void handleSocialLogin("google")} className="rounded-md border border-zinc-300 px-2 py-1 text-[11px] dark:border-zinc-700 dark:text-zinc-100">Google</button>
-                <button onClick={() => void handleSocialLogin("kakao")} className="rounded-md border border-zinc-300 px-2 py-1 text-[11px] dark:border-zinc-700 dark:text-zinc-100">Kakao</button>
-                <button onClick={() => void handleSocialLogin("naver")} className="rounded-md border border-zinc-300 px-2 py-1 text-[11px] dark:border-zinc-700 dark:text-zinc-100">Naver</button>
-              </div>
+              <button
+                onClick={openLoginPopup}
+                className="rounded-md border border-zinc-300 px-2 py-1 text-[11px] dark:border-zinc-700 dark:text-zinc-100"
+              >
+                Login
+              </button>
             )}
             <button
               onClick={() => setContextOpen(true)}
@@ -643,6 +626,9 @@ export default function HomePage() {
                 </option>
               ))}
             </select>
+            <span className="rounded-full bg-zinc-100 px-2 py-1 text-[11px] text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">
+              Provider: {providerName}
+            </span>
           </div>
         </header>
 
@@ -741,13 +727,6 @@ export default function HomePage() {
               </p>
             )}
 
-            {adsEnabled && (
-              <AdSlot
-                slot={process.env.NEXT_PUBLIC_ADSENSE_SLOT_SIDEBAR ?? ""}
-                format="rectangle"
-                className="mt-4 min-h-[120px] rounded-xl border border-zinc-200 bg-zinc-50 p-2 dark:border-zinc-800 dark:bg-zinc-900/40"
-              />
-            )}
           </aside>
 
           <section className="min-w-0 rounded-2xl border border-zinc-200 bg-white p-3 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
@@ -812,155 +791,10 @@ export default function HomePage() {
           </section>
         </section>
 
-        {adsEnabled && (
-          <section className="mb-4">
-            <AdSlot
-              slot={process.env.NEXT_PUBLIC_ADSENSE_SLOT_FOOTER ?? ""}
-              format="horizontal"
-              className="min-h-[90px] rounded-2xl border border-zinc-200 bg-white p-2 shadow-sm dark:border-zinc-800 dark:bg-zinc-900"
-            />
-          </section>
-        )}
-
         <footer className="text-center text-[11px] text-zinc-500 dark:text-zinc-400">
           Accept: 오른쪽 Results → 왼쪽 Queue | Queue 클릭: Restore
           <CheckCheck className="ml-1 inline h-3.5 w-3.5" />
         </footer>
-
-        <section className="mt-4 rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
-          <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-            <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
-              <BarChart3 className="mr-1 inline h-4 w-4" /> Traffic & Revenue Monitor
-            </h3>
-            <button
-              onClick={() => void refreshAnalytics()}
-              className="rounded-lg border border-zinc-300 px-3 py-1.5 text-xs dark:border-zinc-700 dark:text-zinc-100"
-            >
-              {analyticsLoading ? "갱신 중..." : "새로고침"}
-            </button>
-          </div>
-
-          <div className="mb-3 grid grid-cols-1 gap-2 sm:grid-cols-5">
-            <label className="text-xs text-zinc-600 dark:text-zinc-300">
-              CPM (USD)
-              <input
-                type="number"
-                min={0}
-                step="0.1"
-                value={cpm}
-                onChange={(e) => setCpm(Number(e.target.value))}
-                className="mt-1 w-full rounded-lg border border-zinc-300 bg-white px-2 py-1 text-xs dark:border-zinc-700 dark:bg-zinc-950"
-              />
-            </label>
-            <label className="text-xs text-zinc-600 dark:text-zinc-300">
-              CTR (0-1)
-              <input
-                type="number"
-                min={0}
-                max={1}
-                step="0.001"
-                value={ctr}
-                onChange={(e) => setCtr(Number(e.target.value))}
-                className="mt-1 w-full rounded-lg border border-zinc-300 bg-white px-2 py-1 text-xs dark:border-zinc-700 dark:bg-zinc-950"
-              />
-            </label>
-            <label className="text-xs text-zinc-600 dark:text-zinc-300">
-              CPC (USD)
-              <input
-                type="number"
-                min={0}
-                step="0.01"
-                value={cpc}
-                onChange={(e) => setCpc(Number(e.target.value))}
-                className="mt-1 w-full rounded-lg border border-zinc-300 bg-white px-2 py-1 text-xs dark:border-zinc-700 dark:bg-zinc-950"
-              />
-            </label>
-            <label className="text-xs text-zinc-600 dark:text-zinc-300">
-              Fill Rate (0-1)
-              <input
-                type="number"
-                min={0}
-                max={1}
-                step="0.01"
-                value={fillRate}
-                onChange={(e) => setFillRate(Number(e.target.value))}
-                className="mt-1 w-full rounded-lg border border-zinc-300 bg-white px-2 py-1 text-xs dark:border-zinc-700 dark:bg-zinc-950"
-              />
-            </label>
-            <label className="text-xs text-zinc-600 dark:text-zinc-300">
-              Ad Slots / Page
-              <input
-                type="number"
-                min={1}
-                max={10}
-                step="1"
-                value={slotsPerPage}
-                onChange={(e) => setSlotsPerPage(Number(e.target.value))}
-                className="mt-1 w-full rounded-lg border border-zinc-300 bg-white px-2 py-1 text-xs dark:border-zinc-700 dark:bg-zinc-950"
-              />
-            </label>
-          </div>
-
-          {analytics ? (
-            <>
-              <div className="grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">
-                <div className="rounded-lg bg-zinc-100 p-2 dark:bg-zinc-800">
-                  <p className="text-zinc-500 dark:text-zinc-400">Page Views ({analytics.windowDays}d)</p>
-                  <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">{analytics.totals.pageViews}</p>
-                </div>
-                <div className="rounded-lg bg-zinc-100 p-2 dark:bg-zinc-800">
-                  <p className="text-zinc-500 dark:text-zinc-400">Total Events</p>
-                  <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">{analytics.totals.totalEvents}</p>
-                </div>
-                <div className="rounded-lg bg-zinc-100 p-2 dark:bg-zinc-800">
-                  <p className="text-zinc-500 dark:text-zinc-400">Estimated Revenue</p>
-                  <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">${analytics.revenueEstimate.estimatedRevenue.toFixed(4)}</p>
-                </div>
-                <div className="rounded-lg bg-zinc-100 p-2 dark:bg-zinc-800">
-                  <p className="text-zinc-500 dark:text-zinc-400">Projected Monthly</p>
-                  <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">${analytics.revenueEstimate.projectedMonthlyRevenue.toFixed(4)}</p>
-                </div>
-                <div className="rounded-lg bg-zinc-100 p-2 dark:bg-zinc-800">
-                  <p className="text-zinc-500 dark:text-zinc-400">Estimated Clicks</p>
-                  <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">{analytics.revenueEstimate.estimatedClicks}</p>
-                </div>
-                <div className="rounded-lg bg-zinc-100 p-2 dark:bg-zinc-800">
-                  <p className="text-zinc-500 dark:text-zinc-400">CPM vs CPC</p>
-                  <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
-                    ${analytics.revenueEstimate.cpmBasedRevenue.toFixed(4)} / ${analytics.revenueEstimate.cpcBasedRevenue.toFixed(4)}
-                  </p>
-                </div>
-              </div>
-
-              <div className="mt-3 max-h-44 overflow-y-auto rounded-lg border border-zinc-200 dark:border-zinc-800">
-                <table className="w-full text-left text-xs">
-                  <thead className="bg-zinc-50 dark:bg-zinc-900/60">
-                    <tr>
-                      <th className="px-2 py-1.5">Day</th>
-                      <th className="px-2 py-1.5">PV</th>
-                      <th className="px-2 py-1.5">Generate</th>
-                      <th className="px-2 py-1.5">Refine</th>
-                      <th className="px-2 py-1.5">Publish</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {analytics.daily.map((row) => (
-                      <tr key={row.day} className="border-t border-zinc-200 dark:border-zinc-800">
-                        <td className="px-2 py-1.5">{row.day}</td>
-                        <td className="px-2 py-1.5">{row.pageViews}</td>
-                        <td className="px-2 py-1.5">{row.generateCount}</td>
-                        <td className="px-2 py-1.5">{row.refineCount}</td>
-                        <td className="px-2 py-1.5">{row.publishCount}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </>
-          ) : (
-            <p className="text-xs text-zinc-500 dark:text-zinc-400">트래픽 데이터가 아직 없습니다.</p>
-          )}
-        </section>
 
         <section className="mt-4 rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
           <div className="mb-3 flex items-center justify-between">

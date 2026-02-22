@@ -54,8 +54,6 @@ OAuth/publish values are listed in `.env.example`.
 - `GET /api/jobs/{job_id}`
 - `GET /api/publish/logs`
 - `GET /api/threads`
-- `POST /api/analytics/events`
-- `GET /api/analytics/summary`
 - `GET /api/auth/me`
 - `POST /api/auth/logout`
 - `GET /api/auth/{provider}/connect`

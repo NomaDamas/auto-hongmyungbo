@@ -5,15 +5,13 @@ The frontend provides the full draft-to-publish user flow.
 ## Features
 
 - Draft input and multi-platform generation
-- Structured intent controls (objective/audience/core message/action)
-- Style sample input for stronger style transfer
+- Per-platform style transfer using reference posts
 - Card-level accept/reject/edit workflow
 - Version history with undo/redo
 - Voice-to-text refine input
 - OAuth-based social login and account connection
 - Scheduled publish trigger
 - Publish logs and per-platform thread view
-- Analytics/revenue monitor panel
 
 ## Data/Auth Guidance
 
@@ -44,10 +42,6 @@ npm run build
 ## Environment Variables
 
 - `NEXT_PUBLIC_API_URL=http://localhost:8000`
-- `NEXT_PUBLIC_ENABLE_ADS=false`
-- `NEXT_PUBLIC_ADSENSE_CLIENT=` (optional)
-- `NEXT_PUBLIC_ADSENSE_SLOT_SIDEBAR=` (optional)
-- `NEXT_PUBLIC_ADSENSE_SLOT_FOOTER=` (optional)
 - `NEXT_PUBLIC_HMB_IMAGE_URL=` (optional)
 
 ## Docker

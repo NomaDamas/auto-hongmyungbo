@@ -6,7 +6,8 @@ This repository contains a prototype cross-posting product that generates and pu
 
 - `frontend/` (Next.js): user-facing app for drafting, review, approval, and publish actions
 - `backend/` (FastAPI): AI generation, OAuth callbacks, publish queue worker, and external API orchestration
-- `hongmyungbo_automation_traffic_monitoring/`: optional standalone traffic collector and KPI dashboard
+- Traffic monitoring is maintained in a separate repository:
+  - `https://github.com/minsing-jin/hongmyungbo_automation_traffic_monitoring.git`
 
 ## Stack Decision
 
@@ -16,7 +17,7 @@ This repository contains a prototype cross-posting product that generates and pu
   - OpenAI calls and secret management
   - Social OAuth token exchange/callback handling
   - Scheduled/queued publishing jobs
-  - Unified analytics/publish APIs
+  - Unified publishing and OAuth APIs
 
 ## Repository Layout
 
@@ -57,14 +58,10 @@ Open `http://localhost:3000`.
 - `POST /api/refine`
 - `POST /api/publish`
 - `GET /api/jobs/{job_id}`
-- `POST /api/analytics/events`
-- `GET /api/analytics/summary`
 - `GET /api/auth/me`
-
-`/api/generate` and `/api/refine` now support structured intent fields and a style sample input, so users can transfer writing style without manual prompt engineering.
 
 ## Deployment Notes
 
 - Frontend: Vercel (set `NEXT_PUBLIC_API_URL`)
-- Backend: Railway/Render (set `DATABASE_URL`, `OPENAI_API_KEY`, OAuth envs)
-- Optional monitoring monorepo: deploy collector + dashboard separately
+- Backend: Railway/Render (set `DB_PATH`, `OPENAI_API_KEY`, OAuth envs)
+- Traffic monitor: deploy from the dedicated repository above
