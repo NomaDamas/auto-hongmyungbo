@@ -9,14 +9,14 @@ The backend is the orchestration service for AI, OAuth, and publishing workflows
 - Handle social login callbacks (`google`, `kakao`, `naver`)
 - Handle platform OAuth callbacks (`linkedin`, `twitter`, `instagram`, `reddit`)
 - Queue and execute publish jobs in the background worker
-- Store drafts/cards/jobs/logs/events in Supabase Postgres
+- Store drafts/cards/jobs/logs/events in SQLite for now (Postgres migration planned)
 
 ## Database
 
-This backend now uses **Postgres** through `DATABASE_URL` (Supabase recommended).
+This backend currently uses **SQLite** (`DB_PATH`, default `./app.db`).
 
 - On startup, `store.init_db()` creates required tables/indexes if missing.
-- The previous SQLite file (`app.db`) is no longer used by the app runtime.
+- Postgres/Supabase migration is planned for a later phase.
 
 ## Run Locally
 
@@ -24,7 +24,7 @@ This backend now uses **Postgres** through `DATABASE_URL` (Supabase recommended)
 cd backend
 cp .env.example .env
 uv sync
-uv run uvicorn app.main:app --reload --port 8000
+uv run python -m uvicorn app.main:app --reload --port 8000
 ```
 
 Health check:
@@ -37,7 +37,7 @@ curl http://localhost:8000/health
 
 Minimum:
 
-- `DATABASE_URL`
+- `DB_PATH` (optional, default `./app.db`)
 - `OPENAI_API_KEY` (or `OPENROUTER_API_KEY`)
 - `FRONTEND_URL`
 - `ALLOWED_ORIGIN` or `ALLOWED_ORIGINS`

@@ -10,7 +10,8 @@ This repository contains a prototype cross-posting product that generates and pu
 
 ## Stack Decision
 
-- Use **Supabase** for product data, auth, and storage.
+- Current local storage: SQLite (`backend/app.db`)
+- Planned migration: Supabase/Postgres for product data and auth
 - Keep **FastAPI** for server-only workflows:
   - OpenAI calls and secret management
   - Social OAuth token exchange/callback handling
@@ -36,7 +37,7 @@ This repository contains a prototype cross-posting product that generates and pu
 cd backend
 cp .env.example .env
 uv sync
-uv run uvicorn app.main:app --reload --port 8000
+uv run python -m uvicorn app.main:app --reload --port 8000
 ```
 
 ### 2) Frontend
