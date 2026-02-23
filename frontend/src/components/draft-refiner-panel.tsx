@@ -1,7 +1,7 @@
 "use client";
 
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useState } from "react";
-import { Loader2, Sparkles } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { refineDraft } from "@/lib/api";
 import type { DraftRefineLanguage, DraftRefineResponse, GenerationConfig, Platform, ProviderOption } from "@/lib/types";
 
@@ -34,6 +34,7 @@ function summarizeRefinement(result: DraftRefineResponse): string {
     `Audience: ${result.brief.audienceAssumption}`,
     `Key points: ${result.brief.keyPoints.join(" / ")}`,
     `CTA: ${result.brief.cta}`,
+    result.attentionGuide?.strongestHook ? `Strongest hook: ${result.attentionGuide.strongestHook}` : "",
   ].filter(Boolean);
   return lines.join("\n");
 }
@@ -108,21 +109,11 @@ export const DraftRefinerPanel = forwardRef<DraftRefinerPanelRef, Props>(functio
   }, [open]);
 
   return (
-    <section className="mt-3">
-      <button
-        type="button"
-        onClick={() => void runRefine(false)}
-        disabled={loading}
-        className="rounded-lg border border-zinc-300 bg-white px-3 py-1.5 text-xs font-medium dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
-      >
-        <Sparkles className="mr-1 inline h-3.5 w-3.5" />
-        {loading ? "Refining..." : "✨ Draft Idea Booster"}
-      </button>
-
+    <>
       {open && (
-        <aside className="fixed left-4 top-20 z-50 h-[calc(100vh-6rem)] w-[min(460px,92vw)] overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-2xl dark:border-zinc-800 dark:bg-zinc-900">
-          <div className="flex items-center justify-between border-b border-zinc-200 px-3 py-2 dark:border-zinc-800">
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-zinc-600 dark:text-zinc-300">Draft Idea Lab</h3>
+        <aside className="fixed left-4 top-20 z-50 h-[calc(100vh-6rem)] w-[min(460px,92vw)] overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-2xl dark:border-zinc-700/50 dark:bg-zinc-900">
+          <div className="flex items-center justify-between border-b border-zinc-200 bg-zinc-50/50 px-3 py-2 dark:border-zinc-800 dark:bg-zinc-800/30">
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-violet-600 dark:text-violet-400">Draft Idea Lab</h3>
             <button
               type="button"
               onClick={() => setOpen(false)}
@@ -144,7 +135,7 @@ export const DraftRefinerPanel = forwardRef<DraftRefinerPanelRef, Props>(functio
                   className={`max-w-[92%] whitespace-pre-wrap rounded-lg px-3 py-2 text-xs ${
                     m.role === "assistant"
                       ? "border border-zinc-200 bg-zinc-50 text-zinc-700 dark:border-zinc-800 dark:bg-zinc-950/40 dark:text-zinc-200"
-                      : "ml-auto bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
+                      : "ml-auto bg-violet-600 text-white dark:bg-violet-500"
                   }`}
                 >
                   {m.text}
@@ -172,9 +163,55 @@ export const DraftRefinerPanel = forwardRef<DraftRefinerPanelRef, Props>(functio
 
               {result && (
                 <>
+                  {result.attentionGuide && (
+                    <div className="rounded-lg border border-zinc-200 bg-white p-2 dark:border-zinc-800 dark:bg-zinc-900">
+                      <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                        <span className="mr-1 inline-flex h-4 w-4 items-center justify-center rounded bg-violet-100 text-[9px] font-bold text-violet-600 dark:bg-violet-500/20 dark:text-violet-400">A</span>
+                        Attention boost
+                      </p>
+                      <p className="text-xs font-medium text-zinc-700 dark:text-zinc-200">
+                        Best hook: {result.attentionGuide.strongestHook}
+                      </p>
+                      <div className="mt-2 flex flex-wrap gap-1">
+                        {result.attentionGuide.hookOptions.map((hook, idx) => (
+                          <button
+                            key={`hook-${idx + 1}`}
+                            type="button"
+                            onClick={() => onInsertIntoDraft(hook)}
+                            title={hook}
+                            className="rounded-full border border-violet-300 px-2 py-0.5 text-[11px] text-violet-700 hover:bg-violet-50 dark:border-violet-500/50 dark:text-violet-300 dark:hover:bg-violet-500/10"
+                          >
+                            Hook {idx + 1}: {hook.length > 28 ? `${hook.slice(0, 28)}...` : hook}
+                          </button>
+                        ))}
+                        {result.attentionGuide.ctaOptions.map((cta, idx) => (
+                          <button
+                            key={`cta-${idx + 1}`}
+                            type="button"
+                            onClick={() => onInsertIntoDraft(cta)}
+                            title={cta}
+                            className="rounded-full border border-zinc-300 px-2 py-0.5 text-[11px] text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800/60"
+                          >
+                            CTA {idx + 1}: {cta.length > 28 ? `${cta.slice(0, 28)}...` : cta}
+                          </button>
+                        ))}
+                      </div>
+                      {!!result.attentionGuide.riskNotes.length && (
+                        <ul className="mt-2 list-disc space-y-0.5 pl-4 text-[11px] text-zinc-600 dark:text-zinc-300">
+                          {result.attentionGuide.riskNotes.map((note, idx) => (
+                            <li key={`risk-${idx + 1}`}>{note}</li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  )}
+
                   {!!result.questions.length && (
                     <div className="rounded-lg border border-zinc-200 bg-white p-2 dark:border-zinc-800 dark:bg-zinc-900">
-                      <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Missing info</p>
+                      <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                        <span className="mr-1 inline-flex h-4 w-4 items-center justify-center rounded bg-violet-100 text-[9px] font-bold text-violet-600 dark:bg-violet-500/20 dark:text-violet-400">B</span>
+                        Missing info
+                      </p>
                       <div className="space-y-2">
                         {result.questions.map((q) => (
                           <div key={q.id}>
@@ -185,10 +222,10 @@ export const DraftRefinerPanel = forwardRef<DraftRefinerPanelRef, Props>(functio
                                   key={`${q.id}-${choice}`}
                                   type="button"
                                   onClick={() => setAnswers((prev) => ({ ...prev, [q.id]: choice }))}
-                                  className={`rounded-full border px-2 py-0.5 text-[11px] ${
+                                  className={`rounded-full border px-2 py-0.5 text-[11px] transition-colors ${
                                     answers[q.id] === choice
-                                      ? "border-zinc-900 bg-zinc-900 text-white dark:border-zinc-100 dark:bg-zinc-100 dark:text-zinc-900"
-                                      : "border-zinc-300 text-zinc-700 dark:border-zinc-700 dark:text-zinc-200"
+                                      ? "border-violet-600 bg-violet-600 text-white dark:border-violet-500 dark:bg-violet-500"
+                                      : "border-zinc-300 text-zinc-700 hover:border-violet-300 dark:border-zinc-700 dark:text-zinc-200 dark:hover:border-violet-500/50"
                                   }`}
                                 >
                                   {choice}
@@ -202,7 +239,10 @@ export const DraftRefinerPanel = forwardRef<DraftRefinerPanelRef, Props>(functio
                   )}
 
                   <div className="rounded-lg border border-zinc-200 bg-white p-2 dark:border-zinc-800 dark:bg-zinc-900">
-                    <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Polished draft</p>
+                    <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                      <span className="mr-1 inline-flex h-4 w-4 items-center justify-center rounded bg-violet-100 text-[9px] font-bold text-violet-600 dark:bg-violet-500/20 dark:text-violet-400">C</span>
+                      Polished draft
+                    </p>
                     <textarea
                       readOnly
                       value={result.polishedDraft}
@@ -228,7 +268,10 @@ export const DraftRefinerPanel = forwardRef<DraftRefinerPanelRef, Props>(functio
 
                   {!!result.angles.length && selectedAngle && (
                     <div className="rounded-lg border border-zinc-200 bg-white p-2 dark:border-zinc-800 dark:bg-zinc-900">
-                      <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Try angle</p>
+                      <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                        <span className="mr-1 inline-flex h-4 w-4 items-center justify-center rounded bg-violet-100 text-[9px] font-bold text-violet-600 dark:bg-violet-500/20 dark:text-violet-400">D</span>
+                        Try angle
+                      </p>
                       <select
                         value={selectedAngle.id}
                         onChange={(e) => setSelectedAngleId(e.target.value)}
@@ -281,7 +324,7 @@ export const DraftRefinerPanel = forwardRef<DraftRefinerPanelRef, Props>(functio
                     setChatInput("");
                   }}
                   disabled={loading}
-                  className="rounded-md border border-zinc-300 px-2 py-1 text-xs dark:border-zinc-700 dark:text-zinc-200"
+                  className="rounded-md bg-violet-600 px-2 py-1 text-xs text-white transition-colors hover:bg-violet-700 dark:bg-violet-500 dark:hover:bg-violet-600"
                 >
                   Send
                 </button>
@@ -290,6 +333,6 @@ export const DraftRefinerPanel = forwardRef<DraftRefinerPanelRef, Props>(functio
           </div>
         </aside>
       )}
-    </section>
+    </>
   );
 });

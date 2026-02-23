@@ -110,9 +110,17 @@ export type DraftRefineAngle = {
   draftSnippet?: string;
 };
 
+export type DraftRefineAttentionGuide = {
+  strongestHook: string;
+  hookOptions: string[];
+  ctaOptions: string[];
+  riskNotes: string[];
+};
+
 export type DraftRefineResponse = {
   brief: DraftRefineBrief;
   questions: DraftRefineQuestion[];
   angles: DraftRefineAngle[];
+  attentionGuide?: DraftRefineAttentionGuide;
   polishedDraft: string;
 };

@@ -195,10 +195,18 @@ class DraftRefineAngle(BaseModel):
     draftSnippet: Optional[str] = None
 
 
+class DraftRefineAttentionGuide(BaseModel):
+    strongestHook: str
+    hookOptions: List[str]
+    ctaOptions: List[str]
+    riskNotes: List[str]
+
+
 class DraftRefineResponse(BaseModel):
     brief: DraftRefineBrief
     questions: List[DraftRefineQuestion]
     angles: List[DraftRefineAngle]
+    attentionGuide: Optional[DraftRefineAttentionGuide] = None
     polishedDraft: str
 
 
@@ -1067,6 +1075,7 @@ async def refine_draft(req: DraftRefineRequest, request: Request) -> DraftRefine
     prompt = (
         "You are a senior writing coach. Reorganize messy notes into a clear brief and polished draft.\n"
         "Do not invent factual claims. If information is missing, ask targeted questions instead.\n"
+        "Goal: maximize audience attention without clickbait or misinformation.\n"
         f"{_language_instruction(req.language, raw)}\n"
         "Return strict JSON with EXACT keys:\n"
         "{"
@@ -1074,6 +1083,7 @@ async def refine_draft(req: DraftRefineRequest, request: Request) -> DraftRefine
         '"cta":"string","hashtags?":["string"]},'
         '"questions":[{"id":"string","question":"string","choices?":["string"]}] (max 3),'
         '"angles":[{"id":"string","label":"string","preview":"2-3 sentences","draftSnippet?":"string"}] (3-5 items),'
+        '"attentionGuide":{"strongestHook":"string","hookOptions":["max 3"],"ctaOptions":["max 3"],"riskNotes":["max 3"]},'
         '"polishedDraft":"string"'
         "}\n\n"
         f"Target platforms: {platform_list}\n"
@@ -1111,6 +1121,30 @@ async def refine_draft(req: DraftRefineRequest, request: Request) -> DraftRefine
                 DraftRefineAngle(id="angle_3", label="Action-first", preview="Lead with a practical checklist and finish with a direct CTA."),
             ][: 3 - len(response.angles)]
         )
+
+    if not response.attentionGuide:
+        response.attentionGuide = DraftRefineAttentionGuide(
+            strongestHook="Start with one concrete pain point your audience already feels.",
+            hookOptions=[
+                "Ask a sharp question tied to a real pain point.",
+                "Share one surprising but believable insight first.",
+                "Open with a short before/after contrast.",
+            ],
+            ctaOptions=[
+                "Ask for one specific opinion in comments.",
+                "Invite readers to share their current approach.",
+                "Offer a simple next step they can try today.",
+            ],
+            riskNotes=[
+                "Avoid over-claiming results without evidence.",
+                "Keep the first two lines concrete and specific.",
+                "Do not overload with too many topics in one post.",
+            ],
+        )
+    else:
+        response.attentionGuide.hookOptions = response.attentionGuide.hookOptions[:3]
+        response.attentionGuide.ctaOptions = response.attentionGuide.ctaOptions[:3]
+        response.attentionGuide.riskNotes = response.attentionGuide.riskNotes[:3]
 
     return response
 
