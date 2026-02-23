@@ -53,6 +53,7 @@ In `Options`, you can configure at runtime:
 ## What Works Out of the Box
 
 - Draft -> multi-platform generation
+- Optional Draft Refiner panel (structured brief, missing questions, angles, polished draft)
 - Platform-specific preview and editing
 - Accept/Reject queue flow
 - Refine (text + voice input)
