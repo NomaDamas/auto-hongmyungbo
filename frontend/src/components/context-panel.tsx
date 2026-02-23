@@ -72,8 +72,8 @@ export function ContextPanel({
   };
 
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-black/50 p-4">
-      <aside className="relative max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-black/10 bg-white p-5 shadow-xl dark:border-white/10 dark:bg-zinc-900">
+    <div className="fixed inset-0 z-50 grid place-items-center bg-black/50 p-4 backdrop-blur-sm">
+      <aside className="relative max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-black/10 bg-white p-5 shadow-xl dark:border-zinc-700/50 dark:bg-zinc-900">
         <header className="mb-4 flex items-center justify-between">
           <div>
             <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">Platform Writing Style</h2>
@@ -110,9 +110,9 @@ export function ContextPanel({
             <div className="mb-2 inline-flex rounded-md border border-zinc-300 p-0.5 dark:border-zinc-700">
               <button
                 onClick={() => setDraftLanguage("auto")}
-                className={`rounded px-2 py-1 text-[11px] font-medium ${
+                className={`rounded px-2 py-1 text-[11px] font-medium transition-colors ${
                   languageMode === "unified"
-                    ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
+                    ? "bg-violet-600 text-white dark:bg-violet-500"
                     : "text-zinc-600 dark:text-zinc-300"
                 }`}
               >
@@ -120,9 +120,9 @@ export function ContextPanel({
               </button>
               <button
                 onClick={() => setDraftLanguage("per_platform")}
-                className={`rounded px-2 py-1 text-[11px] font-medium ${
+                className={`rounded px-2 py-1 text-[11px] font-medium transition-colors ${
                   languageMode === "per_platform"
-                    ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
+                    ? "bg-violet-600 text-white dark:bg-violet-500"
                     : "text-zinc-600 dark:text-zinc-300"
                 }`}
               >
@@ -172,10 +172,10 @@ export function ContextPanel({
             <button
               key={p}
               onClick={() => setTab(p)}
-              className={`shrink-0 rounded-full px-3 py-1 text-xs capitalize ${
+              className={`shrink-0 rounded-full px-3 py-1 text-xs capitalize transition-colors ${
                 p === tab
-                  ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
-                  : "border border-zinc-300 text-zinc-700 dark:border-zinc-700 dark:text-zinc-200"
+                  ? "bg-violet-600 text-white dark:bg-violet-500"
+                  : "border border-zinc-300 text-zinc-700 hover:border-violet-300 dark:border-zinc-700 dark:text-zinc-200 dark:hover:border-violet-500/50"
               }`}
             >
               {p}
@@ -188,7 +188,7 @@ export function ContextPanel({
           value={currentValue}
           onChange={(e) => setDraftContexts((prev) => ({ ...prev, [tab]: e.target.value }))}
           placeholder="Optional: additional style constraints for this platform"
-          className="mb-3 h-28 w-full rounded-2xl border border-zinc-300 bg-white px-3 py-3 text-sm outline-none focus:ring-2 focus:ring-zinc-300 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100 dark:focus:ring-zinc-700"
+          className="mb-3 h-28 w-full rounded-2xl border border-zinc-300 bg-white px-3 py-3 text-sm outline-none focus:ring-2 focus:ring-violet-400/50 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100 dark:focus:ring-violet-500/40"
         />
 
         <label className="mb-2 block text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
@@ -206,7 +206,7 @@ export function ContextPanel({
             }))
           }
           placeholder={"Paste multiple posts and separate each with:\n---"}
-          className="h-[28vh] w-full rounded-2xl border border-zinc-300 bg-white px-3 py-3 text-sm outline-none focus:ring-2 focus:ring-zinc-300 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100 dark:focus:ring-zinc-700"
+          className="h-[28vh] w-full rounded-2xl border border-zinc-300 bg-white px-3 py-3 text-sm outline-none focus:ring-2 focus:ring-violet-400/50 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100 dark:focus:ring-violet-500/40"
         />
 
         <div className="mt-4 flex items-center justify-end gap-2">
@@ -225,7 +225,7 @@ export function ContextPanel({
           </button>
           <button
             onClick={handleSave}
-            className="rounded-lg bg-zinc-900 px-3 py-2 text-xs font-semibold text-white dark:bg-zinc-100 dark:text-zinc-900"
+            className="rounded-lg bg-violet-600 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-violet-700 dark:bg-violet-500 dark:hover:bg-violet-600"
           >
             Save
           </button>

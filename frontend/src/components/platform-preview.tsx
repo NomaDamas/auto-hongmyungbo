@@ -51,6 +51,7 @@ function skinClasses(platform: Platform) {
     return {
       shell: "rounded-xl border border-zinc-200 bg-white p-3 dark:border-zinc-700 dark:bg-zinc-900",
       footer: "text-zinc-500 dark:text-zinc-400",
+      avatar: "bg-blue-200 dark:bg-blue-800",
       label: "LinkedIn",
     };
   }
@@ -58,6 +59,7 @@ function skinClasses(platform: Platform) {
     return {
       shell: "rounded-xl border border-orange-200 bg-orange-50 p-3 dark:border-orange-900 dark:bg-zinc-800",
       footer: "text-zinc-500 dark:text-zinc-400",
+      avatar: "bg-orange-200 dark:bg-orange-800",
       label: "Reddit",
     };
   }
@@ -65,6 +67,7 @@ function skinClasses(platform: Platform) {
     return {
       shell: "rounded-xl border border-zinc-200 bg-black p-3 text-white dark:border-zinc-700",
       footer: "text-zinc-300",
+      avatar: "bg-zinc-600 dark:bg-zinc-500",
       label: "X",
     };
   }
@@ -72,12 +75,14 @@ function skinClasses(platform: Platform) {
     return {
       shell: "rounded-xl border border-zinc-200 bg-gradient-to-b from-fuchsia-50 to-rose-50 p-3 dark:border-zinc-700 dark:from-zinc-900 dark:to-zinc-800",
       footer: "text-zinc-500 dark:text-zinc-400",
+      avatar: "bg-gradient-to-br from-fuchsia-300 to-rose-300 dark:from-fuchsia-700 dark:to-rose-700",
       label: "Instagram",
     };
   }
   return {
     shell: "rounded-xl border border-zinc-200 bg-white p-3 dark:border-zinc-700 dark:bg-zinc-800",
     footer: "text-zinc-500 dark:text-zinc-400",
+    avatar: "bg-emerald-200 dark:bg-emerald-800",
     label: "Blog",
   };
 }
@@ -90,7 +95,7 @@ export function PlatformPreview({ platform, title, text, expanded, canExpand }: 
     <div className={skin.shell}>
       <div className="mb-2 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <span className="h-7 w-7 rounded-full bg-zinc-300 dark:bg-zinc-600" />
+          <span className={`h-7 w-7 rounded-full ${skin.avatar}`} />
           <div>
             <p className="text-xs font-semibold">{skin.label} User</p>
             <p className={`text-[10px] ${skin.footer}`}>just now</p>
@@ -114,9 +119,9 @@ export function PlatformPreview({ platform, title, text, expanded, canExpand }: 
       </div>
 
       <div className={`mt-3 flex items-center gap-4 border-t border-zinc-200 pt-2 text-[11px] ${skin.footer} dark:border-zinc-700`}>
-        <span>Like</span>
-        <span>Comment</span>
-        <span>Share</span>
+        <span className="cursor-default transition-colors hover:text-violet-500">Like</span>
+        <span className="cursor-default transition-colors hover:text-violet-500">Comment</span>
+        <span className="cursor-default transition-colors hover:text-violet-500">Share</span>
       </div>
     </div>
   );

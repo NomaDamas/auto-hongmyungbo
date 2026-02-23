@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Check, Copy, Expand, Loader2, Mic, Pencil, RotateCcw, RotateCw, X } from "lucide-react";
 import { PlatformPreview } from "@/components/platform-preview";
+import { getPlatformIcon } from "@/components/platform-icons";
 import { transformPreviewText } from "@/lib/preview-transform";
 import type { CardState, Platform } from "@/lib/types";
 
@@ -82,7 +83,7 @@ export function PlatformCard({
 
   return (
     <article
-      className={`relative rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm transition-all dark:border-zinc-800 dark:bg-zinc-900 ${
+      className={`relative rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm transition-all dark:border-zinc-700/50 dark:bg-zinc-900 dark:shadow-glow-sm ${
         isCollapsing ? "scale-95 opacity-0" : ""
       }`}
     >
@@ -96,7 +97,10 @@ export function PlatformCard({
 
       <header className="mb-3 flex items-center justify-between gap-2">
         <div>
-          <p className="text-base font-semibold capitalize text-zinc-900 dark:text-zinc-100">{card.platform}</p>
+          <p className="flex items-center gap-1.5 text-base font-semibold capitalize text-zinc-900 dark:text-zinc-100">
+            {(() => { const Icon = getPlatformIcon(card.platform); return <Icon className="h-4 w-4 text-violet-500" />; })()}
+            {card.platform}
+          </p>
           <p className="text-[11px] uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
             {card.status} · version {card.versionIndex + 1}
           </p>
@@ -130,10 +134,10 @@ export function PlatformCard({
           >
             <RotateCw className="mr-1 inline h-3 w-3" />
           </button>
-          <button onClick={onAccept} className="rounded-md border border-emerald-500 px-2 py-1 text-[11px] text-emerald-700 dark:text-emerald-300">
+          <button onClick={onAccept} className="rounded-md bg-emerald-500 px-2 py-1 text-[11px] text-white transition-colors hover:bg-emerald-600 dark:bg-emerald-600 dark:hover:bg-emerald-500">
             <Check className="mr-1 inline h-3 w-3" />
           </button>
-          <button onClick={onReject} className="rounded-md border border-rose-500 px-2 py-1 text-[11px] text-rose-700 dark:text-rose-300">
+          <button onClick={onReject} className="rounded-md border border-rose-400 px-2 py-1 text-[11px] text-rose-600 transition-colors hover:bg-rose-50 dark:border-rose-500 dark:text-rose-400 dark:hover:bg-rose-500/10">
             <X className="mr-1 inline h-3 w-3" />
           </button>
         </div>
@@ -144,10 +148,10 @@ export function PlatformCard({
           <button
             key={`${v.createdAt}-${idx}`}
             onClick={() => onSelectVersion(idx)}
-            className={`shrink-0 rounded-full px-2 py-1 text-[11px] ${
+            className={`shrink-0 rounded-full px-2 py-1 text-[11px] transition-colors ${
               idx === card.versionIndex
-                ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
-                : "border border-zinc-300 text-zinc-700 dark:border-zinc-700 dark:text-zinc-200"
+                ? "bg-violet-600 text-white dark:bg-violet-500"
+                : "border border-zinc-300 text-zinc-700 hover:border-violet-300 dark:border-zinc-700 dark:text-zinc-200 dark:hover:border-violet-500/50"
             }`}
           >
             v{idx + 1}
@@ -160,9 +164,9 @@ export function PlatformCard({
           <div className="flex gap-1">
             <button
               onClick={() => setViewMode("preview")}
-              className={`rounded-md px-2 py-1 text-[11px] font-medium ${
+              className={`rounded-md px-2 py-1 text-[11px] font-medium transition-colors ${
                 viewMode === "preview"
-                  ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
+                  ? "bg-violet-600 text-white dark:bg-violet-500"
                   : "border border-zinc-300 text-zinc-600 dark:border-zinc-700 dark:text-zinc-300"
               }`}
             >
@@ -170,9 +174,9 @@ export function PlatformCard({
             </button>
             <button
               onClick={() => setViewMode("edit")}
-              className={`rounded-md px-2 py-1 text-[11px] font-medium ${
+              className={`rounded-md px-2 py-1 text-[11px] font-medium transition-colors ${
                 viewMode === "edit"
-                  ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
+                  ? "bg-violet-600 text-white dark:bg-violet-500"
                   : "border border-zinc-300 text-zinc-600 dark:border-zinc-700 dark:text-zinc-300"
               }`}
             >
@@ -246,7 +250,7 @@ export function PlatformCard({
                   onPreviewChange(draftTitle, draftBody);
                   setViewMode("preview");
                 }}
-                className="rounded-md bg-zinc-900 px-2 py-1 text-[11px] font-semibold text-white dark:bg-zinc-100 dark:text-zinc-900"
+                className="rounded-md bg-violet-600 px-2 py-1 text-[11px] font-semibold text-white hover:bg-violet-700 dark:bg-violet-500 dark:hover:bg-violet-600"
               >
                 Apply
               </button>
@@ -260,7 +264,7 @@ export function PlatformCard({
           <button
             key={s}
             onClick={() => setFeedback(s)}
-            className="rounded-full border border-zinc-300 px-2 py-1 text-[11px] text-zinc-600 dark:border-zinc-700 dark:text-zinc-300"
+            className="rounded-full border border-zinc-300 px-2 py-1 text-[11px] text-zinc-600 transition-colors hover:border-violet-400 hover:text-violet-600 dark:border-zinc-700 dark:text-zinc-300 dark:hover:border-violet-500/50 dark:hover:text-violet-300"
           >
             {s}
           </button>
@@ -272,13 +276,13 @@ export function PlatformCard({
           value={feedback}
           onChange={(e) => setFeedback(e.target.value)}
           placeholder="Enter refinement prompt"
-          className="h-20 w-full rounded-xl border border-zinc-300 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-zinc-300 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100 dark:focus:ring-zinc-700"
+          className="h-20 w-full rounded-xl border border-zinc-300 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-violet-400/50 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100 dark:focus:ring-violet-500/40"
         />
         <div className="flex gap-2">
           <button
             disabled={card.isRefining || !feedback.trim()}
             onClick={() => onRefine(feedback)}
-            className="rounded-lg bg-zinc-900 px-3 py-2 text-xs font-semibold text-white disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900"
+            className="rounded-lg bg-violet-600 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-violet-700 disabled:opacity-50 dark:bg-violet-500 dark:hover:bg-violet-600"
           >
             <Pencil className="mr-1 inline h-3 w-3" /> Edit
           </button>

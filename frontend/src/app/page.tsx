@@ -1,7 +1,8 @@
 "use client";
 
 import { type KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
-import { ArchiveRestore, CheckCheck, Settings2, Sparkles } from "lucide-react";
+import { ArchiveRestore, CheckCheck, FileText, Inbox, Layers, MessageSquare, Settings2, SlidersHorizontal, Send, Sparkles } from "lucide-react";
+import { getPlatformIcon } from "@/components/platform-icons";
 import { PlatformCard } from "@/components/platform-card";
 import { ContextPanel } from "@/components/context-panel";
 import { OptionsPanel } from "@/components/options-panel";
@@ -137,9 +138,23 @@ function getPlatformLabel(platform: Platform): string {
   return platform;
 }
 
-function toRefineLanguage(language: LanguageSettingOption): DraftRefineLanguage {
+function toRefineLanguageFromOption(language: LanguageOption): DraftRefineLanguage {
   if (language === "korean") return "ko";
   if (language === "english") return "en";
+  return "auto";
+}
+
+function toRefineLanguage(
+  language: LanguageSettingOption,
+  selectedPlatforms: Platform[],
+  perPlatformLanguages: PerPlatformLanguageMap,
+): DraftRefineLanguage {
+  if (language !== "per_platform") {
+    return toRefineLanguageFromOption(language);
+  }
+  const mapped = selectedPlatforms.map((p) => toRefineLanguageFromOption(perPlatformLanguages[p]));
+  const unique = Array.from(new Set(mapped.filter((x) => x !== "auto")));
+  if (unique.length === 1) return unique[0];
   return "auto";
 }
 
@@ -626,7 +641,8 @@ export default function HomePage() {
       />
 
       <main className="mx-auto min-h-screen w-full max-w-7xl px-4 py-6 md:px-6">
-        <header className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-zinc-200 bg-white/80 p-4 shadow-sm backdrop-blur dark:border-zinc-800 dark:bg-zinc-900/70">
+        <header className="relative mb-4 flex flex-wrap items-center justify-between gap-3 overflow-hidden rounded-2xl border border-zinc-200 bg-white/80 p-4 shadow-sm backdrop-blur dark:border-zinc-800 dark:bg-zinc-900/70">
+          <div className="absolute inset-x-0 bottom-0 h-[2px] bg-gradient-to-r from-violet-500 via-fuchsia-500 to-violet-500 opacity-60" />
           <div>
             <h1 className="text-2xl font-semibold text-zinc-900 dark:text-zinc-100">Auto-HongMyungbo</h1>
             <p className="text-xs font-medium lowercase tracking-wide text-zinc-500 dark:text-zinc-400">ai cross posting social content studio</p>
@@ -634,15 +650,15 @@ export default function HomePage() {
           <div className="flex flex-wrap items-center gap-2">
             <button
               onClick={() => setContextOpen(true)}
-              className="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-xs font-medium dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
+              className="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-xs font-medium transition-colors hover:border-violet-400 hover:text-violet-700 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:border-violet-500 dark:hover:text-violet-300"
             >
               <Settings2 className="mr-1 inline h-3.5 w-3.5" /> Platform Writing Style
             </button>
             <button
               onClick={() => setOptionsOpen(true)}
-              className="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-xs font-medium dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
+              className="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-xs font-medium transition-colors hover:border-violet-400 hover:text-violet-700 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:border-violet-500 dark:hover:text-violet-300"
             >
-              Options
+              <SlidersHorizontal className="mr-1 inline h-3.5 w-3.5" /> Options
             </button>
           </div>
         </header>
@@ -650,8 +666,17 @@ export default function HomePage() {
         <section className="mb-4 grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-[1.05fr_1.95fr]">
           <aside className="min-w-0 rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
             <div className="mb-2 flex items-center justify-between">
-              <h2 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Draft</h2>
-              <span className="text-xs text-zinc-500 dark:text-zinc-400">ID: {draftId ?? "-"}</span>
+              <div className="flex items-center gap-2">
+                <h2 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Draft</h2>
+                <span className="text-xs text-zinc-500 dark:text-zinc-400">ID: {draftId ?? "-"}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => refinerRef.current?.openAndRefine()}
+                className="rounded-lg border border-zinc-300 bg-white px-3 py-1.5 text-xs font-medium dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
+              >
+                ✨ Draft Idea Booster
+              </button>
             </div>
             <textarea
               ref={textareaRef}
@@ -659,7 +684,7 @@ export default function HomePage() {
               onChange={(e) => setDraft(e.target.value)}
               onKeyDown={handleTextareaKeydown}
               placeholder="Write your draft..."
-              className="mb-3 h-44 w-full rounded-xl border border-zinc-300 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-zinc-300 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100 dark:focus:ring-zinc-700"
+              className="mb-3 h-44 w-full rounded-xl border border-zinc-300 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-violet-400/50 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100 dark:focus:ring-violet-500/40"
             />
             <DraftRefinerPanel
               ref={refinerRef}
@@ -667,7 +692,7 @@ export default function HomePage() {
               provider={provider}
               model={selectedModel}
               generationConfig={generationConfig}
-              language={toRefineLanguage(language)}
+              language={toRefineLanguage(language, selectedPlatforms, perPlatformLanguages)}
               platforms={selectedPlatforms}
               onReplaceDraft={setDraft}
               onInsertIntoDraft={handleInsertIntoDraft}
@@ -676,16 +701,16 @@ export default function HomePage() {
               <button
                 onClick={handleGenerate}
                 disabled={loading || !draft.trim() || selectedPlatforms.length === 0}
-                className="rounded-lg bg-zinc-900 px-3 py-2 text-xs font-semibold text-white disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900"
+                className="rounded-lg bg-violet-600 px-3 py-2 text-xs font-semibold text-white shadow-sm transition-all hover:bg-violet-700 hover:shadow-glow-sm disabled:opacity-50 dark:bg-violet-500 dark:hover:bg-violet-600"
               >
                 <Sparkles className="mr-1 inline h-3.5 w-3.5" /> {loading ? "Generating..." : `Generate ${selectedPlatforms.length} Platform${selectedPlatforms.length === 1 ? "" : "s"}`}
               </button>
               <button
                 onClick={handlePublish}
                 disabled={publishing || !draftId || acceptedCount === 0}
-                className="rounded-lg border border-zinc-300 px-3 py-2 text-xs font-medium disabled:opacity-50 dark:border-zinc-700 dark:text-zinc-100"
+                className="rounded-lg border border-violet-300 px-3 py-2 text-xs font-medium text-violet-700 transition-colors hover:bg-violet-50 disabled:opacity-50 dark:border-violet-500/40 dark:text-violet-300 dark:hover:bg-violet-500/10"
               >
-                {publishing ? "Publishing..." : scheduleEnabled ? `Scheduled Publish (${acceptedCount})` : `Queue Publish (${acceptedCount})`}
+                <Send className="mr-1 inline h-3.5 w-3.5" /> {publishing ? "Publishing..." : scheduleEnabled ? `Scheduled Publish (${acceptedCount})` : `Queue Publish (${acceptedCount})`}
               </button>
             </div>
             <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -703,25 +728,29 @@ export default function HomePage() {
             </div>
 
             <div className="mt-3 flex flex-wrap gap-1.5">
-              <span className="rounded-full bg-zinc-100 px-2 py-1 text-[11px] text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">
-                Platforms: {selectedPlatforms.join(", ") || "none"}
+              <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-[10px] text-zinc-500 dark:bg-zinc-800/60 dark:text-zinc-400">
+                {selectedPlatforms.join(", ") || "no platforms"}
               </span>
-              <span className="rounded-full bg-zinc-100 px-2 py-1 text-[11px] text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">
-                Auto publish: {autoPublish ? "ON" : "OFF"}
+              <span className={`rounded-full px-2 py-0.5 text-[10px] ${autoPublish ? "bg-violet-100 text-violet-600 dark:bg-violet-500/15 dark:text-violet-300" : "bg-zinc-100 text-zinc-500 dark:bg-zinc-800/60 dark:text-zinc-400"}`}>
+                auto: {autoPublish ? "ON" : "OFF"}
               </span>
-              <span className="rounded-full bg-zinc-100 px-2 py-1 text-[11px] text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">
-                Language: {language}
+              <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-[10px] text-zinc-500 dark:bg-zinc-800/60 dark:text-zinc-400">
+                lang: {language}
               </span>
-              {(["linkedin", "twitter", "instagram", "reddit"] as Platform[]).map((platform) => (
-                <button
-                  key={platform}
-                  onClick={() => void handleOAuthConnect(platform)}
-                  disabled={oauthBusyPlatform === platform}
-                  className="rounded-full border border-zinc-300 px-2 py-1 text-[11px] capitalize text-zinc-700 disabled:opacity-50 dark:border-zinc-700 dark:text-zinc-200"
-                >
-                  {oauthBusyPlatform === platform ? `${getPlatformLabel(platform)}...` : `${getPlatformLabel(platform)} OAuth`}
-                </button>
-              ))}
+              {(["linkedin", "twitter", "instagram", "reddit"] as Platform[]).map((platform) => {
+                const Icon = getPlatformIcon(platform);
+                return (
+                  <button
+                    key={platform}
+                    onClick={() => void handleOAuthConnect(platform)}
+                    disabled={oauthBusyPlatform === platform}
+                    className="inline-flex items-center gap-1 rounded-full bg-zinc-100 px-2 py-0.5 text-[10px] text-zinc-500 transition-colors hover:bg-zinc-200 disabled:opacity-50 dark:bg-zinc-800/60 dark:text-zinc-400 dark:hover:bg-zinc-700/60"
+                  >
+                    <Icon className="h-3 w-3" />
+                    {oauthBusyPlatform === platform ? "..." : "OAuth"}
+                  </button>
+                );
+              })}
             </div>
 
             <section className="mt-4 rounded-xl border border-zinc-200 p-3 dark:border-zinc-800">
@@ -745,14 +774,20 @@ export default function HomePage() {
                     </span>
                   </button>
                 ))}
-                {!queueByOrder.length && <p className="text-xs text-zinc-500 dark:text-zinc-400">Accepted cards are stored here.</p>}
+                {!queueByOrder.length && (
+                  <div className="flex flex-col items-center gap-1 py-4 text-center">
+                    <Inbox className="h-5 w-5 text-zinc-400 dark:text-zinc-500" />
+                    <p className="text-xs text-zinc-500 dark:text-zinc-400">Accepted cards appear here</p>
+                  </div>
+                )}
               </div>
             </section>
 
             {publishJob && (
-              <p className="mt-3 text-xs text-zinc-600 dark:text-zinc-300">
+              <div className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-violet-50 px-2.5 py-1 text-xs font-medium text-violet-700 dark:bg-violet-500/10 dark:text-violet-300">
+                <span className={`h-1.5 w-1.5 rounded-full ${publishJob.status === "done" ? "bg-emerald-500" : publishJob.status === "failed" ? "bg-rose-500" : "bg-amber-500 animate-pulse"}`} />
                 Job #{publishJob.id}: {publishJob.status}
-              </p>
+              </div>
             )}
 
           </aside>
@@ -775,19 +810,23 @@ export default function HomePage() {
 
             {!compareMode && cardsByOrder.length > 0 && (
               <div className="mb-2 flex gap-1 overflow-x-auto pb-1">
-                {cardsByOrder.map((card) => (
-                  <button
-                    key={cardKey(card)}
-                    onClick={() => setActivePlatform(card.platform)}
-                    className={`shrink-0 rounded-full px-3 py-1 text-xs capitalize ${
-                      activePlatform === card.platform
-                        ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
-                        : "border border-zinc-300 text-zinc-700 dark:border-zinc-700 dark:text-zinc-200"
-                    }`}
-                  >
-                    {card.platform}
-                  </button>
-                ))}
+                {cardsByOrder.map((card) => {
+                  const Icon = getPlatformIcon(card.platform);
+                  return (
+                    <button
+                      key={cardKey(card)}
+                      onClick={() => setActivePlatform(card.platform)}
+                      className={`inline-flex shrink-0 items-center gap-1 rounded-full px-3 py-1 text-xs capitalize transition-colors ${
+                        activePlatform === card.platform
+                          ? "bg-violet-600 text-white dark:bg-violet-500"
+                          : "border border-zinc-300 text-zinc-700 hover:border-violet-300 dark:border-zinc-700 dark:text-zinc-200 dark:hover:border-violet-500/50"
+                      }`}
+                    >
+                      <Icon className="h-3 w-3" />
+                      {card.platform}
+                    </button>
+                  );
+                })}
               </div>
             )}
 
@@ -826,48 +865,61 @@ export default function HomePage() {
                 onPreviewChange={(title, body) => handlePreviewEdit(activeCard.platform, title, body)}
               />
             ) : (
-              <div className="grid h-[360px] place-items-center rounded-xl border border-dashed border-zinc-300 text-sm text-zinc-500 dark:border-zinc-700 dark:text-zinc-400">
-                No result cards yet. Generate from Draft, then Accept to move cards into Queue.
+              <div className="grid h-[360px] place-items-center rounded-xl border border-dashed border-zinc-300 dark:border-zinc-700">
+                <div className="flex flex-col items-center gap-2 text-center">
+                  <Layers className="h-10 w-10 text-zinc-300 dark:text-zinc-600" />
+                  <p className="text-sm font-medium text-zinc-500 dark:text-zinc-400">No results yet</p>
+                  <p className="max-w-xs text-xs text-zinc-400 dark:text-zinc-500">Write a draft and hit Generate. Accept cards to move them into the publish queue.</p>
+                </div>
               </div>
             )}
           </section>
         </section>
 
-        <footer className="text-center text-[11px] text-zinc-500 dark:text-zinc-400">
-          Accept: Results -&gt; Queue | Click a Queue item to restore
-          <CheckCheck className="ml-1 inline h-3.5 w-3.5" />
+        <footer className="py-1 text-center text-xs text-zinc-400 dark:text-zinc-500">
+          <CheckCheck className="mr-1 inline h-3.5 w-3.5" />
+          Accept moves results to Queue · Click a Queue item to restore
         </footer>
 
         <section className="mt-4 rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
           <div className="mb-3 flex items-center justify-between">
             <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Publish Logs & Platform Threads</h3>
-            <button onClick={() => void refreshPublishData()} className="rounded-lg border border-zinc-300 px-3 py-1.5 text-xs dark:border-zinc-700 dark:text-zinc-100">
+            <button onClick={() => void refreshPublishData()} className="rounded-lg border border-zinc-300 px-3 py-1.5 text-xs transition-colors hover:border-violet-400 dark:border-zinc-700 dark:text-zinc-100 dark:hover:border-violet-500">
               {logsLoading ? "Loading..." : "Refresh"}
             </button>
           </div>
           <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-            <div className="rounded-xl border border-zinc-200 p-3 dark:border-zinc-800">
-              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Promotion Log</p>
+            <div className="rounded-xl border border-zinc-200 bg-zinc-50/50 p-3 dark:border-zinc-800 dark:bg-zinc-800/30">
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                <FileText className="mr-1 inline h-3 w-3" /> Promotion Log
+              </p>
               <div className="max-h-64 space-y-2 overflow-y-auto">
                 {publishLogs.map((log) => (
-                  <div key={log.id} className="rounded-lg border border-zinc-200 px-2 py-2 text-xs dark:border-zinc-700">
-                    <p className="font-semibold capitalize">{log.platform} · {log.status}</p>
+                  <div key={log.id} className="rounded-lg border-l-2 border-violet-400 bg-white px-3 py-2 text-xs shadow-sm dark:border-violet-500/60 dark:bg-zinc-800/50">
+                    <p className="font-semibold capitalize text-zinc-900 dark:text-zinc-100">{log.platform} · <span className={log.status === "published" ? "text-emerald-600 dark:text-emerald-400" : "text-zinc-500 dark:text-zinc-400"}>{log.status}</span></p>
                     <p className="line-clamp-1 text-zinc-600 dark:text-zinc-300">{log.title || "-"}</p>
                     <p className="text-[11px] text-zinc-500 dark:text-zinc-400">{new Date(log.createdAt).toLocaleString()}</p>
                     {log.postUrl && (
-                      <a className="text-[11px] text-blue-600 underline" href={log.postUrl} target="_blank" rel="noreferrer">open</a>
+                      <a className="text-[11px] text-violet-600 underline dark:text-violet-400" href={log.postUrl} target="_blank" rel="noreferrer">open</a>
                     )}
                   </div>
                 ))}
-                {!publishLogs.length && <p className="text-xs text-zinc-500 dark:text-zinc-400">No logs yet.</p>}
+                {!publishLogs.length && (
+                  <div className="flex flex-col items-center gap-1 py-6 text-center">
+                    <FileText className="h-6 w-6 text-zinc-300 dark:text-zinc-600" />
+                    <p className="text-xs text-zinc-400 dark:text-zinc-500">No publish logs yet</p>
+                  </div>
+                )}
               </div>
             </div>
-            <div className="rounded-xl border border-zinc-200 p-3 dark:border-zinc-800">
-              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Platform Threads</p>
+            <div className="rounded-xl border border-zinc-200 bg-zinc-50/50 p-3 dark:border-zinc-800 dark:bg-zinc-800/30">
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                <MessageSquare className="mr-1 inline h-3 w-3" /> Platform Threads
+              </p>
               <div className="max-h-64 space-y-2 overflow-y-auto">
                 {threads.map((thread) => (
-                  <div key={thread.platform} className="rounded-lg border border-zinc-200 px-2 py-2 text-xs dark:border-zinc-700">
-                    <p className="mb-1 font-semibold capitalize">{thread.platform}</p>
+                  <div key={thread.platform} className="rounded-lg border-l-2 border-violet-400 bg-white px-3 py-2 text-xs shadow-sm dark:border-violet-500/60 dark:bg-zinc-800/50">
+                    <p className="mb-1 font-semibold capitalize text-zinc-900 dark:text-zinc-100">{thread.platform}</p>
                     <div className="space-y-1">
                       {thread.items.slice(0, 5).map((item) => (
                         <p key={item.id} className="line-clamp-1 text-zinc-600 dark:text-zinc-300">{item.title || item.body || "-"}</p>
@@ -875,7 +927,12 @@ export default function HomePage() {
                     </div>
                   </div>
                 ))}
-                {!threads.length && <p className="text-xs text-zinc-500 dark:text-zinc-400">No platform threads yet.</p>}
+                {!threads.length && (
+                  <div className="flex flex-col items-center gap-1 py-6 text-center">
+                    <MessageSquare className="h-6 w-6 text-zinc-300 dark:text-zinc-600" />
+                    <p className="text-xs text-zinc-400 dark:text-zinc-500">No platform threads yet</p>
+                  </div>
+                )}
               </div>
             </div>
           </div>
