@@ -57,6 +57,7 @@ In `Options`, you can configure at runtime:
 - Platform-specific preview and editing
 - Accept/Reject queue flow
 - Refine (text + voice input)
+- Local JSON persistence (no external DB required)
 
 ## Optional Features (Can Be Added Later)
 

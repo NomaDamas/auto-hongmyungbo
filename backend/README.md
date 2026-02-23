@@ -15,14 +15,14 @@ This file is for backend-only development.
 - Apply structured intent constraints and style-sample-based transfer during generation/refinement
 - Handle platform OAuth callbacks (`linkedin`, `twitter`, `instagram`, `reddit`)
 - Queue and execute publish jobs in the background worker
-- Store drafts/cards/jobs/logs/events in SQLite for now (Postgres migration planned)
+- Store drafts/cards/jobs/logs/events in a local JSON file store
 
-## Database
+## Local Store
 
-This backend currently uses **SQLite** (`DB_PATH`, default `./app.db`).
+This backend uses a local JSON store file (`STORE_PATH`, default `./local_store.json`).
 
-- On startup, `store.init_db()` creates required tables/indexes if missing.
-- Postgres/Supabase migration is planned for a later phase.
+- On startup, `store.init_db()` initializes and loads the local store file.
+- No external database setup is required.
 
 ## Run Locally
 
@@ -43,7 +43,7 @@ curl http://localhost:8000/health
 
 Minimum:
 
-- `DB_PATH` (optional, default `./app.db`)
+- `STORE_PATH` (optional, default `./local_store.json`)
 - `OPENROUTER_API_KEY` (recommended default)
 - `OPENAI_API_KEY` (optional, needed for STT/voice refine)
 - `FRONTEND_URL`
