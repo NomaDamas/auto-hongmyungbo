@@ -1,5 +1,4 @@
 export type Platform = "reddit" | "linkedin" | "twitter" | "instagram" | "blog";
-export type SocialProvider = "google" | "kakao" | "naver";
 
 export type ModelOption = string;
 export type ProviderOption = "openai" | "openrouter";
@@ -43,13 +42,6 @@ export type PublishJob = {
   payload: Record<string, unknown>;
   result: Record<string, unknown> | null;
   error: string | null;
-};
-
-export type UserInfo = {
-  id: number;
-  name?: string | null;
-  email?: string | null;
-  avatarUrl?: string | null;
 };
 
 export type PublishLogItem = {

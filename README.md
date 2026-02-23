@@ -1,67 +1,78 @@
-# AI Social Cross-Posting Agent
+# Auto-HongMyungbo (Open Source Local Edition)
 
-This repository contains a prototype cross-posting product that generates and publishes platform-specific content from one draft.
+![Auto-HongMyungbo Preview](docs/images/ddalcak_myungbo.png)
 
-## Architecture
+Generate platform-specific social post drafts from one input and review them in a built-in preview UI.
 
-- `frontend/` (Next.js): user-facing app for drafting, review, approval, and publish actions
-- `backend/` (FastAPI): AI generation, OAuth callbacks, publish queue worker, and external API orchestration
-- Traffic monitoring is maintained in a separate repository:
-  - `https://github.com/minsing-jin/hongmyungbo_automation_traffic_monitoring.git`
+This repo is optimized for **easy local usage**.  
+If you can run two commands, you can use it.
 
-## Stack Decision
+## What You Need
 
-- Current local storage: SQLite (`backend/app.db`)
-- Planned migration: Supabase/Postgres for product data and auth
-- Keep **FastAPI** for server-only workflows:
-  - OpenAI calls and secret management
-  - Social OAuth token exchange/callback handling
-  - Scheduled/queued publishing jobs
-  - Unified publishing and OAuth APIs
+- macOS/Linux (or WSL on Windows)
+- Node.js LTS + npm
+- `uv` (Python package manager)
+- OpenAI API key
 
-## Repository Layout
+## 5-Minute Quick Start
+
+```bash
+git clone https://github.com/NomaDamas/auto-hongmyungbo.git
+cd auto-hongmyungbo
+./scripts/setup_local.sh
+```
+
+Edit `backend/.env` and set:
+
+```env
+OPENAI_API_KEY=your_key_here
+```
+
+Run:
+
+```bash
+./scripts/start_local.sh
+```
+
+Open: `http://localhost:3000`
+
+## What Works Out of the Box
+
+- Draft -> multi-platform generation
+- Platform-specific preview and editing
+- Accept/Reject queue flow
+- Refine (text + voice input)
+
+## Optional Features (Can Be Added Later)
+
+- Social login / OAuth publish integrations
+- Scheduled publishing configs
+
+You can use the app locally without setting all OAuth keys.
+
+## Project Structure
 
 ```text
 .
-├── backend/
-├── frontend/
-├── hongmyungbo_automation_traffic_monitoring/
-├── docs/
-└── scripts/
+├── frontend/   # Next.js UI
+├── backend/    # FastAPI API server
+├── scripts/    # one-command local setup/run
+└── docs/
+    └── images/ # README screenshots/assets
 ```
 
-## Local Development
+## Stop Running Services
 
-### 1) Backend
+Press `Ctrl + C` in the terminal where `./scripts/start_local.sh` is running.
 
-```bash
-cd backend
-cp .env.example .env
-uv sync
-uv run python -m uvicorn app.main:app --reload --port 8000
+## README Images
+
+Put screenshots and visual assets in:
+
+- `docs/images/`
+
+Example markdown:
+
+```md
+![Dashboard Preview](docs/images/dashboard-preview.png)
 ```
-
-### 2) Frontend
-
-```bash
-cd frontend
-cp .env.local.example .env.local
-npm install
-npm run dev
-```
-
-Open `http://localhost:3000`.
-
-## Key API Endpoints
-
-- `POST /api/generate`
-- `POST /api/refine`
-- `POST /api/publish`
-- `GET /api/jobs/{job_id}`
-- `GET /api/auth/me`
-
-## Deployment Notes
-
-- Frontend: Vercel (set `NEXT_PUBLIC_API_URL`)
-- Backend: Railway/Render (set `DB_PATH`, `OPENAI_API_KEY`, OAuth envs)
-- Traffic monitor: deploy from the dedicated repository above
