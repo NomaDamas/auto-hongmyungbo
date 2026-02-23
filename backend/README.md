@@ -1,6 +1,13 @@
 # Backend (FastAPI)
 
-The backend is the orchestration service for AI, OAuth, and publishing workflows.
+For easiest local usage, use the root quick start in `../README.md`:
+
+```bash
+./scripts/setup_local.sh
+./scripts/start_local.sh
+```
+
+This file is for backend-only development.
 
 ## Responsibilities
 

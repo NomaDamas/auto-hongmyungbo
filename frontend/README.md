@@ -1,6 +1,13 @@
 # Frontend (Next.js)
 
-The frontend provides the full draft-to-publish user flow.
+For easiest local usage, use the root quick start in `../README.md`:
+
+```bash
+./scripts/setup_local.sh
+./scripts/start_local.sh
+```
+
+This file is for frontend-only development.
 
 ## Features
 
@@ -12,7 +19,7 @@ The frontend provides the full draft-to-publish user flow.
 - Card-level accept/reject/edit workflow
 - Version history with undo/redo
 - Voice-to-text refine input
-- OAuth-based social login and account connection
+- Direct platform OAuth connect buttons (no app login required for local mode)
 - Scheduled publish trigger
 - Publish logs and per-platform thread view
 - Long preview readability without entering Edit:

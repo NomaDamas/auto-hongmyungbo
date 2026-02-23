@@ -10,12 +10,9 @@ import {
   fetchProvider,
   generatePosts,
   getJob,
-  getMe,
   getOAuthConnectUrl,
   getPublishLogs,
-  getSocialAuthConnectUrl,
   getThreads,
-  logout,
   refinePost,
   transcribeAudio,
   updateCardStatus,
@@ -33,8 +30,6 @@ import type {
   PublishLogItem,
   ProviderOption,
   SocialThread,
-  SocialProvider,
-  UserInfo,
   UserProfile,
 } from "@/lib/types";
 
@@ -150,8 +145,6 @@ export default function HomePage() {
   const [autoPublish, setAutoPublish] = useState(false);
   const [language, setLanguage] = useState<LanguageSettingOption>("auto");
   const [perPlatformLanguages, setPerPlatformLanguages] = useState<PerPlatformLanguageMap>(DEFAULT_PER_PLATFORM_LANGUAGES);
-  const [user, setUser] = useState<UserInfo | null>(null);
-  const [authLoading, setAuthLoading] = useState(true);
   const [logsLoading, setLogsLoading] = useState(false);
   const [publishLogs, setPublishLogs] = useState<PublishLogItem[]>([]);
   const [threads, setThreads] = useState<SocialThread[]>([]);
@@ -182,11 +175,6 @@ export default function HomePage() {
   }, [activePlatform, cardsByOrder]);
 
   const refreshPublishData = async () => {
-    if (!user) {
-      setPublishLogs([]);
-      setThreads([]);
-      return;
-    }
     try {
       setLogsLoading(true);
       const [logs, threadData] = await Promise.all([getPublishLogs(80), getThreads(20)]);
@@ -211,15 +199,6 @@ export default function HomePage() {
       } catch (err) {
         console.error(err);
       }
-
-      try {
-        const me = await getMe();
-        setUser(me);
-      } catch (err) {
-        console.error(err);
-      } finally {
-        setAuthLoading(false);
-      }
     };
     void init();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -227,8 +206,7 @@ export default function HomePage() {
 
   useEffect(() => {
     void refreshPublishData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user]);
+  }, []);
 
   const setCardRefining = (platform: Platform, isRefining: boolean) => {
     setResultCards((prev) => prev.map((c) => (c.platform === platform ? { ...c, isRefining } : c)));
@@ -435,10 +413,6 @@ export default function HomePage() {
   };
 
   const handlePublish = async () => {
-    if (!user) {
-      alert("Login required before publishing.");
-      return;
-    }
     if (!draftId) {
       alert("Generate posts first.");
       return;
@@ -468,10 +442,6 @@ export default function HomePage() {
   };
 
   const handleOAuthConnect = async (platform: Platform) => {
-    if (!user) {
-      alert("Login first, then connect platform OAuth.");
-      return;
-    }
     try {
       setOauthBusyPlatform(platform);
       const apiBase = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
@@ -480,91 +450,10 @@ export default function HomePage() {
       window.open(authUrl, "_blank", "noopener,noreferrer");
     } catch (err) {
       console.error(err);
-      alert("Failed to create OAuth connect URL.");
+      const message = err instanceof Error ? err.message : "Failed to create OAuth connect URL.";
+      alert(message);
     } finally {
       setOauthBusyPlatform(null);
-    }
-  };
-
-  const handleSocialLogin = async (provider: SocialProvider, targetWindow: Window = window) => {
-    try {
-      const apiBase = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
-      const redirectUri = `${apiBase}/api/auth/${provider}/callback`;
-      const { authUrl } = await getSocialAuthConnectUrl(provider, redirectUri);
-      targetWindow.location.href = authUrl;
-    } catch (err) {
-      console.error(err);
-      alert("Social login connection failed.");
-    }
-  };
-
-  const openLoginPopup = () => {
-    const popup = window.open("", "social-login-popup", "width=440,height=560,resizable=yes,scrollbars=yes");
-    if (!popup) {
-      alert("Popup blocked. Allow popups and try again.");
-      return;
-    }
-
-    const html = `
-<!doctype html>
-<html>
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Social Login</title>
-  <style>
-    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; margin: 0; background: #f5f5f4; color: #18181b; }
-    .wrap { max-width: 360px; margin: 28px auto; background: white; border: 1px solid #e4e4e7; border-radius: 14px; padding: 18px; }
-    h1 { margin: 0 0 6px; font-size: 18px; }
-    p { margin: 0 0 16px; font-size: 12px; color: #52525b; }
-    button { width: 100%; margin: 6px 0; padding: 10px 12px; border-radius: 10px; border: 1px solid #d4d4d8; background: #fafafa; cursor: pointer; font-weight: 600; }
-    button:hover { background: #f4f4f5; }
-  </style>
-</head>
-<body>
-  <div class="wrap">
-    <h1>Login</h1>
-    <p>Select a social provider.</p>
-    <button data-provider="google">Continue with Google</button>
-    <button data-provider="kakao">Continue with Kakao</button>
-    <button data-provider="naver">Continue with Naver</button>
-  </div>
-  <script>
-    document.querySelectorAll("button[data-provider]").forEach(function (btn) {
-      btn.addEventListener("click", function () {
-        const provider = btn.getAttribute("data-provider");
-        window.opener.postMessage({ type: "social-login", provider }, window.location.origin);
-      });
-    });
-  </script>
-</body>
-</html>`;
-    popup.document.open();
-    popup.document.write(html);
-    popup.document.close();
-  };
-
-  useEffect(() => {
-    const onMessage = (event: MessageEvent) => {
-      if (event.origin !== window.location.origin) return;
-      if (!event.data || event.data.type !== "social-login") return;
-      const provider = event.data.provider as SocialProvider;
-      if (!["google", "kakao", "naver"].includes(provider)) return;
-      const popupWindow = event.source as Window | null;
-      void handleSocialLogin(provider, popupWindow || window);
-    };
-    window.addEventListener("message", onMessage);
-    return () => window.removeEventListener("message", onMessage);
-  }, []);
-
-  const handleLogout = async () => {
-    try {
-      await logout();
-      setUser(null);
-      setPublishLogs([]);
-      setThreads([]);
-    } catch (err) {
-      console.error(err);
     }
   };
 
@@ -626,26 +515,6 @@ export default function HomePage() {
             <p className="text-xs font-medium lowercase tracking-wide text-zinc-500 dark:text-zinc-400">ai cross posting social content studio</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            {authLoading ? (
-              <span className="text-xs text-zinc-500 dark:text-zinc-400">Checking login...</span>
-            ) : user ? (
-              <div className="flex items-center gap-2 rounded-lg border border-zinc-300 px-2 py-1 dark:border-zinc-700">
-                <span className="text-xs text-zinc-700 dark:text-zinc-200">{user.name || user.email || `user#${user.id}`}</span>
-                <button
-                  onClick={() => void handleLogout()}
-                  className="rounded-md border border-zinc-300 px-2 py-1 text-[11px] dark:border-zinc-700 dark:text-zinc-100"
-                >
-                  Logout
-                </button>
-              </div>
-            ) : (
-              <button
-                onClick={openLoginPopup}
-                className="rounded-md border border-zinc-300 px-2 py-1 text-[11px] dark:border-zinc-700 dark:text-zinc-100"
-              >
-                Login
-              </button>
-            )}
             <button
               onClick={() => setContextOpen(true)}
               className="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-xs font-medium dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
@@ -842,43 +711,40 @@ export default function HomePage() {
               {logsLoading ? "Loading..." : "Refresh"}
             </button>
           </div>
-          {!user && <p className="text-xs text-zinc-500 dark:text-zinc-400">Login to view your publish logs and platform threads.</p>}
-          {user && (
-            <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-              <div className="rounded-xl border border-zinc-200 p-3 dark:border-zinc-800">
-                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Promotion Log</p>
-                <div className="max-h-64 space-y-2 overflow-y-auto">
-                  {publishLogs.map((log) => (
-                    <div key={log.id} className="rounded-lg border border-zinc-200 px-2 py-2 text-xs dark:border-zinc-700">
-                      <p className="font-semibold capitalize">{log.platform} · {log.status}</p>
-                      <p className="line-clamp-1 text-zinc-600 dark:text-zinc-300">{log.title || "-"}</p>
-                      <p className="text-[11px] text-zinc-500 dark:text-zinc-400">{new Date(log.createdAt).toLocaleString()}</p>
-                      {log.postUrl && (
-                        <a className="text-[11px] text-blue-600 underline" href={log.postUrl} target="_blank" rel="noreferrer">open</a>
-                      )}
-                    </div>
-                  ))}
-                  {!publishLogs.length && <p className="text-xs text-zinc-500 dark:text-zinc-400">No logs yet.</p>}
-                </div>
-              </div>
-              <div className="rounded-xl border border-zinc-200 p-3 dark:border-zinc-800">
-                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Platform Threads</p>
-                <div className="max-h-64 space-y-2 overflow-y-auto">
-                  {threads.map((thread) => (
-                    <div key={thread.platform} className="rounded-lg border border-zinc-200 px-2 py-2 text-xs dark:border-zinc-700">
-                      <p className="mb-1 font-semibold capitalize">{thread.platform}</p>
-                      <div className="space-y-1">
-                        {thread.items.slice(0, 5).map((item) => (
-                          <p key={item.id} className="line-clamp-1 text-zinc-600 dark:text-zinc-300">{item.title || item.body || "-"}</p>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                  {!threads.length && <p className="text-xs text-zinc-500 dark:text-zinc-400">No platform threads yet.</p>}
-                </div>
+          <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+            <div className="rounded-xl border border-zinc-200 p-3 dark:border-zinc-800">
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Promotion Log</p>
+              <div className="max-h-64 space-y-2 overflow-y-auto">
+                {publishLogs.map((log) => (
+                  <div key={log.id} className="rounded-lg border border-zinc-200 px-2 py-2 text-xs dark:border-zinc-700">
+                    <p className="font-semibold capitalize">{log.platform} · {log.status}</p>
+                    <p className="line-clamp-1 text-zinc-600 dark:text-zinc-300">{log.title || "-"}</p>
+                    <p className="text-[11px] text-zinc-500 dark:text-zinc-400">{new Date(log.createdAt).toLocaleString()}</p>
+                    {log.postUrl && (
+                      <a className="text-[11px] text-blue-600 underline" href={log.postUrl} target="_blank" rel="noreferrer">open</a>
+                    )}
+                  </div>
+                ))}
+                {!publishLogs.length && <p className="text-xs text-zinc-500 dark:text-zinc-400">No logs yet.</p>}
               </div>
             </div>
-          )}
+            <div className="rounded-xl border border-zinc-200 p-3 dark:border-zinc-800">
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Platform Threads</p>
+              <div className="max-h-64 space-y-2 overflow-y-auto">
+                {threads.map((thread) => (
+                  <div key={thread.platform} className="rounded-lg border border-zinc-200 px-2 py-2 text-xs dark:border-zinc-700">
+                    <p className="mb-1 font-semibold capitalize">{thread.platform}</p>
+                    <div className="space-y-1">
+                      {thread.items.slice(0, 5).map((item) => (
+                        <p key={item.id} className="line-clamp-1 text-zinc-600 dark:text-zinc-300">{item.title || item.body || "-"}</p>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+                {!threads.length && <p className="text-xs text-zinc-500 dark:text-zinc-400">No platform threads yet.</p>}
+              </div>
+            </div>
+          </div>
         </section>
       </main>
     </>

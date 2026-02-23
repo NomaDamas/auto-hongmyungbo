@@ -37,7 +37,6 @@
   - 프론트 모니터 패널(가정값: CPM/FillRate/Slots)
 - 광고 모듈 기본 비활성 토글 추가 (`NEXT_PUBLIC_ENABLE_ADS=false`)
 - 별도 최상위 모노레포 스캐폴딩 생성
-  - `hongmyungbo_automation_traffic_monitoring/`
   - `apps/collector`, `apps/dashboard`, `packages/shared`
 
 ### In Progress

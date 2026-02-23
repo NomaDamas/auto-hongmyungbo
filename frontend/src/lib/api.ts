@@ -8,9 +8,7 @@ import type {
   ProviderOption,
   PublishJob,
   PublishLogItem,
-  SocialProvider,
   SocialThread,
-  UserInfo,
   UserProfile,
 } from "@/lib/types";
 
@@ -114,7 +112,14 @@ export async function getOAuthConnectUrl(platform: Platform, redirectUri: string
   const qp = new URLSearchParams({ redirectUri });
   const res = await apiFetch(`${API_URL}/api/oauth/${platform}/connect?${qp.toString()}`);
   if (!res.ok) {
-    throw new Error("OAuth 연결 URL 생성 실패");
+    let detail = "";
+    try {
+      const data = (await res.json()) as { detail?: string };
+      detail = data.detail ?? "";
+    } catch {
+      detail = "";
+    }
+    throw new Error(detail || "OAuth connect URL is not available. Check platform OAuth env settings.");
   }
   return (await res.json()) as { authUrl: string; state: string };
 }
@@ -136,29 +141,12 @@ export async function transcribeAudio(file: Blob): Promise<string> {
   return data.text as string;
 }
 
-export async function getMe(): Promise<UserInfo | null> {
-  const res = await apiFetch(`${API_URL}/api/auth/me`);
-  if (!res.ok) return null;
-  return (await res.json()) as UserInfo | null;
-}
-
-export async function logout(): Promise<void> {
-  await apiFetch(`${API_URL}/api/auth/logout`, { method: "POST" });
-}
-
-export async function getSocialAuthConnectUrl(provider: SocialProvider, redirectUri: string): Promise<{ authUrl: string; state: string }> {
-  const qp = new URLSearchParams({ redirectUri });
-  const res = await apiFetch(`${API_URL}/api/auth/${provider}/connect?${qp.toString()}`);
-  if (!res.ok) {
-    throw new Error("소셜 로그인 URL 생성 실패");
-  }
-  return (await res.json()) as { authUrl: string; state: string };
-}
-
 export async function getPublishLogs(limit = 100): Promise<PublishLogItem[]> {
   const res = await apiFetch(`${API_URL}/api/publish/logs?limit=${limit}`);
   if (!res.ok) {
-    throw new Error("발행 로그 조회 실패");
+    // Local OSS mode can run without auth/session setup.
+    if (res.status === 401 || res.status === 403) return [];
+    throw new Error("Failed to fetch publish logs");
   }
   return (await res.json()) as PublishLogItem[];
 }
@@ -166,7 +154,9 @@ export async function getPublishLogs(limit = 100): Promise<PublishLogItem[]> {
 export async function getThreads(limitPerPlatform = 20): Promise<SocialThread[]> {
   const res = await apiFetch(`${API_URL}/api/threads?limitPerPlatform=${limitPerPlatform}`);
   if (!res.ok) {
-    throw new Error("스레드 조회 실패");
+    // Local OSS mode can run without auth/session setup.
+    if (res.status === 401 || res.status === 403) return [];
+    throw new Error("Failed to fetch platform threads");
   }
   return (await res.json()) as SocialThread[];
 }

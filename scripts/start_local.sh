@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+LOG_DIR="$ROOT_DIR/.logs"
+mkdir -p "$LOG_DIR"
+
+if [[ ! -f "$ROOT_DIR/backend/.env" || ! -f "$ROOT_DIR/frontend/.env.local" ]]; then
+  echo "Missing env files. Run ./scripts/setup_local.sh first."
+  exit 1
+fi
+
+if ! grep -qE '^OPENAI_API_KEY=.+$' "$ROOT_DIR/backend/.env"; then
+  echo "OPENAI_API_KEY is not set in backend/.env"
+  echo "Set it, then run ./scripts/start_local.sh again."
+  exit 1
+fi
+
+echo "Starting backend on http://localhost:8000 ..."
+(
+  cd "$ROOT_DIR/backend"
+  uv run python -m uvicorn app.main:app --reload --port 8000
+) >"$LOG_DIR/backend.log" 2>&1 &
+BACKEND_PID=$!
+
+cleanup() {
+  echo
+  echo "Stopping services..."
+  kill "$BACKEND_PID" >/dev/null 2>&1 || true
+}
+trap cleanup EXIT INT TERM
+
+echo "Backend logs: $LOG_DIR/backend.log"
+echo "Starting frontend on http://localhost:3000 ..."
+cd "$ROOT_DIR/frontend"
+npm run dev
+
