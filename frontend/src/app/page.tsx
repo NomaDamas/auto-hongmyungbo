@@ -6,6 +6,7 @@ import { PlatformCard } from "@/components/platform-card";
 import { ContextPanel } from "@/components/context-panel";
 import { OptionsPanel } from "@/components/options-panel";
 import {
+  configureRuntimeApiKeys,
   enqueuePublish,
   fetchProvider,
   generatePosts,
@@ -20,6 +21,7 @@ import {
 import type {
   CardState,
   CardVersion,
+  GenerationConfig,
   GeneratedCard,
   LanguageOption,
   LanguageSettingOption,
@@ -35,7 +37,16 @@ import type {
 
 const PLATFORM_ORDER: Platform[] = ["reddit", "linkedin", "twitter", "instagram", "blog"];
 
-const OPENAI_MODELS: ModelOption[] = ["gpt-4o-mini", "gpt-4o", "gpt-4.1-mini"];
+const OPENAI_MODELS: ModelOption[] = [
+  "gpt-5",
+  "gpt-5-mini",
+  "gpt-5-nano",
+  "gpt-4.1",
+  "gpt-4.1-mini",
+  "gpt-4.1-nano",
+  "gpt-4o",
+  "gpt-4o-mini",
+];
 const OPENROUTER_MODELS: ModelOption[] = [
   "openai/gpt-4o-mini",
   "openai/gpt-4o",
@@ -119,12 +130,28 @@ function buildUserProfile(contexts: Record<Platform, string>, referencePosts: Re
   return { styles };
 }
 
+function getPlatformLabel(platform: Platform): string {
+  if (platform === "twitter") return "x";
+  return platform;
+}
+
+const DEFAULT_GENERATION_CONFIG: GenerationConfig = {
+  thinkingMode: false,
+  reasoningEffort: "medium",
+  temperature: 0.7,
+  topP: 1,
+  maxOutputTokens: 1500,
+};
+
 export default function HomePage() {
   const [draft, setDraft] = useState("");
-  const [modelOptions, setModelOptions] = useState<ModelOption[]>(OPENAI_MODELS);
-  const [availableProviders, setAvailableProviders] = useState<ProviderOption[]>(["openai"]);
-  const [provider, setProvider] = useState<ProviderOption>("openai");
-  const [selectedModel, setSelectedModel] = useState<ModelOption>("gpt-4o-mini");
+  const [availableProviders, setAvailableProviders] = useState<ProviderOption[]>(["openrouter"]);
+  const [provider, setProvider] = useState<ProviderOption>("openrouter");
+  const [selectedModel, setSelectedModel] = useState<ModelOption>("openai/gpt-4o-mini");
+  const [generationConfig, setGenerationConfig] = useState<GenerationConfig>(DEFAULT_GENERATION_CONFIG);
+  const [openaiApiKey, setOpenaiApiKey] = useState("");
+  const [openrouterApiKey, setOpenrouterApiKey] = useState("");
+  const [rememberApiKeys, setRememberApiKeys] = useState(false);
   const [draftId, setDraftId] = useState<number | null>(null);
   const [resultCards, setResultCards] = useState<CardState[]>([]);
   // Default OFF: single focused platform. ON: side-by-side comparison grid.
@@ -188,13 +215,35 @@ export default function HomePage() {
   };
 
   useEffect(() => {
+    const shouldRememberApiKeys = window.localStorage.getItem("hmb_remember_api_keys") === "1";
+    const savedOpenaiApiKey = shouldRememberApiKeys ? window.localStorage.getItem("hmb_openai_api_key") ?? "" : "";
+    const savedOpenrouterApiKey = shouldRememberApiKeys ? window.localStorage.getItem("hmb_openrouter_api_key") ?? "" : "";
+    const savedConfigRaw = window.localStorage.getItem("hmb_generation_config");
+    let savedConfig = DEFAULT_GENERATION_CONFIG;
+    if (savedConfigRaw) {
+      try {
+        savedConfig = { ...DEFAULT_GENERATION_CONFIG, ...(JSON.parse(savedConfigRaw) as Partial<GenerationConfig>) };
+      } catch {
+        savedConfig = DEFAULT_GENERATION_CONFIG;
+      }
+    }
+    setOpenaiApiKey(savedOpenaiApiKey);
+    setOpenrouterApiKey(savedOpenrouterApiKey);
+    setRememberApiKeys(shouldRememberApiKeys);
+    setGenerationConfig(savedConfig);
+    configureRuntimeApiKeys({ openaiApiKey: savedOpenaiApiKey, openrouterApiKey: savedOpenrouterApiKey });
+
     const init = async () => {
       try {
         const providerInfo = await fetchProvider();
         const initialProvider = providerInfo.provider === "openrouter" ? "openrouter" : "openai";
-        setAvailableProviders(providerInfo.availableProviders?.length ? providerInfo.availableProviders : [initialProvider]);
+        const candidateProviders = providerInfo.availableProviders?.length ? providerInfo.availableProviders : [initialProvider];
+        const normalizedProviders = candidateProviders.filter(
+          (p): p is ProviderOption => p === "openai" || p === "openrouter",
+        );
+        const providers: ProviderOption[] = Array.from(new Set<ProviderOption>([...normalizedProviders, "openai", "openrouter"]));
+        setAvailableProviders(providers);
         setProvider(initialProvider);
-        setModelOptions(initialProvider === "openrouter" ? OPENROUTER_MODELS : OPENAI_MODELS);
         setSelectedModel(providerInfo.defaultModel);
       } catch (err) {
         console.error(err);
@@ -234,6 +283,7 @@ export default function HomePage() {
         language === "per_platform" ? "auto" : language,
         language === "per_platform" ? perPlatformLanguages : undefined,
         provider,
+        generationConfig,
       );
       setDraftId(generated.draftId);
       const nextCards = generated.cards.map(toCardState);
@@ -341,6 +391,7 @@ export default function HomePage() {
         model: selectedModel,
         language: language === "per_platform" ? perPlatformLanguages[platform] : language,
         provider,
+        generationConfig,
       });
 
       setResultCards((prev) =>
@@ -498,13 +549,39 @@ export default function HomePage() {
       <OptionsPanel
         open={optionsOpen}
         provider={provider}
+        selectedModel={selectedModel}
+        generationConfig={generationConfig}
+        openaiApiKey={openaiApiKey}
+        openrouterApiKey={openrouterApiKey}
         availableProviders={availableProviders}
+        modelOptionsByProvider={{ openai: OPENAI_MODELS, openrouter: OPENROUTER_MODELS }}
         onClose={() => setOptionsOpen(false)}
-        onSave={(nextProvider) => {
+        onSave={({
+          provider: nextProvider,
+          model: nextModel,
+          generationConfig: nextConfig,
+          openaiApiKey: nextOpenaiApiKey,
+          openrouterApiKey: nextOpenrouterApiKey,
+          rememberApiKeys: nextRememberApiKeys,
+        }) => {
           setProvider(nextProvider);
           const nextModels = nextProvider === "openrouter" ? OPENROUTER_MODELS : OPENAI_MODELS;
-          setModelOptions(nextModels);
-          setSelectedModel(nextModels[0]);
+          setSelectedModel(nextModel.trim() || nextModels[0]);
+          setGenerationConfig(nextConfig);
+          setOpenaiApiKey(nextOpenaiApiKey);
+          setOpenrouterApiKey(nextOpenrouterApiKey);
+          setRememberApiKeys(nextRememberApiKeys);
+          window.localStorage.setItem("hmb_generation_config", JSON.stringify(nextConfig));
+          if (nextRememberApiKeys) {
+            window.localStorage.setItem("hmb_remember_api_keys", "1");
+            window.localStorage.setItem("hmb_openai_api_key", nextOpenaiApiKey);
+            window.localStorage.setItem("hmb_openrouter_api_key", nextOpenrouterApiKey);
+          } else {
+            window.localStorage.removeItem("hmb_remember_api_keys");
+            window.localStorage.removeItem("hmb_openai_api_key");
+            window.localStorage.removeItem("hmb_openrouter_api_key");
+          }
+          configureRuntimeApiKeys({ openaiApiKey: nextOpenaiApiKey, openrouterApiKey: nextOpenrouterApiKey });
         }}
       />
 
@@ -589,7 +666,7 @@ export default function HomePage() {
                   disabled={oauthBusyPlatform === platform}
                   className="rounded-full border border-zinc-300 px-2 py-1 text-[11px] capitalize text-zinc-700 disabled:opacity-50 dark:border-zinc-700 dark:text-zinc-200"
                 >
-                  {oauthBusyPlatform === platform ? `${platform}...` : `${platform} OAuth`}
+                  {oauthBusyPlatform === platform ? `${getPlatformLabel(platform)}...` : `${getPlatformLabel(platform)} OAuth`}
                 </button>
               ))}
             </div>
@@ -631,7 +708,11 @@ export default function HomePage() {
             <div className="mb-2 flex items-center justify-between">
               <h2 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Platform Results</h2>
               <div className="flex items-center gap-2">
-                <span className="text-[11px] text-zinc-500 dark:text-zinc-400">model: {selectedModel}</span>
+                <span className="text-[11px] text-zinc-500 dark:text-zinc-400">
+                  model: {selectedModel} | provider: {provider}
+                  {generationConfig.thinkingMode ? ` | thinking: ${generationConfig.reasoningEffort}` : ""}
+                  {rememberApiKeys ? " | api key: remembered" : " | api key: session only"}
+                </span>
                 <label className="flex items-center gap-2 rounded-md border border-zinc-300 px-2 py-1 text-xs text-zinc-700 dark:border-zinc-700 dark:text-zinc-200">
                   <input type="checkbox" checked={compareMode} onChange={(e) => setCompareMode(e.target.checked)} />
                   Compare mode
