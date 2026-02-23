@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { type KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
 import { ArchiveRestore, CheckCheck, Settings2, Sparkles } from "lucide-react";
 import { PlatformCard } from "@/components/platform-card";
 import { ContextPanel } from "@/components/context-panel";
 import { OptionsPanel } from "@/components/options-panel";
+import { DraftRefinerPanel, type DraftRefinerPanelRef } from "@/components/draft-refiner-panel";
 import {
   configureRuntimeApiKeys,
   enqueuePublish,
@@ -21,6 +22,7 @@ import {
 import type {
   CardState,
   CardVersion,
+  DraftRefineLanguage,
   GenerationConfig,
   GeneratedCard,
   LanguageOption,
@@ -135,6 +137,12 @@ function getPlatformLabel(platform: Platform): string {
   return platform;
 }
 
+function toRefineLanguage(language: LanguageSettingOption): DraftRefineLanguage {
+  if (language === "korean") return "ko";
+  if (language === "english") return "en";
+  return "auto";
+}
+
 const DEFAULT_GENERATION_CONFIG: GenerationConfig = {
   thinkingMode: false,
   reasoningEffort: "medium",
@@ -180,6 +188,8 @@ export default function HomePage() {
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const refinerRef = useRef<DraftRefinerPanelRef | null>(null);
 
   const cardsByOrder = useMemo(() => insertByPlatformOrder(resultCards), [resultCards]);
   const queueByOrder = useMemo(() => insertByPlatformOrder(queueCards), [queueCards]);
@@ -519,6 +529,36 @@ export default function HomePage() {
     );
   };
 
+  const handleInsertIntoDraft = (snippet: string) => {
+    const text = snippet.trim();
+    if (!text) return;
+    const el = textareaRef.current;
+    if (!el) {
+      setDraft((prev) => `${prev.trim()}\n\n---\n${text}`.trim());
+      return;
+    }
+    const start = el.selectionStart ?? draft.length;
+    const end = el.selectionEnd ?? draft.length;
+    const prefix = draft.slice(0, start);
+    const suffix = draft.slice(end);
+    const inserted = `${prefix}${prefix.endsWith("\n") || !prefix ? "" : "\n"}${text}${suffix.startsWith("\n") || !suffix ? "" : "\n"}${suffix}`;
+    setDraft(inserted);
+  };
+
+  const handleTextareaKeydown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
+    const metaOrCtrl = event.metaKey || event.ctrlKey;
+    if (!metaOrCtrl || event.altKey) return;
+    if (event.shiftKey && event.key === "Enter") {
+      event.preventDefault();
+      refinerRef.current?.openAndRefine();
+      return;
+    }
+    if (!event.shiftKey && event.key === "Enter") {
+      event.preventDefault();
+      void handleGenerate();
+    }
+  };
+
   return (
     <>
       <ContextPanel
@@ -614,10 +654,23 @@ export default function HomePage() {
               <span className="text-xs text-zinc-500 dark:text-zinc-400">ID: {draftId ?? "-"}</span>
             </div>
             <textarea
+              ref={textareaRef}
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
+              onKeyDown={handleTextareaKeydown}
               placeholder="Write your draft..."
               className="mb-3 h-44 w-full rounded-xl border border-zinc-300 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-zinc-300 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100 dark:focus:ring-zinc-700"
+            />
+            <DraftRefinerPanel
+              ref={refinerRef}
+              draft={draft}
+              provider={provider}
+              model={selectedModel}
+              generationConfig={generationConfig}
+              language={toRefineLanguage(language)}
+              platforms={selectedPlatforms}
+              onReplaceDraft={setDraft}
+              onInsertIntoDraft={handleInsertIntoDraft}
             />
             <div className="flex gap-2">
               <button

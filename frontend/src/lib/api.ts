@@ -1,4 +1,6 @@
 import type {
+  DraftRefineLanguage,
+  DraftRefineResponse,
   GenerateResponse,
   GeneratedCard,
   GenerationConfig,
@@ -196,4 +198,27 @@ export async function fetchProvider(): Promise<{ provider: ProviderOption; defau
   const res = await apiFetch(`${API_URL}/api/provider`);
   if (!res.ok) return { provider: "openrouter", defaultModel: "openai/gpt-4o-mini", availableProviders: ["openrouter"] };
   return res.json();
+}
+
+export async function refineDraft(payload: {
+  rawDraft: string;
+  language?: DraftRefineLanguage;
+  platforms?: Platform[];
+  context?: {
+    answers?: Record<string, string>;
+  };
+  model?: ModelOption;
+  provider?: ProviderOption;
+  generationConfig?: GenerationConfig;
+}): Promise<DraftRefineResponse> {
+  const res = await apiFetch(`${API_URL}/api/draft/refine`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const data = (await res.json().catch(() => ({}))) as { detail?: string };
+    throw new Error(data.detail || "Draft refinement failed");
+  }
+  return (await res.json()) as DraftRefineResponse;
 }

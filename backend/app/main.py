@@ -159,6 +159,49 @@ class StyleExtractResponse(BaseModel):
     systemInstructions: str
 
 
+class DraftRefineContext(BaseModel):
+    answers: Dict[str, str] = Field(default_factory=dict)
+
+
+class DraftRefineRequest(BaseModel):
+    rawDraft: str
+    language: Optional[str] = "auto"
+    platforms: Optional[List[Platform]] = None
+    context: Optional[DraftRefineContext] = None
+    model: Optional[str] = None
+    provider: Optional[str] = None
+    generationConfig: Optional[GenerationConfig] = None
+
+
+class DraftRefineBrief(BaseModel):
+    title: Optional[str] = None
+    coreMessage: str
+    audienceAssumption: str
+    keyPoints: List[str]
+    cta: str
+    hashtags: Optional[List[str]] = None
+
+
+class DraftRefineQuestion(BaseModel):
+    id: str
+    question: str
+    choices: Optional[List[str]] = None
+
+
+class DraftRefineAngle(BaseModel):
+    id: str
+    label: str
+    preview: str
+    draftSnippet: Optional[str] = None
+
+
+class DraftRefineResponse(BaseModel):
+    brief: DraftRefineBrief
+    questions: List[DraftRefineQuestion]
+    angles: List[DraftRefineAngle]
+    polishedDraft: str
+
+
 class STTResponse(BaseModel):
     text: str
 
@@ -367,6 +410,25 @@ def _generation_kwargs(model: str, generation_config: Optional[GenerationConfig]
             effort = "medium"
         kwargs["reasoning_effort"] = effort
     return kwargs
+
+
+def _default_model_for_provider(provider: Optional[str]) -> str:
+    selected = (provider or "").strip().lower()
+    if selected == "openai":
+        return "gpt-4o-mini"
+    return "openai/gpt-4o-mini"
+
+
+def _language_instruction(language: Optional[str], raw_draft: str) -> str:
+    lang = (language or "auto").lower().strip()
+    if lang == "ko":
+        return "Return all fields in Korean."
+    if lang == "en":
+        return "Return all fields in English."
+    return (
+        "Detect the input language and return all fields in that language. "
+        "If mixed, follow the dominant language."
+    )
 
 
 def _trim_for_prompt(text: str, limit: int = 900) -> str:
@@ -989,6 +1051,68 @@ async def extract_style(req: StyleExtractRequest, request: Request) -> StyleExtr
     )
 
     return StyleExtractResponse(extractedTone=extracted, systemInstructions=instructions)
+
+
+@app.post("/api/draft/refine", response_model=DraftRefineResponse)
+async def refine_draft(req: DraftRefineRequest, request: Request) -> DraftRefineResponse:
+    raw = (req.rawDraft or "").strip()
+    if not raw:
+        raise HTTPException(status_code=400, detail="rawDraft is required")
+
+    resolved_model = (req.model or "").strip() or _default_model_for_provider(req.provider)
+    selected_client = _resolve_text_client(request, req.provider, resolved_model)
+    platform_list = ", ".join([(p.value if isinstance(p, Platform) else str(p)) for p in (req.platforms or [])]) or "not specified"
+    answers_block = "\n".join([f"- {k}: {v}" for k, v in (req.context.answers if req.context else {}).items() if v.strip()]) or "N/A"
+
+    prompt = (
+        "You are a senior writing coach. Reorganize messy notes into a clear brief and polished draft.\n"
+        "Do not invent factual claims. If information is missing, ask targeted questions instead.\n"
+        f"{_language_instruction(req.language, raw)}\n"
+        "Return strict JSON with EXACT keys:\n"
+        "{"
+        '"brief":{"title?":"string","coreMessage":"string","audienceAssumption":"string","keyPoints":["3-5 items"],'
+        '"cta":"string","hashtags?":["string"]},'
+        '"questions":[{"id":"string","question":"string","choices?":["string"]}] (max 3),'
+        '"angles":[{"id":"string","label":"string","preview":"2-3 sentences","draftSnippet?":"string"}] (3-5 items),'
+        '"polishedDraft":"string"'
+        "}\n\n"
+        f"Target platforms: {platform_list}\n"
+        f"User answers context:\n{answers_block}\n\n"
+        f"Raw draft:\n{_trim_for_prompt(raw, 6000)}"
+    )
+
+    completion = await selected_client.chat.completions.create(
+        model=resolved_model,
+        response_format={"type": "json_object"},
+        **_generation_kwargs(resolved_model, req.generationConfig, default_temperature=0.3),
+        messages=[
+            {"role": "system", "content": "You produce reliable JSON outputs for draft refinement."},
+            {"role": "user", "content": prompt},
+        ],
+    )
+
+    try:
+        parsed = _parse_llm_json(completion.choices[0].message.content)
+        response = DraftRefineResponse.model_validate(parsed)
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=502, detail="Invalid refinement JSON from model") from exc
+
+    response.brief.keyPoints = [x.strip() for x in response.brief.keyPoints if x.strip()][:5]
+    if len(response.brief.keyPoints) < 3:
+        fallback = ["Clarify the key claim", "Add one concrete example", "End with a clear CTA"]
+        response.brief.keyPoints = (response.brief.keyPoints + fallback)[:3]
+    response.questions = response.questions[:3]
+    response.angles = response.angles[:5]
+    if len(response.angles) < 3:
+        response.angles.extend(
+            [
+                DraftRefineAngle(id="angle_1", label="Problem-first", preview="Start from a concrete pain point, then explain your approach."),
+                DraftRefineAngle(id="angle_2", label="Story-first", preview="Open with a short anecdote and connect it to your main message."),
+                DraftRefineAngle(id="angle_3", label="Action-first", preview="Lead with a practical checklist and finish with a direct CTA."),
+            ][: 3 - len(response.angles)]
+        )
+
+    return response
 
 
 @app.post("/api/stt", response_model=STTResponse)

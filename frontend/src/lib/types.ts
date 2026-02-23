@@ -85,3 +85,34 @@ export type GenerationConfig = {
   topP: number;
   maxOutputTokens: number;
 };
+
+export type DraftRefineLanguage = "auto" | "ko" | "en";
+
+export type DraftRefineBrief = {
+  title?: string;
+  coreMessage: string;
+  audienceAssumption: string;
+  keyPoints: string[];
+  cta: string;
+  hashtags?: string[];
+};
+
+export type DraftRefineQuestion = {
+  id: string;
+  question: string;
+  choices?: string[];
+};
+
+export type DraftRefineAngle = {
+  id: string;
+  label: string;
+  preview: string;
+  draftSnippet?: string;
+};
+
+export type DraftRefineResponse = {
+  brief: DraftRefineBrief;
+  questions: DraftRefineQuestion[];
+  angles: DraftRefineAngle[];
+  polishedDraft: string;
+};
