@@ -12,7 +12,7 @@ If you can run two commands, you can use it.
 - macOS/Linux (or WSL on Windows)
 - Node.js LTS + npm
 - `uv` (Python package manager)
-- OpenAI API key
+- LLM API key (OpenRouter recommended)
 
 ## 5-Minute Quick Start
 
@@ -22,11 +22,15 @@ cd auto-hongmyungbo
 ./scripts/setup_local.sh
 ```
 
-Edit `backend/.env` and set:
+Edit `backend/.env` and set (OpenRouter default):
 
 ```env
-OPENAI_API_KEY=your_key_here
+OPENROUTER_API_KEY=your_key_here
 ```
+
+Need help with key issuance/billing?
+
+- `docs/API_KEYS.md`
 
 Run:
 
@@ -35,6 +39,16 @@ Run:
 ```
 
 Open: `http://localhost:3000`
+
+## Runtime Options (No `.env` required)
+
+In `Options`, you can configure at runtime:
+
+- Provider (`OpenAI` / `OpenRouter`)
+- Model (preset or custom model ID)
+- Thinking mode + reasoning effort
+- Temperature / Top-p / Max output tokens
+- API keys (stored locally in your browser)
 
 ## What Works Out of the Box
 

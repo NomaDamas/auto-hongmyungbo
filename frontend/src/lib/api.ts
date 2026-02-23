@@ -1,6 +1,7 @@
 import type {
   GenerateResponse,
   GeneratedCard,
+  GenerationConfig,
   LanguageOption,
   ModelOption,
   PerPlatformLanguageMap,
@@ -13,11 +14,39 @@ import type {
 } from "@/lib/types";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+let runtimeOpenAIKey = "";
+let runtimeOpenRouterKey = "";
+
+export function configureRuntimeApiKeys(keys: { openaiApiKey?: string; openrouterApiKey?: string }) {
+  runtimeOpenAIKey = (keys.openaiApiKey || "").trim();
+  runtimeOpenRouterKey = (keys.openrouterApiKey || "").trim();
+}
+
+function mergeHeaders(initHeaders?: HeadersInit): Record<string, string> {
+  const headers: Record<string, string> = {};
+  if (!initHeaders) return headers;
+  if (Array.isArray(initHeaders)) {
+    for (const [k, v] of initHeaders) headers[k] = v;
+    return headers;
+  }
+  if (initHeaders instanceof Headers) {
+    initHeaders.forEach((v, k) => {
+      headers[k] = v;
+    });
+    return headers;
+  }
+  return { ...initHeaders };
+}
 
 async function apiFetch(input: string, init?: RequestInit): Promise<Response> {
+  const mergedHeaders = mergeHeaders(init?.headers);
+  if (runtimeOpenAIKey) mergedHeaders["x-openai-api-key"] = runtimeOpenAIKey;
+  if (runtimeOpenRouterKey) mergedHeaders["x-openrouter-api-key"] = runtimeOpenRouterKey;
+
   return fetch(input, {
     credentials: "include",
     ...init,
+    headers: mergedHeaders,
   });
 }
 
@@ -29,11 +58,12 @@ export async function generatePosts(
   language?: LanguageOption,
   languageByPlatform?: PerPlatformLanguageMap,
   provider?: ProviderOption,
+  generationConfig?: GenerationConfig,
 ): Promise<GenerateResponse> {
   const res = await apiFetch(`${API_URL}/api/generate`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ draft, userProfile, model, platforms, language, languageByPlatform, provider }),
+    body: JSON.stringify({ draft, userProfile, model, platforms, language, languageByPlatform, provider, generationConfig }),
   });
 
   if (!res.ok) {
@@ -53,6 +83,7 @@ export async function refinePost(payload: {
   model?: ModelOption;
   language?: LanguageOption;
   provider?: ProviderOption;
+  generationConfig?: GenerationConfig;
 }): Promise<GeneratedCard> {
   const res = await apiFetch(`${API_URL}/api/refine`, {
     method: "POST",
@@ -163,6 +194,6 @@ export async function getThreads(limitPerPlatform = 20): Promise<SocialThread[]>
 
 export async function fetchProvider(): Promise<{ provider: ProviderOption; defaultModel: string; availableProviders: ProviderOption[] }> {
   const res = await apiFetch(`${API_URL}/api/provider`);
-  if (!res.ok) return { provider: "openai", defaultModel: "gpt-4o-mini", availableProviders: ["openai"] };
+  if (!res.ok) return { provider: "openrouter", defaultModel: "openai/gpt-4o-mini", availableProviders: ["openrouter"] };
   return res.json();
 }

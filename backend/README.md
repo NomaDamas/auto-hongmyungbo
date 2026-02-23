@@ -13,7 +13,6 @@ This file is for backend-only development.
 
 - Generate/refine platform-specific content via OpenAI/OpenRouter
 - Apply structured intent constraints and style-sample-based transfer during generation/refinement
-- Handle social login callbacks (`google`, `kakao`, `naver`)
 - Handle platform OAuth callbacks (`linkedin`, `twitter`, `instagram`, `reddit`)
 - Queue and execute publish jobs in the background worker
 - Store drafts/cards/jobs/logs/events in SQLite for now (Postgres migration planned)
@@ -45,7 +44,8 @@ curl http://localhost:8000/health
 Minimum:
 
 - `DB_PATH` (optional, default `./app.db`)
-- `OPENAI_API_KEY` (or `OPENROUTER_API_KEY`)
+- `OPENROUTER_API_KEY` (recommended default)
+- `OPENAI_API_KEY` (optional, needed for STT/voice refine)
 - `FRONTEND_URL`
 - `ALLOWED_ORIGIN` or `ALLOWED_ORIGINS`
 
@@ -61,10 +61,6 @@ OAuth/publish values are listed in `.env.example`.
 - `GET /api/jobs/{job_id}`
 - `GET /api/publish/logs`
 - `GET /api/threads`
-- `GET /api/auth/me`
-- `POST /api/auth/logout`
-- `GET /api/auth/{provider}/connect`
-- `GET /api/auth/{provider}/callback`
 - `GET /api/oauth/{platform}/connect`
 - `GET /api/oauth/{platform}/callback`
 

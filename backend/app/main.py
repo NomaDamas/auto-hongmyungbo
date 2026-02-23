@@ -93,6 +93,14 @@ class IntentSpec(BaseModel):
     extraNotes: Optional[str] = None
 
 
+class GenerationConfig(BaseModel):
+    thinkingMode: bool = False
+    reasoningEffort: str = "medium"
+    temperature: Optional[float] = None
+    topP: Optional[float] = None
+    maxOutputTokens: Optional[int] = None
+
+
 class GenerateRequest(BaseModel):
     draft: str
     userProfile: Optional[UserProfile] = None
@@ -103,6 +111,7 @@ class GenerateRequest(BaseModel):
     provider: Optional[str] = None
     intent: Optional[IntentSpec] = None
     styleSample: Optional[str] = None
+    generationConfig: Optional[GenerationConfig] = None
 
 
 class GeneratedCard(BaseModel):
@@ -131,6 +140,7 @@ class RefineRequest(BaseModel):
     provider: Optional[str] = None
     intent: Optional[IntentSpec] = None
     styleSample: Optional[str] = None
+    generationConfig: Optional[GenerationConfig] = None
 
 
 class CardStatusRequest(BaseModel):
@@ -295,25 +305,68 @@ SESSION_TTL_DAYS = int(os.getenv("SESSION_TTL_DAYS", "30"))
 FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
 
 
-def _resolve_text_client(provider: Optional[str], model: str) -> AsyncOpenAI:
+def _read_runtime_api_keys(request: Request) -> tuple[Optional[str], Optional[str]]:
+    openai_key = (request.headers.get("x-openai-api-key") or "").strip() or None
+    openrouter_key = (request.headers.get("x-openrouter-api-key") or "").strip() or None
+    return openai_key, openrouter_key
+
+
+def _resolve_text_client(request: Request, provider: Optional[str], model: str) -> AsyncOpenAI:
+    header_openai_key, header_openrouter_key = _read_runtime_api_keys(request)
+    runtime_openai = AsyncOpenAI(api_key=header_openai_key) if header_openai_key else None
+    runtime_openrouter = (
+        AsyncOpenAI(base_url="https://openrouter.ai/api/v1", api_key=header_openrouter_key) if header_openrouter_key else None
+    )
+    resolved_openai = runtime_openai or openai_client
+    resolved_openrouter = runtime_openrouter or openrouter_client
+
     selected = (provider or "").strip().lower()
     if selected == "openrouter":
-        if not openrouter_client:
+        if not resolved_openrouter:
             raise HTTPException(status_code=400, detail="OpenRouter provider is not configured")
-        return openrouter_client
+        return resolved_openrouter
     if selected == "openai":
-        if not openai_client:
+        if not resolved_openai:
             raise HTTPException(status_code=400, detail="OpenAI provider is not configured")
-        return openai_client
+        return resolved_openai
 
     # Auto selection fallback.
-    if "/" in (model or "") and openrouter_client:
-        return openrouter_client
-    if openai_client:
-        return openai_client
-    if openrouter_client:
-        return openrouter_client
+    if "/" in (model or "") and resolved_openrouter:
+        return resolved_openrouter
+    if resolved_openrouter:
+        return resolved_openrouter
+    if resolved_openai:
+        return resolved_openai
     raise HTTPException(status_code=500, detail="No text generation provider is configured")
+
+
+def _resolve_stt_client(request: Request) -> Optional[AsyncOpenAI]:
+    runtime_openai_key = (request.headers.get("x-openai-api-key") or "").strip()
+    if runtime_openai_key:
+        return AsyncOpenAI(api_key=runtime_openai_key)
+    return stt_client
+
+
+def _supports_reasoning_effort(model: str) -> bool:
+    lowered = (model or "").lower()
+    return lowered.startswith("gpt-5") or lowered.startswith("o1") or lowered.startswith("o3") or lowered.startswith("o4")
+
+
+def _generation_kwargs(model: str, generation_config: Optional[GenerationConfig], default_temperature: float) -> Dict[str, Any]:
+    cfg = generation_config or GenerationConfig()
+    kwargs: Dict[str, Any] = {
+        "temperature": default_temperature if cfg.temperature is None else max(0.0, min(2.0, float(cfg.temperature))),
+    }
+    if cfg.topP is not None:
+        kwargs["top_p"] = max(0.0, min(1.0, float(cfg.topP)))
+    if cfg.maxOutputTokens is not None:
+        kwargs["max_tokens"] = max(128, int(cfg.maxOutputTokens))
+    if cfg.thinkingMode and _supports_reasoning_effort(model):
+        effort = (cfg.reasoningEffort or "medium").lower()
+        if effort not in {"minimal", "low", "medium", "high"}:
+            effort = "medium"
+        kwargs["reasoning_effort"] = effort
+    return kwargs
 
 
 def _trim_for_prompt(text: str, limit: int = 900) -> str:
@@ -375,6 +428,7 @@ async def derive_style_blueprint(
     style_sample: Optional[str],
     model: str,
     selected_client: AsyncOpenAI,
+    generation_config: Optional[GenerationConfig] = None,
 ) -> str:
     sample = (style_sample or "").strip()
     if not sample:
@@ -390,7 +444,7 @@ async def derive_style_blueprint(
         completion = await selected_client.chat.completions.create(
             model=model,
             response_format={"type": "json_object"},
-            temperature=0.2,
+            **_generation_kwargs(model, generation_config, default_temperature=0.2),
             messages=[
                 {"role": "system", "content": "You are a writing-style reverse engineer."},
                 {"role": "user", "content": prompt},
@@ -464,6 +518,7 @@ async def generate_for_platform(
     intent_block: str,
     style_blueprint: str,
     style_sample: Optional[str],
+    generation_config: Optional[GenerationConfig] = None,
 ) -> GeneratedCard:
     system_prompt = PLATFORM_PROMPTS[platform]
     style_block = build_style_block(platform, profile)
@@ -490,7 +545,7 @@ async def generate_for_platform(
     completion = await selected_client.chat.completions.create(
         model=model,
         response_format={"type": "json_object"},
-        temperature=0.7,
+        **_generation_kwargs(model, generation_config, default_temperature=0.7),
         messages=[
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_prompt},
@@ -778,9 +833,9 @@ async def generate_content(req: GenerateRequest, request: Request) -> GenerateRe
     if not selected_platforms:
         raise HTTPException(status_code=400, detail="At least one platform must be selected")
 
-    selected_client = _resolve_text_client(req.provider, req.model)
+    selected_client = _resolve_text_client(request, req.provider, req.model)
     intent_block = build_intent_block(req.intent)
-    style_blueprint = await derive_style_blueprint(req.styleSample, req.model, selected_client)
+    style_blueprint = await derive_style_blueprint(req.styleSample, req.model, selected_client, req.generationConfig)
     tasks = [
         generate_for_platform(
             platform,
@@ -792,6 +847,7 @@ async def generate_content(req: GenerateRequest, request: Request) -> GenerateRe
             intent_block,
             style_blueprint,
             req.styleSample,
+            req.generationConfig,
         )
         for platform in selected_platforms
     ]
@@ -835,12 +891,12 @@ async def update_card_status(card_id: int, req: CardStatusRequest) -> GeneratedC
 
 
 @app.post("/api/refine", response_model=GeneratedCard)
-async def refine_content(req: RefineRequest) -> GeneratedCard:
-    selected_client = _resolve_text_client(req.provider, req.model)
+async def refine_content(req: RefineRequest, request: Request) -> GeneratedCard:
+    selected_client = _resolve_text_client(request, req.provider, req.model)
     system_prompt = PLATFORM_PROMPTS[req.platform]
     style_block = build_style_block(req.platform, req.userProfile)
     intent_block = build_intent_block(req.intent)
-    style_blueprint = await derive_style_blueprint(req.styleSample, req.model, selected_client)
+    style_blueprint = await derive_style_blueprint(req.styleSample, req.model, selected_client, req.generationConfig)
 
     user_prompt = (
         "You are refining an already generated post while preserving platform fit.\n"
@@ -864,7 +920,7 @@ async def refine_content(req: RefineRequest) -> GeneratedCard:
     completion = await selected_client.chat.completions.create(
         model=req.model,
         response_format={"type": "json_object"},
-        temperature=0.7,
+        **_generation_kwargs(req.model, req.generationConfig, default_temperature=0.7),
         messages=[
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_prompt},
@@ -899,7 +955,7 @@ async def refine_content(req: RefineRequest) -> GeneratedCard:
 
 
 @app.post("/api/style/extract", response_model=StyleExtractResponse)
-async def extract_style(req: StyleExtractRequest) -> StyleExtractResponse:
+async def extract_style(req: StyleExtractRequest, request: Request) -> StyleExtractResponse:
     if not req.referencePosts:
         raise HTTPException(status_code=400, detail="referencePosts is required")
 
@@ -909,11 +965,11 @@ async def extract_style(req: StyleExtractRequest) -> StyleExtractResponse:
         + "\n---\n".join(req.referencePosts)
     )
 
-    selected_client = _resolve_text_client(req.provider, req.model)
+    selected_client = _resolve_text_client(request, req.provider, req.model)
     completion = await selected_client.chat.completions.create(
         model=req.model,
         response_format={"type": "json_object"},
-        temperature=0.3,
+        **_generation_kwargs(req.model, None, default_temperature=0.3),
         messages=[
             {"role": "system", "content": "You are an expert writing-style analyst."},
             {"role": "user", "content": prompt},
@@ -936,14 +992,15 @@ async def extract_style(req: StyleExtractRequest) -> StyleExtractResponse:
 
 
 @app.post("/api/stt", response_model=STTResponse)
-async def transcribe_voice(file: UploadFile = File(...)) -> STTResponse:
-    if not stt_client:
+async def transcribe_voice(request: Request, file: UploadFile = File(...)) -> STTResponse:
+    resolved_stt_client = _resolve_stt_client(request)
+    if not resolved_stt_client:
         raise HTTPException(status_code=400, detail="OPENAI_API_KEY is required for STT")
     if not file.filename:
         raise HTTPException(status_code=400, detail="No file uploaded")
 
     audio_bytes = await file.read()
-    transcription = await stt_client.audio.transcriptions.create(
+    transcription = await resolved_stt_client.audio.transcriptions.create(
         model=DEFAULT_STT_MODEL,
         file=(file.filename, audio_bytes, file.content_type or "audio/webm"),
     )
@@ -957,7 +1014,7 @@ async def transcribe_voice(file: UploadFile = File(...)) -> STTResponse:
 
 @app.post("/api/publish", response_model=PublishResponse)
 async def enqueue_publish(req: PublishRequest, request: Request) -> PublishResponse:
-    user = _get_current_user(request, required=True)
+    user = _get_current_user(request, required=False)
     scheduled_at = req.scheduledAt.strip() if req.scheduledAt else None
     job_id, status = store.create_job(
         "publish",
@@ -966,7 +1023,7 @@ async def enqueue_publish(req: PublishRequest, request: Request) -> PublishRespo
             "cardIds": req.cardIds or [],
             "acceptedOnly": req.acceptedOnly,
         },
-        user_id=int(user["id"]),
+        user_id=(int(user["id"]) if user else None),
         run_at=scheduled_at,
     )
     return PublishResponse(jobId=job_id, status=status)
@@ -1057,7 +1114,9 @@ async def get_analytics_summary(
 
 @app.get("/api/publish/logs", response_model=List[PublishLogItem])
 async def get_publish_logs(request: Request, limit: int = Query(100, ge=1, le=500)) -> List[PublishLogItem]:
-    user = _get_current_user(request, required=True)
+    user = _get_current_user(request, required=False)
+    if not user:
+        return []
     rows = store.list_publish_logs(int(user["id"]), limit=limit)
     return [
         PublishLogItem(
@@ -1079,7 +1138,9 @@ async def get_publish_logs(request: Request, limit: int = Query(100, ge=1, le=50
 
 @app.get("/api/threads", response_model=List[PlatformThread])
 async def get_threads(request: Request, limitPerPlatform: int = Query(20, ge=1, le=100)) -> List[PlatformThread]:
-    user = _get_current_user(request, required=True)
+    user = _get_current_user(request, required=False)
+    if not user:
+        return []
     grouped = store.list_threads_by_platform(int(user["id"]), limit_per_platform=limitPerPlatform)
     result: List[PlatformThread] = []
     for platform, items in grouped.items():
@@ -1323,7 +1384,7 @@ async def social_callback(
 
 @app.get("/api/oauth/{platform}/connect", response_model=OAuthConnectResponse)
 async def oauth_connect(platform: Platform, request: Request, redirectUri: str = Query(..., min_length=1)) -> OAuthConnectResponse:
-    _get_current_user(request, required=True)
+    _get_current_user(request, required=False)
     state = secrets.token_urlsafe(24)
     params: Dict[str, str] = {}
     base = ""

@@ -10,9 +10,15 @@ if [[ ! -f "$ROOT_DIR/backend/.env" || ! -f "$ROOT_DIR/frontend/.env.local" ]]; 
   exit 1
 fi
 
-if ! grep -qE '^OPENAI_API_KEY=.+$' "$ROOT_DIR/backend/.env"; then
-  echo "OPENAI_API_KEY is not set in backend/.env"
-  echo "Set it, then run ./scripts/start_local.sh again."
+HAS_OPENROUTER_KEY=false
+HAS_OPENAI_KEY=false
+grep -qE '^OPENROUTER_API_KEY=.+$' "$ROOT_DIR/backend/.env" && HAS_OPENROUTER_KEY=true || true
+grep -qE '^OPENAI_API_KEY=.+$' "$ROOT_DIR/backend/.env" && HAS_OPENAI_KEY=true || true
+
+if [[ "$HAS_OPENROUTER_KEY" == false && "$HAS_OPENAI_KEY" == false ]]; then
+  echo "No LLM API key found in backend/.env"
+  echo "Set OPENROUTER_API_KEY (recommended) or OPENAI_API_KEY."
+  echo "Guide: docs/API_KEYS.md"
   exit 1
 fi
 
@@ -34,4 +40,3 @@ echo "Backend logs: $LOG_DIR/backend.log"
 echo "Starting frontend on http://localhost:3000 ..."
 cd "$ROOT_DIR/frontend"
 npm run dev
-

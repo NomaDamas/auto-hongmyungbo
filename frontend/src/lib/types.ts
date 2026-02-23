@@ -2,6 +2,7 @@ export type Platform = "reddit" | "linkedin" | "twitter" | "instagram" | "blog";
 
 export type ModelOption = string;
 export type ProviderOption = "openai" | "openrouter";
+export type ReasoningEffortOption = "minimal" | "low" | "medium" | "high";
 export type LanguageOption = "auto" | "korean" | "english" | "japanese";
 export type LanguageSettingOption = LanguageOption | "per_platform";
 export type PerPlatformLanguageMap = Record<Platform, LanguageOption>;
@@ -75,4 +76,12 @@ export type UserProfile = {
       }
     >
   >;
+};
+
+export type GenerationConfig = {
+  thinkingMode: boolean;
+  reasoningEffort: ReasoningEffortOption;
+  temperature: number;
+  topP: number;
+  maxOutputTokens: number;
 };
