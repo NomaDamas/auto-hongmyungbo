@@ -520,8 +520,8 @@ export default function HomePage() {
   const handleOAuthConnect = async (platform: Platform) => {
     try {
       setOauthBusyPlatform(platform);
-      const apiBase = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
-      const redirectUri = `${apiBase}/api/oauth/${platform}/callback`;
+      const apiBase = process.env.NEXT_PUBLIC_API_URL || window.location.origin;
+      const redirectUri = `${apiBase.replace(/\/$/, "")}/api/oauth/${platform}/callback`;
       const { authUrl } = await getOAuthConnectUrl(platform, redirectUri);
       window.open(authUrl, "_blank", "noopener,noreferrer");
     } catch (err) {

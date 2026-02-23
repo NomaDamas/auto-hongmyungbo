@@ -11,7 +11,6 @@ If you can run two commands, you can use it.
 
 - macOS/Linux (or WSL on Windows)
 - Node.js LTS + npm
-- `uv` (Python package manager)
 - LLM API key (OpenRouter recommended)
 
 ## 5-Minute Quick Start
@@ -22,7 +21,7 @@ cd auto-hongmyungbo
 ./scripts/setup_local.sh
 ```
 
-Edit `backend/.env` and set (OpenRouter default):
+Edit `frontend/.env.local` and set (OpenRouter default):
 
 ```env
 OPENROUTER_API_KEY=your_key_here
@@ -71,7 +70,6 @@ You can use the app locally without setting all OAuth keys.
 ```text
 .
 ├── frontend/   # Next.js UI
-├── backend/    # FastAPI API server
 ├── scripts/    # one-command local setup/run
 └── docs/
     └── images/ # README screenshots/assets
