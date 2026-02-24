@@ -9,6 +9,9 @@ backend/app.db
 frontend/node_modules/
 frontend/.next/
 frontend/.env.local
+frontend/.env
+frontend/local_store.json
+.env
 
 # OS
 .DS_Store
