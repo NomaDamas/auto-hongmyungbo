@@ -123,6 +123,9 @@ function styleBlock(platform: Platform, profile?: UserProfile): string {
   const style = profile?.styles?.[platform];
   if (!style) return "No additional style constraints.";
   const chunks: string[] = [];
+  if (style.mode === "auto" && style.extractedTone?.trim()) {
+    chunks.push(`Extracted tone to preserve: ${style.extractedTone.trim()}`);
+  }
   if (style.customInstructions?.trim()) chunks.push(style.customInstructions.trim());
   if (style.referencePosts?.length) chunks.push("Reference posts:\n" + style.referencePosts.slice(0, 3).join("\n---\n"));
   return chunks.join("\n\n") || "No additional style constraints.";
@@ -144,6 +147,10 @@ export async function generatePlatformCard(input: {
     input.draft,
     "Style constraints:",
     styleBlock(input.platform, input.userProfile),
+    "Priority:",
+    "1) Keep user intent and core meaning.",
+    "2) Transfer the writing style faithfully (voice, rhythm, phrasing).",
+    "3) Fit platform conventions.",
     "Return strict JSON: {\"title\":\"...\",\"body\":\"...\",\"suggestions\":[\"...\"]}",
   ].join("\n\n");
 
@@ -185,6 +192,10 @@ export async function refineCard(input: {
     input.feedback,
     "Style constraints:",
     styleBlock(input.platform, input.userProfile),
+    "Priority:",
+    "1) Apply user feedback exactly.",
+    "2) Preserve style signal from constraints/reference posts.",
+    "3) Keep platform-native readability.",
     "Return strict JSON: {\"title\":\"...\",\"body\":\"...\",\"suggestions\":[\"...\"]}",
   ].join("\n\n");
 

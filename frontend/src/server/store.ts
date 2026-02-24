@@ -98,8 +98,12 @@ function ensureLoaded(): LocalState {
 
 function save(): void {
   const state = ensureLoaded();
-  fs.mkdirSync(path.dirname(STORE_PATH), { recursive: true });
-  fs.writeFileSync(STORE_PATH, JSON.stringify(state, null, 2), "utf-8");
+  const dir = path.dirname(STORE_PATH);
+  fs.mkdirSync(dir, { recursive: true });
+  // Atomic write: write to temp file first, then rename.
+  const tmp = path.join(dir, `.${path.basename(STORE_PATH)}.tmp-${process.pid}-${Date.now()}`);
+  fs.writeFileSync(tmp, JSON.stringify(state, null, 2), "utf-8");
+  fs.renameSync(tmp, STORE_PATH);
 }
 
 export function createDraft(rawText: string): number {
@@ -212,6 +216,10 @@ export function addPublishLog(row: Omit<PublishLog, "id" | "createdAt">): Publis
     ...row,
   };
   state.publishLogs.push(created);
+  // Keep local store bounded in long-running local sessions.
+  if (state.publishLogs.length > 2000) {
+    state.publishLogs = state.publishLogs.slice(-2000);
+  }
   save();
   return created;
 }
