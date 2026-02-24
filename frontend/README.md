@@ -34,7 +34,7 @@ Use Supabase directly in the frontend for:
 - Product data CRUD
 - File storage
 
-Use FastAPI for AI generation and publish orchestration APIs.
+Use Next.js Route Handlers (`src/app/api/*`) for AI generation and publish orchestration APIs.
 
 ## Run
 
@@ -54,7 +54,7 @@ npm run build
 
 ## Environment Variables
 
-- `NEXT_PUBLIC_API_URL=http://localhost:8000`
+- `NEXT_PUBLIC_API_URL=` (leave empty for same-origin `/api`)
 - `NEXT_PUBLIC_HMB_IMAGE_URL=` (optional)
 
 ## Docker
@@ -62,5 +62,5 @@ npm run build
 ```bash
 cd frontend
 docker build -t hmb-frontend .
-docker run --rm -p 3000:3000 -e NEXT_PUBLIC_API_URL=http://localhost:8000 hmb-frontend
+docker run --rm -p 3000:3000 hmb-frontend
 ```
