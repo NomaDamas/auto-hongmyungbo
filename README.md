@@ -65,6 +65,35 @@ In `Options`, you can configure at runtime:
 - Temperature / Top-p / Max output tokens
 - API keys (stored locally in your browser)
 
+## Use As An Agent Skill
+
+This repository includes an agent-ready skill package:
+
+- Skill definition: `skills/auto-hongmyungbo/SKILL.md`
+- Single entry command: `./scripts/agent_skill_run.mjs`
+- Output format: predictable JSON (`ok`, `steps`, `artifacts`, `error`)
+
+Quick skill run:
+
+```bash
+./scripts/agent_skill_run.mjs \
+  --draft "Launch update: we shipped better preview UX for long social posts." \
+  --provider openrouter \
+  --platforms reddit,linkedin
+```
+
+Enable publish explicitly (safe default is no publish):
+
+```bash
+./scripts/agent_skill_run.mjs --draft-file ./my_draft.txt --publish
+```
+
+Example agent prompts:
+
+- `Run the Auto-HongMyungbo skill for this draft and return the JSON result only.`
+- `Use provider=openai, generate for reddit/linkedin/twitter, then rerun with --publish.`
+- `If generation fails, retry once with a shorter draft and report final JSON.`
+
 ## What Works Out of the Box
 
 - Draft -> multi-platform generation
