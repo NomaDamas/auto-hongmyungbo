@@ -7,6 +7,12 @@ Generate platform-specific social post drafts from one input and review them in 
 This repo is optimized for **easy local usage**.  
 If you can run two commands, you can use it.
 
+## Architecture (Current)
+
+- Single runtime: **Next.js (frontend + server routes)**
+- No standalone FastAPI server required for local OSS usage
+- Local persistence file: `local_store.json` (configurable with `STORE_PATH`)
+
 ## What You Need
 
 - macOS/Linux (or WSL on Windows)
@@ -21,7 +27,7 @@ cd auto-hongmyungbo
 ./scripts/setup_local.sh
 ```
 
-Edit `frontend/.env.local` and set (OpenRouter default):
+Edit `frontend/.env` (or `frontend/.env.local`) and set (OpenRouter default):
 
 ```env
 OPENROUTER_API_KEY=your_key_here
@@ -38,6 +44,16 @@ Run:
 ```
 
 Open: `http://localhost:3000`
+
+## Run (Manual)
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Open `http://localhost:3000`.
 
 ## Runtime Options (No `.env` required)
 
@@ -69,7 +85,9 @@ You can use the app locally without setting all OAuth keys.
 
 ```text
 .
-├── frontend/   # Next.js UI
+├── frontend/   # Next.js UI + API routes
+│   └── src/app/api/  # server routes
+│   └── src/server/   # local store + llm server helpers
 ├── scripts/    # one-command local setup/run
 └── docs/
     └── images/ # README screenshots/assets

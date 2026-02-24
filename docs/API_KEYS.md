@@ -15,7 +15,7 @@ Steps:
 1. Create an account at `https://openrouter.ai/`
 2. Add credits/billing
 3. Go to Keys and create an API key
-4. Open `frontend/.env.local` (optional) or set key in app `Options`
+4. Open `frontend/.env` or `frontend/.env.local` (optional) or set key in app `Options`
 5. Set:
 
 ```env
@@ -32,7 +32,7 @@ Steps:
 1. Create an account at `https://platform.openai.com/`
 2. Add billing/credits
 3. Create an API key
-4. Open `frontend/.env.local` (optional) or set key in app `Options`
+4. Open `frontend/.env` or `frontend/.env.local` (optional) or set key in app `Options`
 5. Set:
 
 ```env
@@ -55,4 +55,4 @@ After setting keys:
 ./scripts/start_local.sh
 ```
 
-If no key is set in `.env.local`, enter it in app `Options` at runtime.
+If no key is set in `.env` / `.env.local`, enter it in app `Options` at runtime.

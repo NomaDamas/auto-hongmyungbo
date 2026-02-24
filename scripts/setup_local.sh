@@ -10,9 +10,9 @@ command -v npm >/dev/null 2>&1 || {
 }
 
 echo "[2/3] Preparing frontend env..."
-if [[ ! -f "$ROOT_DIR/frontend/.env.local" ]]; then
-  cp "$ROOT_DIR/frontend/.env.local.example" "$ROOT_DIR/frontend/.env.local"
-  echo "Created frontend/.env.local from template."
+if [[ ! -f "$ROOT_DIR/frontend/.env.local" && ! -f "$ROOT_DIR/frontend/.env" ]]; then
+  cp "$ROOT_DIR/frontend/.env.example" "$ROOT_DIR/frontend/.env"
+  echo "Created frontend/.env from template."
 fi
 
 echo "[3/3] Installing frontend dependencies..."
@@ -21,6 +21,6 @@ echo "[3/3] Installing frontend dependencies..."
 echo
 echo "Setup complete."
 echo "Next:"
-echo "  1) (Optional) set OPENROUTER_API_KEY or OPENAI_API_KEY in frontend/.env.local"
+echo "  1) (Optional) set OPENROUTER_API_KEY or OPENAI_API_KEY in frontend/.env or frontend/.env.local"
 echo "  2) Or enter API keys directly in Options at runtime"
 echo "  3) Run: ./scripts/start_local.sh"
