@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { LanguageOption, LanguageSettingOption, PerPlatformLanguageMap, Platform } from "@/lib/types";
 
-const PLATFORM_ORDER: Platform[] = ["instagram", "twitter", "linkedin", "reddit", "blog"];
+const PLATFORM_ORDER: Platform[] = ["instagram", "threads", "twitter", "youtube", "tiktok", "linkedin", "reddit"];
 
 type Props = {
   open: boolean;
@@ -35,7 +35,7 @@ export function ContextPanel({
   onClose,
   onSave,
 }: Props) {
-  const [tab, setTab] = useState<Platform>("instagram");
+  const [tab, setTab] = useState<Platform>("threads");
   const [draftContexts, setDraftContexts] = useState<Record<Platform, string>>(contexts);
   const [draftReferencePosts, setDraftReferencePosts] = useState<Record<Platform, string[]>>(referencePosts);
   const [draftEnabled, setDraftEnabled] = useState<Record<Platform, boolean>>(enabledPlatforms);

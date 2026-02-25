@@ -1,5 +1,7 @@
 import { fail, ok } from "@/server/http";
-import { addPublishLog, createJob, getCard, listCardsForDraft, updateJob } from "@/server/store";
+import { addPublishLog, createJob, getOAuthToken, listCardsForDraft, updateJob } from "@/server/store";
+import { publishToPlatform } from "@/server/publishers";
+import { publishByBrowser } from "@/server/browser-automation";
 
 export const runtime = "nodejs";
 
@@ -10,6 +12,7 @@ export async function POST(request: Request) {
       cardIds?: number[];
       acceptedOnly?: boolean;
       scheduledAt?: string;
+      publishMode?: "api" | "browser" | "hybrid";
     };
     if (!body?.draftId) return fail("draftId is required", 400);
 
@@ -26,30 +29,71 @@ export async function POST(request: Request) {
       cardIds: body.cardIds || [],
       acceptedOnly: Boolean(body.acceptedOnly),
       scheduledAt: body.scheduledAt,
+      publishMode: body.publishMode || "browser",
     });
 
-    const published = selected.map((card) => {
-      const result = {
-        ok: true,
-        postId: `${card.platform}_${Date.now()}_${card.id}`,
-        url: `https://local.${card.platform}.mock/post/${card.id}`,
-      };
-      addPublishLog({
-        draftId: body.draftId,
-        cardId: card.id,
-        platform: card.platform,
-        title: card.title,
-        body: card.body,
-        postId: result.postId,
-        postUrl: result.url,
-        status: "success",
-      });
-      return result;
+    const published = [];
+    const failed = [];
+    const mode = body.publishMode || "browser";
+    for (const card of selected) {
+      let result: { ok: boolean; postId?: string; url?: string; error?: string } | null = null;
+      if (mode === "browser") {
+        result = await publishByBrowser({ platform: card.platform as any, title: card.title, body: card.body });
+      } else if (mode === "hybrid") {
+        const browserResult = await publishByBrowser({ platform: card.platform as any, title: card.title, body: card.body });
+        if (browserResult.ok) {
+          result = browserResult;
+        }
+      }
+
+      if ((!result || !result.ok) && mode !== "browser") {
+        const token = getOAuthToken(card.platform);
+        if (token?.accessToken) {
+          const apiResult = await publishToPlatform({ card, token });
+          if (result && !result.ok && !apiResult.ok) {
+            result = { ok: false, error: `${result.error}; api: ${apiResult.error}` };
+          } else {
+            result = apiResult;
+          }
+        } else {
+          result = { ok: false, error: `${card.platform} is not connected (missing OAuth token).` };
+        }
+      }
+
+      if (result?.ok) {
+        addPublishLog({
+          draftId: body.draftId,
+          cardId: card.id,
+          platform: card.platform,
+          title: card.title,
+          body: card.body,
+          postId: result.postId,
+          postUrl: result.url,
+          status: "success",
+        });
+        published.push({ platform: card.platform, cardId: card.id, postId: result.postId, url: result.url });
+      } else {
+        const errorText = result?.error || "publish failed";
+        addPublishLog({
+          draftId: body.draftId,
+          cardId: card.id,
+          platform: card.platform,
+          title: card.title,
+          body: card.body,
+          status: "failed",
+          errorText,
+        });
+        failed.push({ platform: card.platform, cardId: card.id, error: errorText });
+      }
+    }
+
+    updateJob(job.id, {
+      status: failed.length ? "failed" : "done",
+      result: { published, failed, count: published.length, total: selected.length },
+      error: failed.length ? `${failed.length} platform(s) failed` : null,
     });
 
-    updateJob(job.id, { status: "done", result: { published, count: published.length }, error: null });
-
-    return ok({ jobId: job.id, status: "done" });
+    return ok({ jobId: job.id, status: failed.length ? "failed" : "done" });
   } catch (err) {
     return fail(err instanceof Error ? err.message : "Publish failed", 400);
   }

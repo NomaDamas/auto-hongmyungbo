@@ -18,7 +18,12 @@ const PLATFORM_PROMPTS: Record<Platform, string> = {
     "You are an X copywriter. Return JSON with keys: title, body, suggestions. Make a concise, high-impact post or short thread.",
   instagram:
     "You are an Instagram caption writer. Return JSON with keys: title, body, suggestions. Keep it visual and engaging.",
-  blog: "You are a blog editor. Return JSON with keys: title, body, suggestions. Use clear structured markdown.",
+  threads:
+    "You are a Threads writer. Return JSON with keys: title, body, suggestions. Keep it conversational and concise.",
+  youtube:
+    "You are a YouTube community post writer. Return JSON with keys: title, body, suggestions. Use strong hook and clear CTA.",
+  tiktok:
+    "You are a TikTok caption writer. Return JSON with keys: title, body, suggestions. Keep it short, punchy, trend-aware.",
 };
 
 function parseJson<T>(raw: string | null | undefined): T {

@@ -1,4 +1,4 @@
-export type Platform = "reddit" | "linkedin" | "twitter" | "instagram" | "blog";
+export type Platform = "reddit" | "linkedin" | "twitter" | "instagram" | "threads" | "youtube" | "tiktok";
 
 export type ModelOption = string;
 export type ProviderOption = "openai" | "openrouter";
@@ -123,4 +123,18 @@ export type DraftRefineResponse = {
   angles: DraftRefineAngle[];
   attentionGuide?: DraftRefineAttentionGuide;
   polishedDraft: string;
+};
+
+export type SetupStatus = {
+  llm: {
+    envOpenAI: boolean;
+    envOpenRouter: boolean;
+  };
+  oauth: Record<
+    "linkedin" | "twitter" | "instagram" | "reddit" | "threads" | "youtube" | "tiktok",
+    {
+      configured: boolean;
+      missing: string[];
+    }
+  >;
 };

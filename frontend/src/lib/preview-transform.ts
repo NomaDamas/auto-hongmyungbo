@@ -12,8 +12,11 @@ export type PlatformPreviewTransform = {
 
 const PLATFORM_LIMITS: Partial<Record<Platform, number>> = {
   twitter: 280,
+  threads: 500,
   instagram: 2200,
+  tiktok: 2200,
   linkedin: 3000,
+  youtube: 5000,
   reddit: 40000,
 };
 
@@ -47,4 +50,3 @@ export function transformPreviewText(platform: Platform, rawText: string): Platf
     limitState,
   };
 }
-

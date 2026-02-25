@@ -11,6 +11,7 @@ frontend/.next/
 frontend/.env.local
 frontend/.env
 frontend/local_store.json
+frontend/.browser-profiles/
 .env
 
 # OS

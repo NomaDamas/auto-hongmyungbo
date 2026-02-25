@@ -3,7 +3,7 @@ import { fail, ok } from "@/server/http";
 
 export const runtime = "nodejs";
 
-const ALLOWED_PLATFORMS = new Set(["reddit", "linkedin", "twitter", "instagram", "blog"]);
+const ALLOWED_PLATFORMS = new Set(["reddit", "linkedin", "twitter", "instagram", "threads", "youtube", "tiktok"]);
 const ALLOWED_LANG = new Set(["auto", "ko", "en"]);
 
 export async function POST(request: Request) {

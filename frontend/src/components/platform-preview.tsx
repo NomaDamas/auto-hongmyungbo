@@ -13,10 +13,12 @@ type Props = {
 
 const PREVIEW_LINE_CLAMP: Record<Platform, number> = {
   twitter: 5,
+  threads: 6,
   instagram: 6,
+  tiktok: 5,
   linkedin: 7,
+  youtube: 8,
   reddit: 9,
-  blog: 10,
 };
 
 function tokenizeLine(line: string): ReactNode[] {
@@ -79,11 +81,35 @@ function skinClasses(platform: Platform) {
       label: "Instagram",
     };
   }
+  if (platform === "threads") {
+    return {
+      shell: "rounded-xl border border-zinc-200 bg-zinc-50 p-3 dark:border-zinc-700 dark:bg-zinc-900",
+      footer: "text-zinc-500 dark:text-zinc-400",
+      avatar: "bg-zinc-300 dark:bg-zinc-700",
+      label: "Threads",
+    };
+  }
+  if (platform === "youtube") {
+    return {
+      shell: "rounded-xl border border-red-200 bg-red-50 p-3 dark:border-red-900 dark:bg-zinc-800",
+      footer: "text-zinc-500 dark:text-zinc-400",
+      avatar: "bg-red-200 dark:bg-red-800",
+      label: "YouTube",
+    };
+  }
+  if (platform === "tiktok") {
+    return {
+      shell: "rounded-xl border border-cyan-200 bg-cyan-50 p-3 dark:border-cyan-900 dark:bg-zinc-800",
+      footer: "text-zinc-500 dark:text-zinc-400",
+      avatar: "bg-cyan-200 dark:bg-cyan-800",
+      label: "TikTok",
+    };
+  }
   return {
     shell: "rounded-xl border border-zinc-200 bg-white p-3 dark:border-zinc-700 dark:bg-zinc-800",
     footer: "text-zinc-500 dark:text-zinc-400",
     avatar: "bg-emerald-200 dark:bg-emerald-800",
-    label: "Blog",
+    label: "Post",
   };
 }
 
@@ -126,4 +152,3 @@ export function PlatformPreview({ platform, title, text, expanded, canExpand }: 
     </div>
   );
 }
-

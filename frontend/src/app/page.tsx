@@ -11,12 +11,13 @@ import {
   configureRuntimeApiKeys,
   enqueuePublish,
   fetchProvider,
+  fetchSetupStatus,
   generatePosts,
   getJob,
-  getOAuthConnectUrl,
   getPublishLogs,
   getThreads,
   refinePost,
+  startBrowserLogin,
   transcribeAudio,
   updateCardStatus,
 } from "@/lib/api";
@@ -35,10 +36,11 @@ import type {
   PublishLogItem,
   ProviderOption,
   SocialThread,
+  SetupStatus,
   UserProfile,
 } from "@/lib/types";
 
-const PLATFORM_ORDER: Platform[] = ["reddit", "linkedin", "twitter", "instagram", "blog"];
+const PLATFORM_ORDER: Platform[] = ["reddit", "linkedin", "twitter", "threads", "instagram", "youtube", "tiktok"];
 
 const OPENAI_MODELS: ModelOption[] = [
   "gpt-5",
@@ -65,30 +67,47 @@ const EMPTY_CONTEXTS: Record<Platform, string> = {
   reddit: "",
   linkedin: "",
   twitter: "",
+  threads: "",
   instagram: "",
-  blog: "",
+  youtube: "",
+  tiktok: "",
 };
 const EMPTY_REFERENCE_POSTS: Record<Platform, string[]> = {
   reddit: [],
   linkedin: [],
   twitter: [],
+  threads: [],
   instagram: [],
-  blog: [],
+  youtube: [],
+  tiktok: [],
 };
 const DEFAULT_PER_PLATFORM_LANGUAGES: PerPlatformLanguageMap = {
   reddit: "auto",
   linkedin: "auto",
   twitter: "auto",
+  threads: "auto",
   instagram: "auto",
-  blog: "auto",
+  youtube: "auto",
+  tiktok: "auto",
 };
 const DEFAULT_ENABLED_PLATFORMS: Record<Platform, boolean> = {
   reddit: true,
   linkedin: true,
   twitter: true,
+  threads: true,
   instagram: true,
-  blog: true,
+  youtube: true,
+  tiktok: true,
 };
+const OAUTH_PLATFORMS: Array<"linkedin" | "twitter" | "instagram" | "reddit" | "threads" | "youtube" | "tiktok"> = [
+  "linkedin",
+  "twitter",
+  "instagram",
+  "reddit",
+  "threads",
+  "youtube",
+  "tiktok",
+];
 
 function cardKey(card: CardState): string {
   return card.id ? `id-${card.id}` : `platform-${card.platform}`;
@@ -135,6 +154,9 @@ function buildUserProfile(contexts: Record<Platform, string>, referencePosts: Re
 
 function getPlatformLabel(platform: Platform): string {
   if (platform === "twitter") return "x";
+  if (platform === "threads") return "threads";
+  if (platform === "youtube") return "youtube";
+  if (platform === "tiktok") return "tiktok";
   return platform;
 }
 
@@ -186,6 +208,9 @@ export default function HomePage() {
   const [publishJob, setPublishJob] = useState<PublishJob | null>(null);
   const [publishing, setPublishing] = useState(false);
   const [oauthBusyPlatform, setOauthBusyPlatform] = useState<Platform | null>(null);
+  const [setupStatus, setSetupStatus] = useState<SetupStatus | null>(null);
+  const [setupPromptOpen, setSetupPromptOpen] = useState(false);
+  const [oauthConnected, setOauthConnected] = useState<Record<string, boolean>>({});
 
   const [contextOpen, setContextOpen] = useState(false);
   const [optionsOpen, setOptionsOpen] = useState(false);
@@ -198,6 +223,7 @@ export default function HomePage() {
   const [logsLoading, setLogsLoading] = useState(false);
   const [publishLogs, setPublishLogs] = useState<PublishLogItem[]>([]);
   const [threads, setThreads] = useState<SocialThread[]>([]);
+  const [showAdvanced, setShowAdvanced] = useState(false);
   const [scheduleEnabled, setScheduleEnabled] = useState(false);
   const [scheduledAt, setScheduledAt] = useState("");
 
@@ -270,12 +296,39 @@ export default function HomePage() {
         setAvailableProviders(providers);
         setProvider(initialProvider);
         setSelectedModel(providerInfo.defaultModel);
+        const status = await fetchSetupStatus();
+        setSetupStatus(status);
+        const hasLocalKey = Boolean(savedOpenaiApiKey.trim() || savedOpenrouterApiKey.trim());
+        const hasEnvKey = status.llm.envOpenAI || status.llm.envOpenRouter;
+        if (!hasLocalKey && !hasEnvKey) setSetupPromptOpen(true);
       } catch (err) {
         console.error(err);
       }
     };
     void init();
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    const next: Record<string, boolean> = {};
+    for (const platform of OAUTH_PLATFORMS) {
+      next[platform] = window.localStorage.getItem(`hmb_oauth_connected_${platform}`) === "1";
+    }
+    setOauthConnected(next);
+
+    const onMessage = (event: MessageEvent) => {
+      if (event.origin !== window.location.origin) return;
+      const data = (event.data || {}) as { type?: string; platform?: string; ok?: boolean; error?: string };
+      if (data.type !== "hmb_oauth_callback" || !data.platform) return;
+      if (data.ok) {
+        window.localStorage.setItem(`hmb_oauth_connected_${data.platform}`, "1");
+        setOauthConnected((prev) => ({ ...prev, [data.platform!]: true }));
+      } else {
+        alert(data.error || `${data.platform} login failed.`);
+      }
+    };
+    window.addEventListener("message", onMessage);
+    return () => window.removeEventListener("message", onMessage);
   }, []);
 
   useEffect(() => {
@@ -500,6 +553,7 @@ export default function HomePage() {
         draftId,
         acceptedOnly: true,
         scheduledAt: scheduleEnabled && scheduledAt ? new Date(scheduledAt).toISOString() : undefined,
+        publishMode: "browser",
       });
 
       for (let i = 0; i < 20; i += 1) {
@@ -520,13 +574,13 @@ export default function HomePage() {
   const handleOAuthConnect = async (platform: Platform) => {
     try {
       setOauthBusyPlatform(platform);
-      const apiBase = process.env.NEXT_PUBLIC_API_URL || window.location.origin;
-      const redirectUri = `${apiBase.replace(/\/$/, "")}/api/oauth/${platform}/callback`;
-      const { authUrl } = await getOAuthConnectUrl(platform, redirectUri);
-      window.open(authUrl, "_blank", "noopener,noreferrer");
+      const result = await startBrowserLogin(platform, 120000);
+      window.localStorage.setItem(`hmb_oauth_connected_${platform}`, "1");
+      setOauthConnected((prev) => ({ ...prev, [platform]: true }));
+      alert(`${result.message} Browser session is saved for ${platform}.`);
     } catch (err) {
       console.error(err);
-      const message = err instanceof Error ? err.message : "Failed to create OAuth connect URL.";
+      const message = err instanceof Error ? err.message : "Failed to start browser login.";
       alert(message);
     } finally {
       setOauthBusyPlatform(null);
@@ -576,6 +630,51 @@ export default function HomePage() {
 
   return (
     <>
+      {setupPromptOpen && (
+        <div className="fixed inset-0 z-[60] grid place-items-center bg-black/50 p-4 backdrop-blur-sm">
+          <aside className="w-full max-w-lg rounded-2xl border border-zinc-200 bg-white p-5 shadow-xl dark:border-zinc-800 dark:bg-zinc-900">
+            <header className="mb-3">
+              <h2 className="text-base font-semibold text-zinc-900 dark:text-zinc-100">Initial Setup Required</h2>
+              <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                If keys are already in <code>frontend/.env</code>, restart the app and refresh.
+              </p>
+            </header>
+            <div className="space-y-3 text-xs">
+              {setupStatus && !(setupStatus.llm.envOpenAI || setupStatus.llm.envOpenRouter || openaiApiKey || openrouterApiKey) && (
+                <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-amber-800 dark:border-amber-600/60 dark:bg-amber-500/10 dark:text-amber-200">
+                  Add at least one LLM key: <code>OPENAI_API_KEY</code> or <code>OPENROUTER_API_KEY</code>
+                </div>
+              )}
+              <div className="rounded-lg border border-zinc-200 p-3 dark:border-zinc-700">
+                <p className="mb-1 font-semibold text-zinc-700 dark:text-zinc-200">Easy mode (recommended)</p>
+                <p className="text-zinc-600 dark:text-zinc-300">
+                  You do not need OAuth API keys for basic usage.
+                </p>
+                <p className="text-zinc-600 dark:text-zinc-300">
+                  Click each platform <strong>Browser Login</strong> once, then use one-click publish.
+                </p>
+              </div>
+            </div>
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                onClick={() => setSetupPromptOpen(false)}
+                className="rounded-lg border border-zinc-300 px-3 py-2 text-xs dark:border-zinc-700 dark:text-zinc-200"
+              >
+                Close
+              </button>
+              <button
+                onClick={() => {
+                  setSetupPromptOpen(false);
+                  setOptionsOpen(true);
+                }}
+                className="rounded-lg bg-violet-600 px-3 py-2 text-xs font-semibold text-white hover:bg-violet-700 dark:bg-violet-500 dark:hover:bg-violet-600"
+              >
+                Open Options (API Key)
+              </button>
+            </div>
+          </aside>
+        </div>
+      )}
       <ContextPanel
         open={contextOpen}
         contexts={contexts}
@@ -737,17 +836,25 @@ export default function HomePage() {
               <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-[10px] text-zinc-500 dark:bg-zinc-800/60 dark:text-zinc-400">
                 lang: {language}
               </span>
-              {(["linkedin", "twitter", "instagram", "reddit"] as Platform[]).map((platform) => {
+              {(OAUTH_PLATFORMS as Platform[]).map((platform) => {
                 const Icon = getPlatformIcon(platform);
+                const oauthPlatform = platform as "linkedin" | "twitter" | "instagram" | "reddit" | "threads" | "youtube" | "tiktok";
+                const connected = Boolean(oauthConnected[oauthPlatform]);
+                const label = connected ? "Ready" : "Browser Login";
                 return (
                   <button
                     key={platform}
                     onClick={() => void handleOAuthConnect(platform)}
                     disabled={oauthBusyPlatform === platform}
-                    className="inline-flex items-center gap-1 rounded-full bg-zinc-100 px-2 py-0.5 text-[10px] text-zinc-500 transition-colors hover:bg-zinc-200 disabled:opacity-50 dark:bg-zinc-800/60 dark:text-zinc-400 dark:hover:bg-zinc-700/60"
+                    className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] transition-colors disabled:opacity-50 ${
+                      connected
+                        ? "bg-emerald-100 text-emerald-700 hover:bg-emerald-200 dark:bg-emerald-500/20 dark:text-emerald-300"
+                        : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200 dark:bg-zinc-800/60 dark:text-zinc-300 dark:hover:bg-zinc-700/60"
+                    }`}
+                    title={connected ? "Login saved." : "Login once in popup browser."}
                   >
                     <Icon className="h-3 w-3" />
-                    {oauthBusyPlatform === platform ? "..." : "OAuth"}
+                    {oauthBusyPlatform === platform ? "..." : label}
                   </button>
                 );
               })}
@@ -882,60 +989,73 @@ export default function HomePage() {
         </footer>
 
         <section className="mt-4 rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
-          <div className="mb-3 flex items-center justify-between">
-            <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Publish Logs & Platform Threads</h3>
-            <button onClick={() => void refreshPublishData()} className="rounded-lg border border-zinc-300 px-3 py-1.5 text-xs transition-colors hover:border-violet-400 dark:border-zinc-700 dark:text-zinc-100 dark:hover:border-violet-500">
-              {logsLoading ? "Loading..." : "Refresh"}
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Advanced</h3>
+            <button
+              onClick={() => setShowAdvanced((v) => !v)}
+              className="rounded-lg border border-zinc-300 px-3 py-1.5 text-xs transition-colors hover:border-violet-400 dark:border-zinc-700 dark:text-zinc-100 dark:hover:border-violet-500"
+            >
+              {showAdvanced ? "Hide" : "Show"}
             </button>
           </div>
-          <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-            <div className="rounded-xl border border-zinc-200 bg-zinc-50/50 p-3 dark:border-zinc-800 dark:bg-zinc-800/30">
-              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-                <FileText className="mr-1 inline h-3 w-3" /> Promotion Log
-              </p>
-              <div className="max-h-64 space-y-2 overflow-y-auto">
-                {publishLogs.map((log) => (
-                  <div key={log.id} className="rounded-lg border-l-2 border-violet-400 bg-white px-3 py-2 text-xs shadow-sm dark:border-violet-500/60 dark:bg-zinc-800/50">
-                    <p className="font-semibold capitalize text-zinc-900 dark:text-zinc-100">{log.platform} · <span className={log.status === "published" ? "text-emerald-600 dark:text-emerald-400" : "text-zinc-500 dark:text-zinc-400"}>{log.status}</span></p>
-                    <p className="line-clamp-1 text-zinc-600 dark:text-zinc-300">{log.title || "-"}</p>
-                    <p className="text-[11px] text-zinc-500 dark:text-zinc-400">{new Date(log.createdAt).toLocaleString()}</p>
-                    {log.postUrl && (
-                      <a className="text-[11px] text-violet-600 underline dark:text-violet-400" href={log.postUrl} target="_blank" rel="noreferrer">open</a>
+          {showAdvanced && (
+            <div className="mt-3">
+              <div className="mb-3 flex items-center justify-between">
+                <h4 className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Publish Logs & Platform Threads</h4>
+                <button onClick={() => void refreshPublishData()} className="rounded-lg border border-zinc-300 px-3 py-1.5 text-xs transition-colors hover:border-violet-400 dark:border-zinc-700 dark:text-zinc-100 dark:hover:border-violet-500">
+                  {logsLoading ? "Loading..." : "Refresh"}
+                </button>
+              </div>
+              <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+                <div className="rounded-xl border border-zinc-200 bg-zinc-50/50 p-3 dark:border-zinc-800 dark:bg-zinc-800/30">
+                  <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                    <FileText className="mr-1 inline h-3 w-3" /> Promotion Log
+                  </p>
+                  <div className="max-h-64 space-y-2 overflow-y-auto">
+                    {publishLogs.map((log) => (
+                      <div key={log.id} className="rounded-lg border-l-2 border-violet-400 bg-white px-3 py-2 text-xs shadow-sm dark:border-violet-500/60 dark:bg-zinc-800/50">
+                        <p className="font-semibold capitalize text-zinc-900 dark:text-zinc-100">{log.platform} · <span className={log.status === "published" ? "text-emerald-600 dark:text-emerald-400" : "text-zinc-500 dark:text-zinc-400"}>{log.status}</span></p>
+                        <p className="line-clamp-1 text-zinc-600 dark:text-zinc-300">{log.title || "-"}</p>
+                        <p className="text-[11px] text-zinc-500 dark:text-zinc-400">{new Date(log.createdAt).toLocaleString()}</p>
+                        {log.postUrl && (
+                          <a className="text-[11px] text-violet-600 underline dark:text-violet-400" href={log.postUrl} target="_blank" rel="noreferrer">open</a>
+                        )}
+                      </div>
+                    ))}
+                    {!publishLogs.length && (
+                      <div className="flex flex-col items-center gap-1 py-6 text-center">
+                        <FileText className="h-6 w-6 text-zinc-300 dark:text-zinc-600" />
+                        <p className="text-xs text-zinc-400 dark:text-zinc-500">No publish logs yet</p>
+                      </div>
                     )}
                   </div>
-                ))}
-                {!publishLogs.length && (
-                  <div className="flex flex-col items-center gap-1 py-6 text-center">
-                    <FileText className="h-6 w-6 text-zinc-300 dark:text-zinc-600" />
-                    <p className="text-xs text-zinc-400 dark:text-zinc-500">No publish logs yet</p>
+                </div>
+                <div className="rounded-xl border border-zinc-200 bg-zinc-50/50 p-3 dark:border-zinc-800 dark:bg-zinc-800/30">
+                  <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                    <MessageSquare className="mr-1 inline h-3 w-3" /> Platform Threads
+                  </p>
+                  <div className="max-h-64 space-y-2 overflow-y-auto">
+                    {threads.map((thread) => (
+                      <div key={thread.platform} className="rounded-lg border-l-2 border-violet-400 bg-white px-3 py-2 text-xs shadow-sm dark:border-violet-500/60 dark:bg-zinc-800/50">
+                        <p className="mb-1 font-semibold capitalize text-zinc-900 dark:text-zinc-100">{thread.platform}</p>
+                        <div className="space-y-1">
+                          {thread.items.slice(0, 5).map((item) => (
+                            <p key={item.id} className="line-clamp-1 text-zinc-600 dark:text-zinc-300">{item.title || item.body || "-"}</p>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                    {!threads.length && (
+                      <div className="flex flex-col items-center gap-1 py-6 text-center">
+                        <MessageSquare className="h-6 w-6 text-zinc-300 dark:text-zinc-600" />
+                        <p className="text-xs text-zinc-400 dark:text-zinc-500">No platform threads yet</p>
+                      </div>
+                    )}
                   </div>
-                )}
+                </div>
               </div>
             </div>
-            <div className="rounded-xl border border-zinc-200 bg-zinc-50/50 p-3 dark:border-zinc-800 dark:bg-zinc-800/30">
-              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-                <MessageSquare className="mr-1 inline h-3 w-3" /> Platform Threads
-              </p>
-              <div className="max-h-64 space-y-2 overflow-y-auto">
-                {threads.map((thread) => (
-                  <div key={thread.platform} className="rounded-lg border-l-2 border-violet-400 bg-white px-3 py-2 text-xs shadow-sm dark:border-violet-500/60 dark:bg-zinc-800/50">
-                    <p className="mb-1 font-semibold capitalize text-zinc-900 dark:text-zinc-100">{thread.platform}</p>
-                    <div className="space-y-1">
-                      {thread.items.slice(0, 5).map((item) => (
-                        <p key={item.id} className="line-clamp-1 text-zinc-600 dark:text-zinc-300">{item.title || item.body || "-"}</p>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-                {!threads.length && (
-                  <div className="flex flex-col items-center gap-1 py-6 text-center">
-                    <MessageSquare className="h-6 w-6 text-zinc-300 dark:text-zinc-600" />
-                    <p className="text-xs text-zinc-400 dark:text-zinc-500">No platform threads yet</p>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
+          )}
         </section>
       </main>
     </>

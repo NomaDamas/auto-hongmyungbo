@@ -24,7 +24,7 @@ If you can run two commands, you can use it.
 ```bash
 git clone https://github.com/NomaDamas/auto-hongmyungbo.git
 cd auto-hongmyungbo
-./scripts/setup_local.sh
+./scripts/setup_local_easy.sh
 ```
 
 Edit `frontend/.env` (or `frontend/.env.local`) and set (OpenRouter default):
@@ -65,6 +65,10 @@ In `Options`, you can configure at runtime:
 - Temperature / Top-p / Max output tokens
 - API keys (stored locally in your browser)
 
+On first run, if no LLM key is detected, the app opens an **Initial Setup Required** prompt.
+If OAuth env keys are missing, each platform shows **Setup OAuth**.
+Once configured, platforms switch to **Login** and then **Connected** after callback.
+
 ## Use As An Agent Skill
 
 This repository includes an agent-ready skill package:
@@ -102,6 +106,22 @@ Example agent prompts:
 - Accept/Reject queue flow
 - Refine (text + voice input)
 - Local JSON persistence (no external DB required)
+
+## Browser Automation Publish (API-limited Platforms)
+
+If platform APIs are limited, publish can use browser automation fallback (`publishMode: hybrid`).
+
+`./scripts/setup_local_easy.sh` already installs Playwright + Chromium.
+
+2. Login session setup (one time per platform):
+
+- In UI, click platform login buttons.
+- If OAuth env is not configured, the app opens a browser login session and stores local browser profile.
+
+3. Publish:
+
+- Queue Publish uses hybrid mode: API first, browser automation fallback.
+- Saved browser profile is reused for one-click posting attempts.
 
 ## Optional Features (Can Be Added Later)
 

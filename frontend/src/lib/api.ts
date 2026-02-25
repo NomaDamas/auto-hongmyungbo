@@ -12,6 +12,7 @@ import type {
   PublishJob,
   PublishLogItem,
   SocialThread,
+  SetupStatus,
   UserProfile,
 } from "@/lib/types";
 
@@ -119,6 +120,7 @@ export async function enqueuePublish(payload: {
   cardIds?: number[];
   acceptedOnly?: boolean;
   scheduledAt?: string;
+  publishMode?: "api" | "browser" | "hybrid";
 }): Promise<{ jobId: number; status: string }> {
   const res = await apiFetch(`${API_URL}/api/publish`, {
     method: "POST",
@@ -131,6 +133,24 @@ export async function enqueuePublish(payload: {
   }
 
   return (await res.json()) as { jobId: number; status: string };
+}
+
+export async function startBrowserLogin(platform: Platform, waitMs = 120000): Promise<{ ok: boolean; message: string }> {
+  let res: Response;
+  try {
+    res = await apiFetch(`${API_URL}/api/automation/login/${platform}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ waitMs }),
+    });
+  } catch (e) {
+    throw new Error("Could not reach local server. Check that ./scripts/start_local.sh is running.");
+  }
+  if (!res.ok) {
+    const data = (await res.json().catch(() => ({}))) as { detail?: string };
+    throw new Error(data.detail || "Failed to start browser login session");
+  }
+  return (await res.json()) as { ok: boolean; message: string };
 }
 
 export async function getJob(jobId: number): Promise<PublishJob> {
@@ -221,4 +241,23 @@ export async function refineDraft(payload: {
     throw new Error(data.detail || "Draft refinement failed");
   }
   return (await res.json()) as DraftRefineResponse;
+}
+
+export async function fetchSetupStatus(): Promise<SetupStatus> {
+  const res = await apiFetch(`${API_URL}/api/setup/status`);
+  if (!res.ok) {
+    return {
+      llm: { envOpenAI: false, envOpenRouter: false },
+      oauth: {
+        linkedin: { configured: false, missing: ["LINKEDIN_CLIENT_ID", "LINKEDIN_CLIENT_SECRET"] },
+        twitter: { configured: false, missing: ["TWITTER_CLIENT_ID", "TWITTER_CLIENT_SECRET"] },
+        instagram: { configured: false, missing: ["INSTAGRAM_CLIENT_ID", "INSTAGRAM_CLIENT_SECRET"] },
+        reddit: { configured: false, missing: ["REDDIT_CLIENT_ID", "REDDIT_CLIENT_SECRET"] },
+        threads: { configured: false, missing: ["THREADS_CLIENT_ID", "THREADS_CLIENT_SECRET"] },
+        youtube: { configured: false, missing: ["YOUTUBE_CLIENT_ID", "YOUTUBE_CLIENT_SECRET"] },
+        tiktok: { configured: false, missing: ["TIKTOK_CLIENT_KEY", "TIKTOK_CLIENT_SECRET"] },
+      },
+    };
+  }
+  return (await res.json()) as SetupStatus;
 }

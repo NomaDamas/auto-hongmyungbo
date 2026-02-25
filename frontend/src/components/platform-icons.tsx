@@ -35,10 +35,26 @@ export function InstagramIcon(props: IconProps) {
   );
 }
 
-export function BlogIcon(props: IconProps) {
+export function ThreadsIcon(props: IconProps) {
   return (
     <svg viewBox="0 0 16 16" fill="currentColor" width="16" height="16" {...props}>
-      <path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1ZM2.33 8c0-.46.06-.9.16-1.33h2.84c-.05.43-.08.87-.08 1.33s.03.9.08 1.33H2.5A5.67 5.67 0 0 1 2.33 8Zm.6-2.67h2.5a11.3 11.3 0 0 1 .87-2.6A5.7 5.7 0 0 0 2.93 5.33Zm2.5 5.34h-2.5a5.7 5.7 0 0 0 3.37 2.6 11.3 11.3 0 0 1-.87-2.6Zm1.3 0c.36 1.27.87 2.24 1.27 2.8.4-.56.91-1.53 1.27-2.8H6.73Zm2.76-1.34H6.5c-.05-.42-.08-.87-.08-1.33s.03-.91.08-1.33H9.5c.05.42.08.87.08 1.33s-.03.91-.08 1.33Zm.24-4H6.27c.36-1.27.87-2.24 1.27-2.8.4.56.91 1.53 1.27 2.8h-.08Zm.94 0h2.5a5.7 5.7 0 0 0-3.37-2.6c.4.7.72 1.58.87 2.6Zm2.84 1.34h-2.84c.05.43.08.87.08 1.33s-.03.9-.08 1.33h2.84c.1-.43.16-.87.16-1.33s-.06-.9-.16-1.33Zm-2.34 4h2.5a5.7 5.7 0 0 1-3.37 2.6c.4-.7.72-1.58.87-2.6Z" />
+      <path d="M9.9 6.6c-.3-1.2-1.2-1.9-2.6-1.9-1.6 0-2.8 1.1-2.8 2.8 0 1.9 1.4 3.2 3.5 3.2 1.5 0 2.7-.7 3-2.2h-1.2c-.2.8-.9 1.2-1.8 1.2-1.3 0-2.2-.8-2.2-2.1 0-1.1.7-1.9 1.7-1.9.9 0 1.4.5 1.6 1.3-.5 0-1 .1-1.4.3-.9.3-1.4 1-1.4 1.8 0 1 .8 1.7 2 1.7 1.4 0 2.3-.8 2.3-2.2 0-.2 0-.5-.1-.8Zm-1.3 2.2c0 .7-.4 1.1-1 1.1-.5 0-.9-.3-.9-.8 0-.4.2-.7.8-.9.3-.1.7-.2 1.1-.2v.8Z" />
+    </svg>
+  );
+}
+
+export function YoutubeIcon(props: IconProps) {
+  return (
+    <svg viewBox="0 0 16 16" fill="currentColor" width="16" height="16" {...props}>
+      <path d="M14.7 4.5a1.8 1.8 0 0 0-1.3-1.3C12.2 3 8 3 8 3s-4.2 0-5.4.2A1.8 1.8 0 0 0 1.3 4.5C1 5.7 1 8 1 8s0 2.3.3 3.5a1.8 1.8 0 0 0 1.3 1.3C3.8 13 8 13 8 13s4.2 0 5.4-.2a1.8 1.8 0 0 0 1.3-1.3C15 10.3 15 8 15 8s0-2.3-.3-3.5ZM6.6 10.4V5.6L10.6 8l-4 2.4Z" />
+    </svg>
+  );
+}
+
+export function TiktokIcon(props: IconProps) {
+  return (
+    <svg viewBox="0 0 16 16" fill="currentColor" width="16" height="16" {...props}>
+      <path d="M10.3 2.2h1.7c.2 1 .8 1.8 1.8 2.1v1.8a4.3 4.3 0 0 1-1.8-.5v4a3.6 3.6 0 1 1-3.6-3.6c.2 0 .4 0 .6.1v1.9a1.8 1.8 0 1 0 1.3 1.7V2.2Z" />
     </svg>
   );
 }
@@ -53,9 +69,13 @@ export function getPlatformIcon(platform: string) {
       return TwitterIcon;
     case "instagram":
       return InstagramIcon;
-    case "blog":
-      return BlogIcon;
+    case "threads":
+      return ThreadsIcon;
+    case "youtube":
+      return YoutubeIcon;
+    case "tiktok":
+      return TiktokIcon;
     default:
-      return BlogIcon;
+      return ThreadsIcon;
   }
 }
