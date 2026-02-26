@@ -2,46 +2,46 @@
 
 ![Auto-HongMyungbo Preview](docs/images/ddalcak_myungbo.png)
 
-하나의 초안(Draft)으로 여러 SNS용 글을 만들고, 수정하고, 순차 발행까지 할 수 있는 로컬 실행 도구입니다.
+A local tool that turns one draft into multi-platform SNS posts, lets you refine them, and publish in sequence.
 
-## 목차
+## Table of Contents
 
-- [1. 이 프로젝트가 하는 일](#1-이-프로젝트가-하는-일)
-- [2. 정말 쉬운 설치 (처음 사용자용)](#2-정말-쉬운-설치-처음-사용자용)
-- [3. 첫 실행](#3-첫-실행)
-- [4. 실제 사용 방법 (처음부터 끝까지)](#4-실제-사용-방법-처음부터-끝까지)
-- [5. 핵심 기능 빠르게 이해하기](#5-핵심-기능-빠르게-이해하기)
-- [6. 로그인/발행 동작 방식](#6-로그인발행-동작-방식)
-- [7. 자주 나는 오류와 해결](#7-자주-나는-오류와-해결)
-- [8. 프로젝트 구조](#8-프로젝트-구조)
+- [1. What This Project Does](#1-what-this-project-does)
+- [2. Easy Setup (First-Time Users)](#2-easy-setup-first-time-users)
+- [3. First Run](#3-first-run)
+- [4. End-to-End Usage](#4-end-to-end-usage)
+- [5. Core Features at a Glance](#5-core-features-at-a-glance)
+- [6. How Login and Publish Work](#6-how-login-and-publish-work)
+- [7. Common Errors and Fixes](#7-common-errors-and-fixes)
+- [8. Project Structure](#8-project-structure)
 
-## 1. 이 프로젝트가 하는 일
+## 1. What This Project Does
 
-- Next.js 하나로 UI + API가 같이 실행됩니다.
-- 외부 DB 없이 로컬 파일(`local_store.json`)에 상태를 저장합니다.
-- 기본 발행 방식은 브라우저 자동화(Playwright)입니다.
-- 지원 흐름:
-  - Draft 작성
-  - 플랫폼별 생성
+- Runs UI + API together in a single Next.js app.
+- Stores state in a local file (`local_store.json`) without an external DB.
+- Uses browser automation (Playwright) as the default publishing method.
+- Supported flow:
+  - Write Draft
+  - Generate per platform
   - Preview/Edit
-  - Queue 관리
-  - 순차 발행 (`Post Next Platform`, `Post All (Beta)`)
+  - Manage Queue
+  - Sequential publish (`Post Next Platform`, `Post All (Beta)`)
 
-## 2. 정말 쉬운 설치 (처음 사용자용)
+## 2. Easy Setup (First-Time Users)
 
-### 2-1. 준비물
+### 2-1. Requirements
 
-- macOS / Linux / Windows(WSL 권장)
+- macOS / Linux / Windows (WSL recommended)
 - Git
-- Node.js 20 이상
-- 터미널
-- LLM API Key 1개 이상
-  - OpenAI 또는 OpenRouter (필수 수준)
-  - Anthropic / Grok / Gemini (선택)
+- Node.js 20+
+- Terminal
+- At least one LLM API key:
+  - OpenAI or OpenRouter (recommended baseline)
+  - Anthropic / Grok / Gemini (optional)
 
-API 키 발급 가이드는 `docs/API_KEYS.md` 참고
+See `docs/API_KEYS.md` for API key setup.
 
-### 2-2. 설치 명령
+### 2-2. Install
 
 ```bash
 git clone https://github.com/NomaDamas/auto-hongmyungbo.git
@@ -49,132 +49,132 @@ cd auto-hongmyungbo
 ./scripts/setup_local_easy.sh
 ```
 
-### 2-3. 환경변수 파일 만들기
+### 2-3. Create Environment File
 
-`frontend/.env` 또는 `frontend/.env.local` 파일 생성:
+Create `frontend/.env` or `frontend/.env.local`:
 
 ```env
-# 최소 1개는 필요
+# At least one is required
 OPENROUTER_API_KEY=your_key_here
-# 또는
+# or
 OPENAI_API_KEY=your_key_here
 
-# 선택
+# Optional
 ANTHROPIC_API_KEY=your_key_here
 GROK_API_KEY=your_key_here
 GEMINI_API_KEY=your_key_here
 ```
 
-Instagram 자동 업로드까지 쓰고 싶다면:
+If you want Instagram auto-upload support:
 
 ```env
 INSTAGRAM_MEDIA_PATH=docs/images/sample.jpg
 ```
 
-## 3. 첫 실행
+## 3. First Run
 
 ```bash
 ./scripts/start_local.sh
 ```
 
-브라우저에서 열기:
+Open in browser:
 
 - `http://localhost:3000`
 
-종료:
+Stop server:
 
-- 서버 실행 터미널에서 `Ctrl + C`
+- `Ctrl + C` in the terminal running the app
 
-## 4. 실제 사용 방법 (처음부터 끝까지)
+## 4. End-to-End Usage
 
-### Step 1) Draft 작성
+### Step 1) Write Draft
 
-왼쪽 `Draft` 박스에 초안을 붙여넣습니다.
+Paste your rough draft into the left `Draft` box.
 
-### Step 2) 옵션 설정
+### Step 2) Configure Options
 
-`Options`에서 아래를 설정합니다.
+In `Options`, set:
 
 - Provider
 - Model
 - API Keys
-- Thinking / Temperature / Token 등
+- Thinking / Temperature / Token settings
 
-### Step 3) (선택) Draft 강화
+### Step 3) Optional Draft Enhancement
 
-- `Draft Idea Booster`: 아이디어 구조화
-- `Aggro Pingpong`: 강한 훅 아이디어
-- `Phrase Booster`: 특정 문구를 더 강하게
-  - Draft에서 문구를 드래그하면 `Phrase Booster` 버튼이 뜸
-  - 클릭하면 채팅형 패널에서 표현 강화 가능
+- `Draft Idea Booster`: structure your idea
+- `Aggro Pingpong`: stronger hook exploration
+- `Phrase Booster`: improve selected wording
+  - Select text in Draft to show the `Phrase Booster` button
+  - Click it to open a chat-style panel for wording improvements
 
-### Step 4) 플랫폼별 생성
+### Step 4) Generate by Platform
 
-`Generate N Platforms` 클릭
+Click `Generate N Platforms`.
 
-- 생성 중 버튼 hover 시 `Cancel`이 나타나고 취소할 수 있음
+- While generating, hover the button to reveal `Cancel`.
 
-### Step 5) 결과 검토
+### Step 5) Review Results
 
-오른쪽 `Platform Results`에서:
+In `Platform Results`:
 
-- Preview로 읽기
-- Edit로 수정
+- Read in Preview
+- Edit directly
 - Accept / Reject
 
-Accept하면 Queue로 이동합니다.
+Accepted cards move to Queue.
 
-### Step 6) 로그인
+### Step 6) Login
 
-각 플랫폼의 `Browser Login` 버튼으로 1회 로그인합니다.
+Use each platform’s `Browser Login` once.
 
-- Connected가 떠도 발행 전에 재검증(preflight)됩니다.
+- Even when `Connected` is shown, preflight login verification runs before publish.
 
-### Step 7) 발행
+### Step 7) Publish
 
-- `Post Next Platform`: 가이드형, 한 플랫폼씩
-- `Post All (Beta)`: Queue를 순차 자동 발행
-- Queue 카드별 `Publish now`: 개별 발행
+- `Post Next Platform`: guided one-by-one publishing
+- `Post All (Beta)`: sequential publish for all queued cards
+- `Publish now` on each queue card: one-off publish
 
-실패 시:
+If a publish fails:
 
-- 해당 플랫폼에서 멈추고 재시도/수동 전환 가능
+- You can retry from that platform or continue manually.
 
-## 5. 핵심 기능 빠르게 이해하기
+## 5. Core Features at a Glance
 
 ### Preview vs Edit
 
-- Preview: 읽기 중심
-- Edit: 직접 수정
+- Preview: reading-focused
+- Edit: direct content editing
 
-### Compare mode
+### Compare Mode
 
-- OFF(기본): 한 플랫폼 집중 보기
-- ON: 여러 플랫폼 비교 보기
+- OFF (default): focused single-platform view
+- ON: side-by-side platform comparison
 
 ### Saved Drafts
 
-- 자동 저장된 초안 이력 복원 가능
-- 삭제하면 로컬 히스토리에서도 제거됨
+- Restore auto-saved draft history
+- Deleting also removes it from local history
 
 ### Theme (Dark/Light)
 
-- 화면 우하단 해/달 버튼으로 전환
-- 선택값은 브라우저에 저장됨
+- Toggle with the sun/moon button (bottom-right)
+- Preference is saved in browser storage
 
-## 6. 로그인/발행 동작 방식
+## 6. How Login and Publish Work
 
-- 로그인 상태는 실제 브라우저 세션 기준으로 판단합니다.
-- 발행 전 로그인 preflight 체크가 들어갑니다.
-- 수동 발행 플랫폼(예: Reddit 등)은 창/탭 이탈까지 감지해 stuck 상태를 줄였습니다.
-- 실패 시 Queue 유지, 성공 시 Queue에서 제거됩니다.
+- Login state is determined from real browser session state.
+- Preflight login checks run before publish.
+- Manual-heavy platforms (for example Reddit) now detect leave/close events to reduce stuck states.
+- On success, items are removed from Queue; on failure, they remain for retry.
 
-## 7. 자주 나는 오류와 해결
+## 7. Common Errors and Fixes
 
 ### 1) `OpenAI/OpenRouter not configured`
 
-- `frontend/.env` 확인
-- 서버 재시작: `./scripts/start_local.sh`
+- Check `frontend/.env`
+- Restart server: `./scripts/start_local.sh`
 
 ### 2) `Playwright not installed`
 
@@ -184,28 +184,28 @@ Accept하면 Queue로 이동합니다.
 
 ### 3) `LLM request failed: unsupported parameter/value`
 
-- 일부 최신 모델은 sampling 파라미터 제한이 있습니다.
-- 현재 코드는 자동 fallback 재시도를 포함합니다.
-- 계속 실패하면 다른 모델로 바꿔서 테스트하세요.
+- Some latest models restrict sampling parameters.
+- The app includes automatic fallback retries.
+- If it still fails, switch model and test again.
 
-### 4) 로그인은 Connected인데 발행 실패
+### 4) Connected login but publish fails
 
-- 해당 플랫폼 `Disconnect` 후 `Browser Login` 재실행
-- 플랫폼 사이트 UI 변경으로 자동화가 실패할 수 있음 (수동 완료 가능)
+- Click `Disconnect` for that platform, then run `Browser Login` again
+- Platform UI changes can break automation; manual completion is still possible
 
-### 5) Queue가 안 비워짐
+### 5) Queue does not flush
 
-- 발행 로그 상태 확인 후 새로고침 1회
+- Check publish logs/status and refresh once
 
-## 8. 프로젝트 구조
+## 8. Project Structure
 
 ```text
 .
 ├── frontend/
 │   ├── src/app/api/      # Next.js API routes
 │   ├── src/components/   # UI components
-│   ├── src/lib/          # client helpers/types
+│   ├── src/lib/          # Client helpers/types
 │   └── src/server/       # LLM + store + automation logic
-├── scripts/              # setup/run scripts
-└── docs/                 # docs + images
+├── scripts/              # Setup/run scripts
+└── docs/                 # Docs + images
 ```
