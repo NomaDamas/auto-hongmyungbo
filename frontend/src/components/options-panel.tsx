@@ -214,6 +214,36 @@ export function OptionsPanel({
                     className="mt-1 w-full rounded-md border border-zinc-300 bg-white px-2 py-1.5 text-xs dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
                   />
                 </label>
+                <label className="block text-[11px] font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                  Anthropic API key (DOM automation fallback)
+                  <input
+                    type="password"
+                    value={draftDomApiKeys.anthropic || ""}
+                    onChange={(e) => setDraftDomApiKeys((prev) => ({ ...prev, anthropic: e.target.value }))}
+                    placeholder="sk-ant-..."
+                    className="mt-1 w-full rounded-md border border-zinc-300 bg-white px-2 py-1.5 text-xs dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
+                  />
+                </label>
+                <label className="block text-[11px] font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                  xAI Grok API key (DOM automation fallback)
+                  <input
+                    type="password"
+                    value={draftDomApiKeys.grok || ""}
+                    onChange={(e) => setDraftDomApiKeys((prev) => ({ ...prev, grok: e.target.value }))}
+                    placeholder="xai-..."
+                    className="mt-1 w-full rounded-md border border-zinc-300 bg-white px-2 py-1.5 text-xs dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
+                  />
+                </label>
+                <label className="block text-[11px] font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                  Google Gemini API key (DOM automation fallback)
+                  <input
+                    type="password"
+                    value={draftDomApiKeys.gemini || ""}
+                    onChange={(e) => setDraftDomApiKeys((prev) => ({ ...prev, gemini: e.target.value }))}
+                    placeholder="AIza..."
+                    className="mt-1 w-full rounded-md border border-zinc-300 bg-white px-2 py-1.5 text-xs dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
+                  />
+                </label>
               </div>
             )}
           </div>
@@ -323,44 +353,10 @@ export function OptionsPanel({
                     Uses your existing {draftDomProvider === "openai" ? "OpenAI" : "OpenRouter"} API key from above.
                   </p>
                 )}
-
-                {draftDomProvider === "anthropic" && (
-                  <label className="block text-[11px] font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-                    Anthropic API key
-                    <input
-                      type="password"
-                      value={draftDomApiKeys.anthropic || ""}
-                      onChange={(e) => setDraftDomApiKeys((prev) => ({ ...prev, anthropic: e.target.value }))}
-                      placeholder="sk-ant-..."
-                      className="mt-1 w-full rounded-md border border-zinc-300 bg-white px-2 py-1.5 text-xs dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
-                    />
-                  </label>
-                )}
-
-                {draftDomProvider === "grok" && (
-                  <label className="block text-[11px] font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-                    xAI (Grok) API key
-                    <input
-                      type="password"
-                      value={draftDomApiKeys.grok || ""}
-                      onChange={(e) => setDraftDomApiKeys((prev) => ({ ...prev, grok: e.target.value }))}
-                      placeholder="xai-..."
-                      className="mt-1 w-full rounded-md border border-zinc-300 bg-white px-2 py-1.5 text-xs dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
-                    />
-                  </label>
-                )}
-
-                {draftDomProvider === "gemini" && (
-                  <label className="block text-[11px] font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-                    Google Gemini API key
-                    <input
-                      type="password"
-                      value={draftDomApiKeys.gemini || ""}
-                      onChange={(e) => setDraftDomApiKeys((prev) => ({ ...prev, gemini: e.target.value }))}
-                      placeholder="AIza..."
-                      className="mt-1 w-full rounded-md border border-zinc-300 bg-white px-2 py-1.5 text-xs dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
-                    />
-                  </label>
+                {(draftDomProvider === "anthropic" || draftDomProvider === "grok" || draftDomProvider === "gemini") && (
+                  <p className="text-[11px] text-zinc-400 dark:text-zinc-500">
+                    This provider uses the API key configured in the API Keys section above.
+                  </p>
                 )}
               </div>
             )}
