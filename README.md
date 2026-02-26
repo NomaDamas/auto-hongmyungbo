@@ -3,9 +3,7 @@
 <img width="1230" height="444" alt="image" src="https://github.com/user-attachments/assets/a90d5fc5-457a-43c5-ba19-9d7af3c722df" />
 
 
-<video width="600" controls>
-  <source src="./docs/images/demo.mp4" type="video/mp4">
-</video>
+<video src="./docs/images/demo.mp4" controls width="600"></video>
 
 
 A local tool that turns one draft into multi-platform SNS posts, lets you refine them, and publish in sequence.
