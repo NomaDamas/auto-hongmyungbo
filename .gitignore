@@ -16,3 +16,4 @@ frontend/.browser-profiles/
 
 # OS
 .DS_Store
+frontend/tsconfig.tsbuildinfo
