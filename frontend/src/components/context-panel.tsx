@@ -1,9 +1,22 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import type { LanguageOption, LanguageSettingOption, PerPlatformLanguageMap, Platform } from "@/lib/types";
+import type { LanguageOption, LanguageSettingOption, PerPlatformLanguageMap, Platform, StyleHistoryEntry, StyleHistoryMap } from "@/lib/types";
 
-const PLATFORM_ORDER: Platform[] = ["instagram", "twitter", "linkedin", "reddit", "blog"];
+const PLATFORM_ORDER: Platform[] = ["instagram", "threads", "twitter", "youtube", "tiktok", "linkedin", "reddit"];
+const STYLE_HISTORY_KEY = "hmb_style_history_v1";
+const MAX_STYLE_HISTORY_PER_PLATFORM = 10;
+
+function platformLabel(platform: Platform): string {
+  if (platform === "twitter") return "X";
+  if (platform === "threads") return "Threads";
+  if (platform === "youtube") return "YouTube";
+  if (platform === "tiktok") return "TikTok";
+  if (platform === "linkedin") return "LinkedIn";
+  if (platform === "instagram") return "Instagram";
+  if (platform === "reddit") return "Reddit";
+  return platform;
+}
 
 type Props = {
   open: boolean;
@@ -35,13 +48,15 @@ export function ContextPanel({
   onClose,
   onSave,
 }: Props) {
-  const [tab, setTab] = useState<Platform>("instagram");
+  const [tab, setTab] = useState<Platform>("threads");
   const [draftContexts, setDraftContexts] = useState<Record<Platform, string>>(contexts);
   const [draftReferencePosts, setDraftReferencePosts] = useState<Record<Platform, string[]>>(referencePosts);
   const [draftEnabled, setDraftEnabled] = useState<Record<Platform, boolean>>(enabledPlatforms);
   const [draftAutoPublish, setDraftAutoPublish] = useState(autoPublish);
   const [draftLanguage, setDraftLanguage] = useState<LanguageSettingOption>(language);
   const [draftPerPlatformLanguages, setDraftPerPlatformLanguages] = useState<PerPlatformLanguageMap>(perPlatformLanguages);
+  const [styleHistory, setStyleHistory] = useState<StyleHistoryMap>({});
+  const [styleHistoryLabel, setStyleHistoryLabel] = useState("");
 
   useEffect(() => {
     if (!open) return;
@@ -51,13 +66,58 @@ export function ContextPanel({
     setDraftAutoPublish(autoPublish);
     setDraftLanguage(language);
     setDraftPerPlatformLanguages(perPlatformLanguages);
+    try {
+      const raw = window.localStorage.getItem(STYLE_HISTORY_KEY);
+      const loaded = raw ? (JSON.parse(raw) as StyleHistoryMap) : {};
+      setStyleHistory(loaded && typeof loaded === "object" ? loaded : {});
+    } catch {
+      setStyleHistory({});
+    }
   }, [autoPublish, contexts, enabledPlatforms, language, open, perPlatformLanguages, referencePosts]);
 
   const currentValue = useMemo(() => draftContexts[tab] ?? "", [draftContexts, tab]);
   const currentReferencePosts = useMemo(() => (draftReferencePosts[tab] ?? []).join("\n---\n"), [draftReferencePosts, tab]);
+  const currentTabHistory = useMemo(() => styleHistory[tab] ?? [], [styleHistory, tab]);
   const languageMode = draftLanguage === "per_platform" ? "per_platform" : "unified";
 
   if (!open) return null;
+
+  const persistStyleHistory = (next: StyleHistoryMap) => {
+    setStyleHistory(next);
+    window.localStorage.setItem(STYLE_HISTORY_KEY, JSON.stringify(next));
+  };
+
+  const saveStyleHistory = () => {
+    const label = styleHistoryLabel.trim();
+    const text = currentReferencePosts.trim();
+    if (!label || !text) return;
+    const entry: StyleHistoryEntry = {
+      id: crypto.randomUUID(),
+      label,
+      text,
+      createdAt: new Date().toISOString(),
+    };
+    const existing = styleHistory[tab] ?? [];
+    const next = [entry, ...existing].slice(0, MAX_STYLE_HISTORY_PER_PLATFORM);
+    persistStyleHistory({ ...styleHistory, [tab]: next });
+    setStyleHistoryLabel("");
+  };
+
+  const applyStyleHistory = (entry: StyleHistoryEntry) => {
+    setDraftReferencePosts((prev) => ({
+      ...prev,
+      [tab]: entry.text
+        .split(/\n\s*---+\s*\n/g)
+        .map((part) => part.trim())
+        .filter(Boolean),
+    }));
+  };
+
+  const deleteStyleHistory = (entryId: string) => {
+    const existing = styleHistory[tab] ?? [];
+    const next = existing.filter((e) => e.id !== entryId);
+    persistStyleHistory({ ...styleHistory, [tab]: next });
+  };
 
   const handleSave = () => {
     onSave({
@@ -97,7 +157,7 @@ export function ContextPanel({
                   checked={draftEnabled[p]}
                   onChange={(e) => setDraftEnabled((prev) => ({ ...prev, [p]: e.target.checked }))}
                 />
-                <span className="text-zinc-700 dark:text-zinc-200">{p}</span>
+                <span className="text-zinc-700 dark:text-zinc-200">{platformLabel(p)}</span>
               </label>
             ))}
           </div>
@@ -148,7 +208,7 @@ export function ContextPanel({
             <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
               {PLATFORM_ORDER.map((platform) => (
                 <label key={platform} className="rounded-md border border-zinc-200 p-2 text-xs dark:border-zinc-700">
-                  <span className="mb-1 block capitalize text-zinc-700 dark:text-zinc-200">{platform}</span>
+                  <span className="mb-1 block text-zinc-700 dark:text-zinc-200">{platformLabel(platform)}</span>
                   <select
                     value={draftPerPlatformLanguages[platform]}
                     onChange={(e) =>
@@ -178,7 +238,7 @@ export function ContextPanel({
                   : "border border-zinc-300 text-zinc-700 hover:border-violet-300 dark:border-zinc-700 dark:text-zinc-200 dark:hover:border-violet-500/50"
               }`}
             >
-              {p}
+              {platformLabel(p)}
             </button>
           ))}
         </div>
@@ -208,6 +268,62 @@ export function ContextPanel({
           placeholder={"Paste multiple posts and separate each with:\n---"}
           className="h-[28vh] w-full rounded-2xl border border-zinc-300 bg-white px-3 py-3 text-sm outline-none focus:ring-2 focus:ring-violet-400/50 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100 dark:focus:ring-violet-500/40"
         />
+
+        <div className="mt-3 rounded-xl border border-zinc-200 p-3 dark:border-zinc-700">
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-600 dark:text-zinc-300">
+            Style History — {tab}
+          </p>
+          <div className="flex flex-wrap items-center gap-2">
+            <input
+              value={styleHistoryLabel}
+              onChange={(e) => setStyleHistoryLabel(e.target.value)}
+              placeholder="Style name"
+              className="min-w-[160px] flex-1 rounded-md border border-zinc-300 bg-white px-2 py-1.5 text-xs dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
+            />
+            <button
+              type="button"
+              onClick={saveStyleHistory}
+              disabled={!styleHistoryLabel.trim() || !currentReferencePosts.trim()}
+              className="rounded-md border border-zinc-300 px-2 py-1 text-xs disabled:opacity-40 dark:border-zinc-700 dark:text-zinc-200"
+            >
+              Save Current
+            </button>
+          </div>
+          {currentTabHistory.length > 0 && (
+            <ul className="mt-2 space-y-1.5">
+              {currentTabHistory.map((entry) => (
+                <li
+                  key={entry.id}
+                  className="flex items-start gap-2 rounded-lg border border-zinc-100 p-2 dark:border-zinc-800"
+                >
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-medium text-zinc-800 dark:text-zinc-200">{entry.label}</p>
+                    <p className="truncate text-[11px] text-zinc-500 dark:text-zinc-400">
+                      {entry.text.slice(0, 60)}{entry.text.length > 60 ? "..." : ""}
+                    </p>
+                    <p className="text-[10px] text-zinc-400 dark:text-zinc-500">
+                      {new Date(entry.createdAt).toLocaleDateString()}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => applyStyleHistory(entry)}
+                    className="shrink-0 rounded-md border border-violet-300 px-2 py-0.5 text-[11px] text-violet-600 dark:border-violet-700 dark:text-violet-300"
+                  >
+                    Apply
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => deleteStyleHistory(entry.id)}
+                    className="shrink-0 rounded-md border border-rose-300 px-2 py-0.5 text-[11px] text-rose-600 dark:border-rose-700 dark:text-rose-300"
+                  >
+                    Delete
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
 
         <div className="mt-4 flex items-center justify-end gap-2">
           <button

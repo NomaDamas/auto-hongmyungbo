@@ -38,13 +38,32 @@ type PublishLog = {
   createdAt: string;
 };
 
+export type StoredOAuthToken = {
+  accessToken: string;
+  refreshToken?: string;
+  tokenType?: string;
+  scope?: string;
+  expiresAt?: string;
+  accountId?: string;
+  updatedAt: string;
+  raw?: Record<string, unknown>;
+};
+
+type OAuthState = {
+  platform: string;
+  redirectUri: string;
+  codeVerifier?: string;
+  createdAt: string;
+};
+
 type LocalState = {
   counters: Record<string, number>;
   drafts: Array<{ id: number; rawText: string; createdAt: string }>;
   cards: StoredCard[];
   jobs: StoredJob[];
   publishLogs: PublishLog[];
-  oauthTokens: Record<string, { accessToken: string; updatedAt: string }>;
+  oauthTokens: Record<string, StoredOAuthToken>;
+  oauthStates: Record<string, OAuthState>;
 };
 
 const STORE_PATH = process.env.STORE_PATH || path.join(process.cwd(), "local_store.json");
@@ -56,6 +75,7 @@ const initialState: LocalState = {
   jobs: [],
   publishLogs: [],
   oauthTokens: {},
+  oauthStates: {},
 };
 
 let cache: LocalState | null = null;
@@ -89,6 +109,7 @@ function ensureLoaded(): LocalState {
       jobs: [...(parsed.jobs || [])],
       publishLogs: [...(parsed.publishLogs || [])],
       oauthTokens: { ...(parsed.oauthTokens || {}) },
+      oauthStates: { ...(parsed.oauthStates || {}) },
     };
   } catch {
     cache = structuredClone(initialState);
@@ -239,13 +260,33 @@ export function listThreadsByPlatform(limitPerPlatform = 20): Record<string, Pub
   return grouped;
 }
 
-export function upsertOAuthToken(platform: string, accessToken: string): void {
+export function upsertOAuthToken(platform: string, token: Omit<StoredOAuthToken, "updatedAt">): void {
   const state = ensureLoaded();
-  state.oauthTokens[platform] = { accessToken, updatedAt: nowIso() };
+  state.oauthTokens[platform] = { ...token, updatedAt: nowIso() };
   save();
 }
 
-export function getOAuthToken(platform: string): string | null {
+export function getOAuthToken(platform: string): StoredOAuthToken | null {
   const state = ensureLoaded();
-  return state.oauthTokens[platform]?.accessToken || null;
+  return state.oauthTokens[platform] || null;
+}
+
+export function createOAuthState(input: { state: string; platform: string; redirectUri: string; codeVerifier?: string }): void {
+  const state = ensureLoaded();
+  state.oauthStates[input.state] = {
+    platform: input.platform,
+    redirectUri: input.redirectUri,
+    codeVerifier: input.codeVerifier,
+    createdAt: nowIso(),
+  };
+  save();
+}
+
+export function consumeOAuthState(stateId: string): OAuthState | null {
+  const state = ensureLoaded();
+  const value = state.oauthStates[stateId];
+  if (!value) return null;
+  delete state.oauthStates[stateId];
+  save();
+  return value;
 }

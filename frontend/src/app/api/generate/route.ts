@@ -4,7 +4,7 @@ import { fail, ok } from "@/server/http";
 
 export const runtime = "nodejs";
 
-const ALLOWED_PLATFORMS = new Set(["reddit", "linkedin", "twitter", "instagram", "blog"]);
+const ALLOWED_PLATFORMS = new Set(["reddit", "linkedin", "twitter", "instagram", "threads", "youtube", "tiktok"]);
 
 export async function POST(request: Request) {
   try {
@@ -26,7 +26,7 @@ export async function POST(request: Request) {
     };
     if (!body.draft || !body.draft.trim()) return fail("draft is required", 400);
     const platforms = (body.platforms || []).filter((p): p is any => ALLOWED_PLATFORMS.has(p));
-    const selectedPlatforms = platforms.length ? platforms : ["reddit", "linkedin", "twitter", "instagram", "blog"];
+    const selectedPlatforms = platforms.length ? platforms : ["reddit", "linkedin", "twitter", "instagram", "threads", "youtube", "tiktok"];
     const llm = makeClient({ headers: request.headers, provider: body.provider, model: body.model });
 
     const cards = await Promise.all(

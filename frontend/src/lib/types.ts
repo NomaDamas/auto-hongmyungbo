@@ -1,7 +1,7 @@
-export type Platform = "reddit" | "linkedin" | "twitter" | "instagram" | "blog";
+export type Platform = "reddit" | "linkedin" | "twitter" | "instagram" | "threads" | "youtube" | "tiktok";
 
 export type ModelOption = string;
-export type ProviderOption = "openai" | "openrouter";
+export type ProviderOption = "openai" | "openrouter" | "anthropic" | "grok" | "gemini";
 export type ReasoningEffortOption = "minimal" | "low" | "medium" | "high";
 export type LanguageOption = "auto" | "korean" | "english" | "japanese";
 export type LanguageSettingOption = LanguageOption | "per_platform";
@@ -123,4 +123,41 @@ export type DraftRefineResponse = {
   angles: DraftRefineAngle[];
   attentionGuide?: DraftRefineAttentionGuide;
   polishedDraft: string;
+};
+
+export type StyleHistoryEntry = {
+  id: string;
+  label: string;
+  text: string;
+  createdAt: string;
+};
+
+export type StyleHistoryMap = Partial<Record<Platform, StyleHistoryEntry[]>>;
+
+export type DomLlmProvider = "openai" | "openrouter" | "anthropic" | "grok" | "gemini";
+
+export type DomLlmConfig = {
+  provider: DomLlmProvider;
+  apiKey?: string; // runtime key (for anthropic/grok/gemini)
+};
+
+export type SavedDraftSnapshot = {
+  id: string;
+  draft: string;
+  cards: CardState[];
+  createdAt: string;
+};
+
+export type SetupStatus = {
+  llm: {
+    envOpenAI: boolean;
+    envOpenRouter: boolean;
+  };
+  oauth: Record<
+    "linkedin" | "twitter" | "instagram" | "reddit" | "threads" | "youtube" | "tiktok",
+    {
+      configured: boolean;
+      missing: string[];
+    }
+  >;
 };

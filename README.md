@@ -2,40 +2,47 @@
 
 ![Auto-HongMyungbo Preview](docs/images/ddalcak_myungbo.png)
 
-Generate platform-specific social post drafts from one input and review them in a built-in preview UI.
+Generate multi-platform social drafts from one input, refine them, and publish with a local-first workflow.
 
-This repo is optimized for **easy local usage**.  
-If you can run two commands, you can use it.
+## Index
 
-## Architecture (Current)
+- [1. What This Project Is](#1-what-this-project-is)
+- [2. Who This Is For](#2-who-this-is-for)
+- [3. 5-Minute Setup](#3-5-minute-setup)
+- [4. First Run (Non-Technical Step-by-Step)](#4-first-run-non-technical-step-by-step)
+- [5. Daily Usage Flow](#5-daily-usage-flow)
+- [6. Platform Login & Publish Behavior](#6-platform-login--publish-behavior)
+- [7. Instagram Special Flow](#7-instagram-special-flow)
+- [8. Troubleshooting](#8-troubleshooting)
+- [9. Project Structure](#9-project-structure)
 
-- Single runtime: **Next.js (frontend + server routes)**
-- No standalone FastAPI server required for local OSS usage
-- Local persistence file: `local_store.json` (configurable with `STORE_PATH`)
+## 1. What This Project Is
 
-## What You Need
+- Single runtime: Next.js UI + API routes
+- Local storage file: `local_store.json` (no external DB required)
+- Default publishing mode: browser automation
 
-- macOS/Linux (or WSL on Windows)
-- Node.js LTS + npm
-- LLM API key (OpenRouter recommended)
+## 2. Who This Is For
 
-## 5-Minute Quick Start
+- Creators who want to write once and adapt for multiple SNS platforms
+- Non-technical users who need easy local usage
+- Developers who want an OSS baseline before hosted/SaaS separation
+
+## 3. 5-Minute Setup
 
 ```bash
 git clone https://github.com/NomaDamas/auto-hongmyungbo.git
 cd auto-hongmyungbo
-./scripts/setup_local.sh
+./scripts/setup_local_easy.sh
 ```
 
-Edit `frontend/.env` (or `frontend/.env.local`) and set (OpenRouter default):
+Create `frontend/.env` or `frontend/.env.local`:
 
 ```env
 OPENROUTER_API_KEY=your_key_here
+# or
+OPENAI_API_KEY=your_key_here
 ```
-
-Need help with key issuance/billing?
-
-- `docs/API_KEYS.md`
 
 Run:
 
@@ -45,66 +52,79 @@ Run:
 
 Open: `http://localhost:3000`
 
-## Run (Manual)
+API key help: `docs/API_KEYS.md`
 
-```bash
-cd frontend
-npm install
-npm run dev
+Optional (for Instagram auto-upload in browser automation):
+
+```env
+INSTAGRAM_MEDIA_PATH=docs/images/sample.jpg
 ```
 
-Open `http://localhost:3000`.
+## 4. First Run (Non-Technical Step-by-Step)
 
-## Runtime Options (No `.env` required)
+1. Open `http://localhost:3000`.
+2. Paste your draft in the Draft box.
+3. Click `Options` and set API key/provider/model once.
+4. Click `Platform Writing Style` only if you want per-platform style/language tuning.
+5. Click `Generate N Platforms`.
 
-In `Options`, you can configure at runtime:
+## 5. Daily Usage Flow
 
-- Provider (`OpenAI` / `OpenRouter`)
-- Model (preset or custom model ID)
-- Thinking mode + reasoning effort
-- Temperature / Top-p / Max output tokens
-- API keys (stored locally in your browser)
+1. Write or paste draft.
+2. (Optional) Click `Refine Draft` to organize logic and improve the draft.
+3. Review platform cards in Preview.
+4. Accept cards you want to publish (accepted cards move to Queue).
+5. Click `Queue Publish`.
 
-## What Works Out of the Box
+Keyboard shortcuts:
 
-- Draft -> multi-platform generation
-- Optional Draft Refiner panel (structured brief, missing questions, angles, polished draft)
-- Platform-specific preview and editing
-- Accept/Reject queue flow
-- Refine (text + voice input)
-- Local JSON persistence (no external DB required)
+- `Cmd/Ctrl + Enter`: Generate
+- `Cmd/Ctrl + Shift + Enter`: Refine Draft
 
-## Optional Features (Can Be Added Later)
+## 6. Platform Login & Publish Behavior
 
-- Social login / OAuth publish integrations
-- Scheduled publishing configs
+- Each platform button shows:
+  - `Browser Login`: not connected
+  - `Disconnect`: connected (click to clear session; login required again)
+- Login state is verified by real browser-session checks, not just cached UI state.
+- Failed publish attempts keep browser windows open so you can finish manually.
 
-You can use the app locally without setting all OAuth keys.
+## 7. Instagram Special Flow
 
-## Project Structure
+Instagram text-only direct auto-publish is limited by platform flow (media-first upload).
+
+Current UX:
+
+1. When you click `Queue Publish`, Instagram title/body is copied to your clipboard automatically.
+2. Instagram create window opens.
+3. If `INSTAGRAM_MEDIA_PATH` is set, app attempts auto-upload + caption + share.
+4. If not set (or UI changed), upload media and paste copied text manually.
+
+This gives a fast “ready-to-post” flow without extra copy/paste hunting.
+
+## 8. Troubleshooting
+
+- `OpenAI/OpenRouter not configured`
+  - Check `frontend/.env` and restart with `./scripts/start_local.sh`
+- `Playwright not installed`
+  - Run `./scripts/setup_local_easy.sh` again
+- Login says connected but publish fails
+  - Click `Disconnect` for that platform, then `Browser Login` again
+- Queue item not clearing
+  - Refresh once; success logs are used to flush queue fallback
+
+## 9. Project Structure
 
 ```text
 .
-├── frontend/   # Next.js UI + API routes
-│   └── src/app/api/  # server routes
-│   └── src/server/   # local store + llm server helpers
-├── scripts/    # one-command local setup/run
+├── frontend/                # Next.js app (UI + API routes)
+│   ├── src/app/api/         # Server routes
+│   └── src/server/          # LLM + store + browser automation helpers
+├── scripts/                 # Local setup/run scripts
 └── docs/
-    └── images/ # README screenshots/assets
+    └── images/              # README assets
 ```
 
-## Stop Running Services
+---
 
-Press `Ctrl + C` in the terminal where `./scripts/start_local.sh` is running.
-
-## README Images
-
-Put screenshots and visual assets in:
-
-- `docs/images/`
-
-Example markdown:
-
-```md
-![Dashboard Preview](docs/images/dashboard-preview.png)
-```
+To stop local server: press `Ctrl + C` in the terminal running `./scripts/start_local.sh`.

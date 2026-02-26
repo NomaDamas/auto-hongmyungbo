@@ -1,4 +1,5 @@
 import type {
+  DomLlmProvider,
   DraftRefineLanguage,
   DraftRefineResponse,
   GenerateResponse,
@@ -12,16 +13,24 @@ import type {
   PublishJob,
   PublishLogItem,
   SocialThread,
+  SetupStatus,
   UserProfile,
 } from "@/lib/types";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "";
 let runtimeOpenAIKey = "";
 let runtimeOpenRouterKey = "";
+let runtimeDomLlmProvider: DomLlmProvider = "openai";
+let runtimeDomLlmApiKeys: Partial<Record<DomLlmProvider, string>> = {};
 
 export function configureRuntimeApiKeys(keys: { openaiApiKey?: string; openrouterApiKey?: string }) {
   runtimeOpenAIKey = (keys.openaiApiKey || "").trim();
   runtimeOpenRouterKey = (keys.openrouterApiKey || "").trim();
+}
+
+export function configureDomLlm(provider: DomLlmProvider, apiKeys: Partial<Record<DomLlmProvider, string>>) {
+  runtimeDomLlmProvider = provider;
+  runtimeDomLlmApiKeys = apiKeys;
 }
 
 function mergeHeaders(initHeaders?: HeadersInit): Record<string, string> {
@@ -44,6 +53,12 @@ async function apiFetch(input: string, init?: RequestInit): Promise<Response> {
   const mergedHeaders = mergeHeaders(init?.headers);
   if (runtimeOpenAIKey) mergedHeaders["x-openai-api-key"] = runtimeOpenAIKey;
   if (runtimeOpenRouterKey) mergedHeaders["x-openrouter-api-key"] = runtimeOpenRouterKey;
+  if (runtimeDomLlmApiKeys.anthropic) mergedHeaders["x-anthropic-api-key"] = runtimeDomLlmApiKeys.anthropic;
+  if (runtimeDomLlmApiKeys.grok) mergedHeaders["x-grok-api-key"] = runtimeDomLlmApiKeys.grok;
+  if (runtimeDomLlmApiKeys.gemini) mergedHeaders["x-gemini-api-key"] = runtimeDomLlmApiKeys.gemini;
+  if (runtimeDomLlmProvider) mergedHeaders["x-dom-llm-provider"] = runtimeDomLlmProvider;
+  const domKey = runtimeDomLlmApiKeys[runtimeDomLlmProvider];
+  if (domKey) mergedHeaders["x-dom-llm-api-key"] = domKey;
 
   return fetch(input, {
     credentials: "include",
@@ -119,6 +134,7 @@ export async function enqueuePublish(payload: {
   cardIds?: number[];
   acceptedOnly?: boolean;
   scheduledAt?: string;
+  publishMode?: "api" | "browser" | "hybrid";
 }): Promise<{ jobId: number; status: string }> {
   const res = await apiFetch(`${API_URL}/api/publish`, {
     method: "POST",
@@ -131,6 +147,44 @@ export async function enqueuePublish(payload: {
   }
 
   return (await res.json()) as { jobId: number; status: string };
+}
+
+export async function startBrowserLogin(platform: Platform, waitMs = 120000): Promise<{ ok: boolean; message: string }> {
+  let res: Response;
+  try {
+    res = await apiFetch(`${API_URL}/api/automation/login/${platform}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ waitMs }),
+    });
+  } catch (e) {
+    throw new Error("Could not reach local server. Check that ./scripts/start_local.sh is running.");
+  }
+  if (!res.ok) {
+    const data = (await res.json().catch(() => ({}))) as { detail?: string };
+    throw new Error(data.detail || "Failed to start browser login session");
+  }
+  return (await res.json()) as { ok: boolean; message: string };
+}
+
+export async function getBrowserLoginSession(platform: Platform): Promise<{ connected: boolean }> {
+  const res = await apiFetch(`${API_URL}/api/automation/session/${platform}`);
+  if (!res.ok) {
+    const data = (await res.json().catch(() => ({}))) as { detail?: string };
+    throw new Error(data.detail || "Failed to check browser login session");
+  }
+  return (await res.json()) as { connected: boolean };
+}
+
+export async function disconnectBrowserLogin(platform: Platform): Promise<{ ok: boolean }> {
+  const res = await apiFetch(`${API_URL}/api/automation/logout/${platform}`, {
+    method: "POST",
+  });
+  if (!res.ok) {
+    const data = (await res.json().catch(() => ({}))) as { detail?: string };
+    throw new Error(data.detail || "Failed to disconnect browser login session");
+  }
+  return (await res.json()) as { ok: boolean };
 }
 
 export async function getJob(jobId: number): Promise<PublishJob> {
@@ -196,7 +250,7 @@ export async function getThreads(limitPerPlatform = 20): Promise<SocialThread[]>
 
 export async function fetchProvider(): Promise<{ provider: ProviderOption; defaultModel: string; availableProviders: ProviderOption[] }> {
   const res = await apiFetch(`${API_URL}/api/provider`);
-  if (!res.ok) return { provider: "openrouter", defaultModel: "openai/gpt-4o-mini", availableProviders: ["openrouter"] };
+  if (!res.ok) return { provider: "openrouter", defaultModel: "openai/gpt-4o-mini", availableProviders: ["openrouter", "openai", "anthropic", "grok", "gemini"] };
   return res.json();
 }
 
@@ -221,4 +275,23 @@ export async function refineDraft(payload: {
     throw new Error(data.detail || "Draft refinement failed");
   }
   return (await res.json()) as DraftRefineResponse;
+}
+
+export async function fetchSetupStatus(): Promise<SetupStatus> {
+  const res = await apiFetch(`${API_URL}/api/setup/status`);
+  if (!res.ok) {
+    return {
+      llm: { envOpenAI: false, envOpenRouter: false },
+      oauth: {
+        linkedin: { configured: false, missing: ["LINKEDIN_CLIENT_ID", "LINKEDIN_CLIENT_SECRET"] },
+        twitter: { configured: false, missing: ["TWITTER_CLIENT_ID", "TWITTER_CLIENT_SECRET"] },
+        instagram: { configured: false, missing: ["INSTAGRAM_CLIENT_ID", "INSTAGRAM_CLIENT_SECRET"] },
+        reddit: { configured: false, missing: ["REDDIT_CLIENT_ID", "REDDIT_CLIENT_SECRET"] },
+        threads: { configured: false, missing: ["THREADS_CLIENT_ID", "THREADS_CLIENT_SECRET"] },
+        youtube: { configured: false, missing: ["YOUTUBE_CLIENT_ID", "YOUTUBE_CLIENT_SECRET"] },
+        tiktok: { configured: false, missing: ["TIKTOK_CLIENT_KEY", "TIKTOK_CLIENT_SECRET"] },
+      },
+    };
+  }
+  return (await res.json()) as SetupStatus;
 }

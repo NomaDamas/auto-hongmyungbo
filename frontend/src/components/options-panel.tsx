@@ -1,7 +1,15 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { GenerationConfig, ModelOption, ProviderOption, ReasoningEffortOption } from "@/lib/types";
+import type { DomLlmProvider, GenerationConfig, ModelOption, ProviderOption, ReasoningEffortOption } from "@/lib/types";
+
+const DOM_LLM_PROVIDERS: { value: DomLlmProvider; label: string; cheapModel: string }[] = [
+  { value: "openai", label: "OpenAI", cheapModel: "gpt-4o-mini" },
+  { value: "openrouter", label: "OpenRouter", cheapModel: "openai/gpt-4o-mini" },
+  { value: "anthropic", label: "Anthropic", cheapModel: "claude-haiku-4-5" },
+  { value: "grok", label: "Grok (xAI)", cheapModel: "grok-4.1-fast" },
+  { value: "gemini", label: "Gemini (Google)", cheapModel: "gemini-3-flash-preview" },
+];
 
 type Props = {
   open: boolean;
@@ -12,6 +20,8 @@ type Props = {
   openrouterApiKey: string;
   availableProviders: ProviderOption[];
   modelOptionsByProvider: Record<ProviderOption, ModelOption[]>;
+  domLlmProvider: DomLlmProvider;
+  domLlmApiKeys: Partial<Record<DomLlmProvider, string>>;
   onClose: () => void;
   onSave: (payload: {
     provider: ProviderOption;
@@ -20,6 +30,8 @@ type Props = {
     openaiApiKey: string;
     openrouterApiKey: string;
     rememberApiKeys: boolean;
+    domLlmProvider: DomLlmProvider;
+    domLlmApiKeys: Partial<Record<DomLlmProvider, string>>;
   }) => void;
 };
 
@@ -32,6 +44,8 @@ export function OptionsPanel({
   openrouterApiKey,
   availableProviders,
   modelOptionsByProvider,
+  domLlmProvider,
+  domLlmApiKeys,
   onClose,
   onSave,
 }: Props) {
@@ -49,6 +63,9 @@ export function OptionsPanel({
   const [showProviderModel, setShowProviderModel] = useState(true);
   const [showApiKeys, setShowApiKeys] = useState(false);
   const [showGeneration, setShowGeneration] = useState(false);
+  const [showDomLlm, setShowDomLlm] = useState(false);
+  const [draftDomProvider, setDraftDomProvider] = useState<DomLlmProvider>(domLlmProvider);
+  const [draftDomApiKeys, setDraftDomApiKeys] = useState<Partial<Record<DomLlmProvider, string>>>(domLlmApiKeys);
 
   useEffect(() => {
     if (!open) return;
@@ -66,7 +83,10 @@ export function OptionsPanel({
     setShowProviderModel(true);
     setShowApiKeys(false);
     setShowGeneration(false);
-  }, [generationConfig, open, openaiApiKey, openrouterApiKey, provider, selectedModel]);
+    setShowDomLlm(false);
+    setDraftDomProvider(domLlmProvider);
+    setDraftDomApiKeys(domLlmApiKeys);
+  }, [domLlmApiKeys, domLlmProvider, generationConfig, open, openaiApiKey, openrouterApiKey, provider, selectedModel]);
 
   useEffect(() => {
     const options = modelOptionsByProvider[draftProvider] ?? [];
@@ -194,6 +214,36 @@ export function OptionsPanel({
                     className="mt-1 w-full rounded-md border border-zinc-300 bg-white px-2 py-1.5 text-xs dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
                   />
                 </label>
+                <label className="block text-[11px] font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                  Anthropic API key (DOM automation fallback)
+                  <input
+                    type="password"
+                    value={draftDomApiKeys.anthropic || ""}
+                    onChange={(e) => setDraftDomApiKeys((prev) => ({ ...prev, anthropic: e.target.value }))}
+                    placeholder="sk-ant-..."
+                    className="mt-1 w-full rounded-md border border-zinc-300 bg-white px-2 py-1.5 text-xs dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
+                  />
+                </label>
+                <label className="block text-[11px] font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                  xAI Grok API key (DOM automation fallback)
+                  <input
+                    type="password"
+                    value={draftDomApiKeys.grok || ""}
+                    onChange={(e) => setDraftDomApiKeys((prev) => ({ ...prev, grok: e.target.value }))}
+                    placeholder="xai-..."
+                    className="mt-1 w-full rounded-md border border-zinc-300 bg-white px-2 py-1.5 text-xs dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
+                  />
+                </label>
+                <label className="block text-[11px] font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                  Google Gemini API key (DOM automation fallback)
+                  <input
+                    type="password"
+                    value={draftDomApiKeys.gemini || ""}
+                    onChange={(e) => setDraftDomApiKeys((prev) => ({ ...prev, gemini: e.target.value }))}
+                    placeholder="AIza..."
+                    className="mt-1 w-full rounded-md border border-zinc-300 bg-white px-2 py-1.5 text-xs dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
+                  />
+                </label>
               </div>
             )}
           </div>
@@ -269,6 +319,48 @@ export function OptionsPanel({
               </div>
             )}
           </div>
+          <div className="rounded-lg border border-zinc-200 dark:border-zinc-800">
+            <button
+              type="button"
+              onClick={() => setShowDomLlm((v) => !v)}
+              className="flex w-full items-center justify-between px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-zinc-700 dark:text-zinc-200"
+            >
+              DOM Analysis LLM (Browser Automation)
+              <span>{showDomLlm ? "−" : "+"}</span>
+            </button>
+            {showDomLlm && (
+              <div className="space-y-3 border-t border-zinc-200 p-3 dark:border-zinc-800">
+                <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
+                  Used for DOM fallback & manual post success detection. Always uses the cheapest model per provider.
+                </p>
+                <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                  Provider
+                </label>
+                <select
+                  value={draftDomProvider}
+                  onChange={(e) => setDraftDomProvider(e.target.value as DomLlmProvider)}
+                  className="w-full rounded-md border border-zinc-300 bg-white px-2 py-1.5 text-xs dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
+                >
+                  {DOM_LLM_PROVIDERS.map((p) => (
+                    <option key={p.value} value={p.value}>
+                      {p.label} ({p.cheapModel})
+                    </option>
+                  ))}
+                </select>
+
+                {(draftDomProvider === "openai" || draftDomProvider === "openrouter") && (
+                  <p className="text-[11px] text-zinc-400 dark:text-zinc-500">
+                    Uses your existing {draftDomProvider === "openai" ? "OpenAI" : "OpenRouter"} API key from above.
+                  </p>
+                )}
+                {(draftDomProvider === "anthropic" || draftDomProvider === "grok" || draftDomProvider === "gemini") && (
+                  <p className="text-[11px] text-zinc-400 dark:text-zinc-500">
+                    This provider uses the API key configured in the API Keys section above.
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
         </section>
 
         <div className="mt-4 flex justify-end gap-2">
@@ -284,6 +376,8 @@ export function OptionsPanel({
               setTemperature(generationConfig.temperature);
               setTopP(generationConfig.topP);
               setMaxOutputTokens(generationConfig.maxOutputTokens);
+              setDraftDomProvider(domLlmProvider);
+              setDraftDomApiKeys(domLlmApiKeys);
             }}
             className="rounded-lg border border-zinc-300 px-3 py-2 text-xs dark:border-zinc-700 dark:text-zinc-200"
           >
@@ -306,6 +400,10 @@ export function OptionsPanel({
                 openaiApiKey: draftOpenaiApiKey.trim(),
                 openrouterApiKey: draftOpenrouterApiKey.trim(),
                 rememberApiKeys,
+                domLlmProvider: draftDomProvider,
+                domLlmApiKeys: Object.fromEntries(
+                  Object.entries(draftDomApiKeys).map(([k, v]) => [k, (v || "").trim()]),
+                ),
               });
               onClose();
             }}

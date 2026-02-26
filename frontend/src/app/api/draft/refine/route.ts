@@ -3,8 +3,37 @@ import { fail, ok } from "@/server/http";
 
 export const runtime = "nodejs";
 
-const ALLOWED_PLATFORMS = new Set(["reddit", "linkedin", "twitter", "instagram", "blog"]);
+const ALLOWED_PLATFORMS = new Set(["reddit", "linkedin", "twitter", "instagram", "threads", "youtube", "tiktok"]);
 const ALLOWED_LANG = new Set(["auto", "ko", "en"]);
+
+function ensureStructuredPolishedDraft(input: any): string {
+  const draft = String(input?.polishedDraft || "").trim();
+  const hasSections = ["[Hook]", "[Core Message]", "[Key Points]", "[Body]", "[CTA]"].every((section) =>
+    draft.includes(section),
+  );
+  if (hasSections) return draft;
+
+  const brief = input?.brief || {};
+  const keyPoints = Array.isArray(brief.keyPoints) ? brief.keyPoints.slice(0, 5) : [];
+  const body = draft || brief.coreMessage || "";
+
+  return [
+    "[Hook]",
+    brief.title ? String(brief.title) : String(brief.coreMessage || ""),
+    "",
+    "[Core Message]",
+    String(brief.coreMessage || ""),
+    "",
+    "[Key Points]",
+    ...(keyPoints.length ? keyPoints.map((point: string) => `- ${point}`) : ["- Clarify your strongest point", "- Add one concrete example", "- End with a clear action"]),
+    "",
+    "[Body]",
+    body,
+    "",
+    "[CTA]",
+    String(brief.cta || "Invite one specific response from readers."),
+  ].join("\n");
+}
 
 export async function POST(request: Request) {
   try {
@@ -43,8 +72,8 @@ export async function POST(request: Request) {
         ...parsed.brief,
         keyPoints: Array.isArray(parsed.brief.keyPoints) ? parsed.brief.keyPoints.slice(0, 5) : [],
       },
-      questions: parsed.questions.slice(0, 3),
-      angles: parsed.angles.slice(0, 5),
+      questions: parsed.questions.slice(0, 2),
+      angles: parsed.angles.slice(0, 2),
     };
 
     if (normalized.brief.keyPoints.length < 3) {
@@ -70,6 +99,7 @@ export async function POST(request: Request) {
         ],
       };
     }
+    normalized.polishedDraft = ensureStructuredPolishedDraft(normalized);
 
     return ok(normalized);
   } catch (err) {
