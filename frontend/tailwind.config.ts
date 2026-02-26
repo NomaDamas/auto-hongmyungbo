@@ -1,13 +1,15 @@
 import type { Config } from "tailwindcss";
 
 const config: Config = {
+  darkMode: "class",
   content: ["./src/**/*.{ts,tsx}"],
   theme: {
     extend: {
       colors: {
         bg: "#f6f5ef",
         ink: "#111827",
-        panel: "#fffdf6",
+        panel: "#fefcf8",
+        "border-default": "#d4d0c8",
         accent: "#f97316",
         accent2: "#0f766e",
         primary: {

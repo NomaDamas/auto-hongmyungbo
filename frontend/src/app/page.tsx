@@ -1,12 +1,14 @@
 "use client";
 
 import { type KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
-import { ArchiveRestore, CheckCheck, FileText, History, Inbox, Layers, MessageSquare, Settings2, SlidersHorizontal, Send, Sparkles, Trash2 } from "lucide-react";
+import { ArchiveRestore, CheckCheck, FileText, History, Inbox, Layers, MessageSquare, Moon, Settings2, SlidersHorizontal, Sun, Send, Sparkles, Trash2, Zap } from "lucide-react";
 import { getPlatformIcon } from "@/components/platform-icons";
 import { PlatformCard } from "@/components/platform-card";
 import { ContextPanel } from "@/components/context-panel";
 import { OptionsPanel } from "@/components/options-panel";
 import { DraftRefinerPanel, type DraftRefinerPanelRef } from "@/components/draft-refiner-panel";
+import { AggroPingpongPanel, type AggroPingpongPanelRef } from "@/components/aggro-pingpong-panel";
+import { PhraseBoosterPanel, type PhraseBoosterPanelRef } from "@/components/phrase-booster-panel";
 import {
   configureDomLlm,
   configureRuntimeApiKeys,
@@ -283,6 +285,8 @@ export default function HomePage() {
 
   const [savedDraftsOpen, setSavedDraftsOpen] = useState(false);
   const [draftHistory, setDraftHistory] = useState<SavedDraftSnapshot[]>([]);
+  const [phraseContext, setPhraseContext] = useState<{ platform: Platform; selectedText: string } | null>(null);
+  const [themeMode, setThemeMode] = useState<"light" | "dark">("light");
   const [domLlmProvider, setDomLlmProvider] = useState<DomLlmProvider>("openai");
   const [domLlmApiKeys, setDomLlmApiKeys] = useState<Partial<Record<DomLlmProvider, string>>>({});
 
@@ -290,8 +294,11 @@ export default function HomePage() {
   const chunksRef = useRef<Blob[]>([]);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const refinerRef = useRef<DraftRefinerPanelRef | null>(null);
+  const aggroRef = useRef<AggroPingpongPanelRef | null>(null);
+  const phraseBoosterRef = useRef<PhraseBoosterPanelRef | null>(null);
   const prevDraftIdRef = useRef<number | null>(null);
   const publishRunRef = useRef(0);
+  const generateAbortRef = useRef<AbortController | null>(null);
   const loginStatusCacheRef = useRef<Partial<Record<Platform, { connected: boolean; checkedAt: number }>>>({});
 
   const cardsByOrder = useMemo(() => insertByPlatformOrder(resultCards), [resultCards]);
@@ -321,6 +328,12 @@ export default function HomePage() {
       },
       ...prev,
     ].slice(0, 40));
+  };
+
+  const applyThemeMode = (mode: "light" | "dark") => {
+    setThemeMode(mode);
+    document.documentElement.classList.toggle("dark", mode === "dark");
+    window.localStorage.setItem("hmb_theme_mode", mode);
   };
 
   const syncBrowserLoginStatus = async (
@@ -423,6 +436,9 @@ export default function HomePage() {
       }
     } catch { /* ignore */ }
     configureRuntimeApiKeys({ openaiApiKey: savedOpenaiApiKey, openrouterApiKey: savedOpenrouterApiKey });
+    const savedTheme = window.localStorage.getItem("hmb_theme_mode");
+    const initialDark = savedTheme ? savedTheme === "dark" : window.matchMedia("(prefers-color-scheme: dark)").matches;
+    applyThemeMode(initialDark ? "dark" : "light");
     try {
       const raw = window.localStorage.getItem(LAST_STYLE_KEY);
       if (raw) {
@@ -610,6 +626,9 @@ export default function HomePage() {
 
   const handleGenerate = async () => {
     if (!draft.trim()) return;
+    if (loading) return;
+    const controller = new AbortController();
+    generateAbortRef.current = controller;
     try {
       setLoading(true);
       const loginRefreshPromise = syncBrowserLoginStatus(selectedPlatforms);
@@ -628,6 +647,7 @@ export default function HomePage() {
         language === "per_platform" ? perPlatformLanguages : undefined,
         provider,
         generationConfig,
+        controller.signal,
       );
       await loginRefreshPromise;
       setDraftId(generated.draftId);
@@ -662,11 +682,21 @@ export default function HomePage() {
         }
       }
     } catch (err) {
+      if ((err as Error)?.name === "AbortError") {
+        return;
+      }
       console.error(err);
       alert("Generation failed.");
     } finally {
+      generateAbortRef.current = null;
       setLoading(false);
     }
+  };
+
+  const handleCancelGenerate = () => {
+    generateAbortRef.current?.abort();
+    generateAbortRef.current = null;
+    setLoading(false);
   };
 
   const moveToQueue = (card: CardState) => {
@@ -722,6 +752,24 @@ export default function HomePage() {
     } catch (err) {
       console.error(err);
       alert("Restore failed.");
+    }
+  };
+
+  const handleDeleteFromQueue = async (card: CardState) => {
+    try {
+      if (card.id) {
+        await updateCardStatus(card.id, "rejected");
+      }
+      const key = cardKey(card);
+      setQueueCards((prev) => prev.filter((c) => cardKey(c) !== key));
+      setPublishCardStates((prev) => {
+        const next = { ...prev };
+        delete next[key];
+        return next;
+      });
+    } catch (err) {
+      console.error(err);
+      alert("Delete failed.");
     }
   };
 
@@ -883,11 +931,10 @@ export default function HomePage() {
       }
 
       type JobResult = {
-        published?: Array<{ cardId?: number; postId?: string; screenshotDataUrl?: string }>;
-        failed?: Array<{ cardId?: number; error?: string; screenshotDataUrl?: string }>;
+        published?: Array<{ platform?: Platform; cardId?: number; postId?: string; screenshotDataUrl?: string }>;
+        failed?: Array<{ platform?: Platform; cardId?: number; error?: string; screenshotDataUrl?: string }>;
       };
       let jobDone = false;
-      let jobSuccess = false;
       let jobResult: JobResult | null = null;
       try {
         const cardIds = typeof card.id === "number" ? [card.id] : [];
@@ -907,7 +954,6 @@ export default function HomePage() {
           setPublishJob(job);
           if (job.status === "done" || job.status === "failed") {
             jobDone = true;
-            jobSuccess = job.status === "done";
             jobResult = (job.result as JobResult) ?? null;
             break;
           }
@@ -919,10 +965,14 @@ export default function HomePage() {
 
       if (isManual) {
         if (publishRunRef.current !== runId) return { ok: false, keptInQueue: true, error: "publish run replaced" };
-        // Check if the server detected success signals on the page
-        const publishedItem = jobResult?.published?.find((p) => p.cardId === card.id);
+        // Match by card id first; fallback by platform for local restored cards without stable ids.
+        const publishedItem =
+          jobResult?.published?.find((p) => typeof card.id === "number" && p.cardId === card.id) ||
+          jobResult?.published?.find((p) => p.platform === card.platform);
         const serverConfirmed = publishedItem?.postId?.includes("manual-confirmed");
-        const failedItem = jobResult?.failed?.find((f) => f.cardId === card.id);
+        const failedItem =
+          jobResult?.failed?.find((f) => typeof card.id === "number" && f.cardId === card.id) ||
+          jobResult?.failed?.find((f) => f.platform === card.platform);
         const failureReason = failedItem?.error ? `\n\nReason: ${failedItem.error}` : "";
 
         if (serverConfirmed) {
@@ -947,7 +997,7 @@ export default function HomePage() {
                 platform: card.platform,
                 status: "success",
                 message: `${label} posted (manual confirm)`,
-                screenshotDataUrl: publishedItem?.screenshotDataUrl || failedItem?.screenshotDataUrl,
+                screenshotDataUrl: failedItem?.screenshotDataUrl,
               });
               return { ok: true, keptInQueue: false };
             }
@@ -963,10 +1013,12 @@ export default function HomePage() {
         }
       } else {
         if (publishRunRef.current !== runId) return { ok: false, keptInQueue: true, error: "publish run replaced" };
-        // Automated platforms: flush on success, keep on failure for retry.
-        if (jobDone && jobSuccess) {
+        // Automated platforms: use per-card result first (more accurate than whole-job status).
+        const publishedItem =
+          jobResult?.published?.find((p) => typeof card.id === "number" && p.cardId === card.id) ||
+          jobResult?.published?.find((p) => p.platform === card.platform);
+        if (jobDone && publishedItem) {
           setQueueCards((prev) => prev.filter((c) => cardKey(c) !== key));
-          const publishedItem = jobResult?.published?.find((p) => p.cardId === card.id);
           setCardUiState(card, "Posted");
           appendPublishActivity({
             platform: card.platform,
@@ -976,7 +1028,9 @@ export default function HomePage() {
           });
           return { ok: true, keptInQueue: false };
         } else if (jobDone) {
-          const failedItem = jobResult?.failed?.find((f) => f.cardId === card.id);
+          const failedItem =
+            jobResult?.failed?.find((f) => typeof card.id === "number" && f.cardId === card.id) ||
+            jobResult?.failed?.find((f) => f.platform === card.platform);
           const failureReason = failedItem?.error ? `\nReason: ${failedItem.error}` : "";
           setCardUiState(card, "Failed");
           appendPublishActivity({
@@ -1162,6 +1216,60 @@ export default function HomePage() {
     const suffix = draft.slice(end);
     const inserted = `${prefix}${prefix.endsWith("\n") || !prefix ? "" : "\n"}${text}${suffix.startsWith("\n") || !suffix ? "" : "\n"}${suffix}`;
     setDraft(inserted);
+  };
+
+  const handleReplaceTextInDraft = (from: string, to: string) => {
+    const targetCard = phraseContext
+      ? resultCards.find((c) => c.platform === phraseContext.platform) ?? null
+      : activeCard;
+    if (!targetCard) return;
+    const source = from.trim();
+    const target = to.trim();
+    if (!source || !target) return;
+    setResultCards((prev) =>
+      prev.map((c) => {
+        if (c.platform !== targetCard.platform) return c;
+        const currentVersion = c.versions[c.versionIndex];
+        let nextBody = currentVersion.body;
+        let nextTitle = currentVersion.title;
+        if (nextBody.includes(source)) {
+          nextBody = nextBody.replace(source, target);
+        } else if (nextTitle.includes(source)) {
+          nextTitle = nextTitle.replace(source, target);
+        } else {
+          nextBody = `${nextBody}${nextBody.endsWith("\n") ? "" : "\n"}${target}`;
+        }
+        const nextVersions = [...c.versions];
+        nextVersions[c.versionIndex] = { ...currentVersion, title: nextTitle, body: nextBody };
+        return { ...c, title: nextTitle, body: nextBody, versions: nextVersions };
+      }),
+    );
+  };
+
+  const handleInsertIntoCardFromPhrase = (snippet: string) => {
+    const text = snippet.trim();
+    if (!text) return;
+    const targetCard = phraseContext
+      ? resultCards.find((c) => c.platform === phraseContext.platform) ?? null
+      : activeCard;
+    if (!targetCard) return;
+    setResultCards((prev) =>
+      prev.map((c) => {
+        if (c.platform !== targetCard.platform) return c;
+        const currentVersion = c.versions[c.versionIndex];
+        const nextBody = `${currentVersion.body}${currentVersion.body.endsWith("\n") || !currentVersion.body ? "" : "\n"}${text}`;
+        const nextVersions = [...c.versions];
+        nextVersions[c.versionIndex] = { ...currentVersion, body: nextBody };
+        return { ...c, body: nextBody, versions: nextVersions };
+      }),
+    );
+  };
+
+  const openPhraseBooster = (platform: Platform, selectedText: string) => {
+    const text = selectedText.trim();
+    if (!text) return;
+    setPhraseContext({ platform, selectedText: text });
+    phraseBoosterRef.current?.openPanel();
   };
 
   const handleTextareaKeydown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -1364,10 +1472,12 @@ export default function HomePage() {
       />
 
       <main className="mx-auto min-h-screen w-full max-w-7xl px-4 py-6 md:px-6">
-        <header className="relative mb-4 flex flex-wrap items-center justify-between gap-3 overflow-hidden rounded-2xl border border-zinc-200 bg-white/80 p-4 shadow-sm backdrop-blur dark:border-zinc-800 dark:bg-zinc-900/70">
+        <header className="glass relative mb-4 flex flex-wrap items-center justify-between gap-3 overflow-hidden rounded-2xl border border-zinc-200/60 bg-gradient-to-r from-white/80 via-violet-50/40 to-fuchsia-50/40 p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900/70 dark:from-zinc-900/70 dark:via-zinc-900/70 dark:to-zinc-900/70">
           <div className="absolute inset-x-0 bottom-0 h-[2px] bg-gradient-to-r from-violet-500 via-fuchsia-500 to-violet-500 opacity-60" />
           <div>
-            <h1 className="text-2xl font-semibold text-zinc-900 dark:text-zinc-100">Auto-HongMyungbo</h1>
+            <h1 className="flex items-center gap-2 text-2xl font-semibold text-zinc-900 dark:text-zinc-100">
+              <span>Auto-HongMyungbo</span>
+            </h1>
             <p className="text-xs font-medium lowercase tracking-wide text-zinc-500 dark:text-zinc-400">ai cross posting social content studio</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -1393,24 +1503,36 @@ export default function HomePage() {
         </header>
 
         <section className="mb-4 grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-[1.05fr_1.95fr]">
-          <aside className="min-w-0 rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+          <aside className="relative min-w-0 rounded-2xl border border-zinc-300 bg-[#fefcf8] p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
             <div className="mb-2 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <h2 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Draft</h2>
                 <span className="text-xs text-zinc-500 dark:text-zinc-400">ID: {draftId ?? "-"}</span>
               </div>
-              <button
-                type="button"
-                onClick={() => refinerRef.current?.openAndRefine()}
-                className="rounded-lg border border-zinc-300 bg-white px-3 py-1.5 text-xs font-medium dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
-              >
-                ✨ Draft Idea Booster
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => refinerRef.current?.openAndRefine()}
+                  className="rounded-lg border border-zinc-300 bg-white px-3 py-1.5 text-xs font-medium dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
+                >
+                  ✨ Draft Idea Booster
+                </button>
+                <button
+                  type="button"
+                  onClick={() => aggroRef.current?.openAndGenerate()}
+                  className="inline-flex items-center gap-1 rounded-full border border-orange-300 bg-orange-50 px-2.5 py-1 text-[11px] font-medium text-orange-600 transition-colors hover:bg-orange-100 hover:text-orange-700 dark:border-orange-700/50 dark:bg-orange-900/20 dark:text-orange-400 dark:hover:bg-orange-900/40"
+                  title="Easter egg: Generate provocative hooks"
+                >
+                  <Zap className="h-3 w-3" /> Aggro Pingpong
+                </button>
+              </div>
             </div>
             <textarea
               ref={textareaRef}
               value={draft}
-              onChange={(e) => setDraft(e.target.value)}
+              onChange={(e) => {
+                setDraft(e.target.value);
+              }}
               onKeyDown={handleTextareaKeydown}
               placeholder="Write your draft..."
               className="mb-3 h-44 w-full rounded-xl border border-zinc-300 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-violet-400/50 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100 dark:focus:ring-violet-500/40"
@@ -1426,14 +1548,54 @@ export default function HomePage() {
               onReplaceDraft={setDraft}
               onInsertIntoDraft={handleInsertIntoDraft}
             />
+            <AggroPingpongPanel
+              ref={aggroRef}
+              draft={draft}
+              provider={provider}
+              model={selectedModel}
+              generationConfig={generationConfig}
+              language={toRefineLanguage(language, selectedPlatforms, perPlatformLanguages)}
+              platforms={selectedPlatforms}
+              onInsertIntoDraft={handleInsertIntoDraft}
+            />
+            <PhraseBoosterPanel
+              ref={phraseBoosterRef}
+              draft={(() => {
+                const targetCard = phraseContext
+                  ? resultCards.find((c) => c.platform === phraseContext.platform) ?? null
+                  : activeCard;
+                if (!targetCard) return draft;
+                const current = targetCard.versions[targetCard.versionIndex];
+                return [current.title, "", current.body].join("\n").trim();
+              })()}
+              selectedText={phraseContext?.selectedText || ""}
+              provider={provider}
+              model={selectedModel}
+              generationConfig={generationConfig}
+              language={toRefineLanguage(language, selectedPlatforms, perPlatformLanguages)}
+              onInsertIntoDraft={handleInsertIntoCardFromPhrase}
+              onReplaceTextInDraft={handleReplaceTextInDraft}
+            />
             <div className="flex gap-2">
-              <button
-                onClick={handleGenerate}
-                disabled={loading || !draft.trim() || selectedPlatforms.length === 0}
-                className="rounded-lg bg-violet-600 px-3 py-2 text-xs font-semibold text-white shadow-sm transition-all hover:bg-violet-700 hover:shadow-glow-sm disabled:opacity-50 dark:bg-violet-500 dark:hover:bg-violet-600"
-              >
-                <Sparkles className="mr-1 inline h-3.5 w-3.5" /> {loading ? "Generating..." : `Generate ${selectedPlatforms.length} Platform${selectedPlatforms.length === 1 ? "" : "s"}`}
-              </button>
+              <div className="group relative">
+                <button
+                  onClick={handleGenerate}
+                  disabled={loading || !draft.trim() || selectedPlatforms.length === 0}
+                  className="btn-lift rounded-lg bg-gradient-to-r from-violet-600 to-fuchsia-600 px-3 py-2 text-xs font-semibold text-white shadow-sm transition-all hover:from-violet-700 hover:to-fuchsia-700 hover:shadow-glow-sm disabled:opacity-50 dark:from-violet-500 dark:to-fuchsia-500 dark:hover:from-violet-600 dark:hover:to-fuchsia-600"
+                >
+                  <Sparkles className="mr-1 inline h-3.5 w-3.5" /> {loading ? "Generating..." : `Generate ${selectedPlatforms.length} Platform${selectedPlatforms.length === 1 ? "" : "s"}`}
+                </button>
+                {loading && (
+                  <button
+                    type="button"
+                    onClick={handleCancelGenerate}
+                    className="pointer-events-none absolute -right-1 top-1/2 -translate-y-1/2 translate-x-full rounded-md border border-rose-300 bg-white px-2 py-1 text-[11px] font-medium text-rose-600 opacity-0 shadow-sm transition-all group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100 dark:border-rose-700/60 dark:bg-zinc-900 dark:text-rose-300"
+                    title="Cancel generation"
+                  >
+                    Cancel
+                  </button>
+                )}
+              </div>
               <button
                 onClick={handlePublish}
                 disabled={!draftId || acceptedCount === 0}
@@ -1548,6 +1710,13 @@ export default function HomePage() {
                         >
                           <ArchiveRestore className="inline h-3 w-3" />
                         </button>
+                        <button
+                          onClick={() => void handleDeleteFromQueue(card)}
+                          className="rounded-md bg-rose-100 px-2 py-1 text-[11px] text-rose-700 hover:bg-rose-200 dark:bg-rose-500/20 dark:text-rose-300 dark:hover:bg-rose-500/30"
+                          title="Delete this card from queue"
+                        >
+                          <Trash2 className="inline h-3 w-3" />
+                        </button>
                       </div>
                     </div>
                   </div>
@@ -1623,7 +1792,7 @@ export default function HomePage() {
 
           </aside>
 
-          <section className="min-w-0 overflow-visible rounded-2xl border border-zinc-200 bg-white p-3 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+          <section className="min-w-0 overflow-visible rounded-2xl border border-zinc-300 bg-[#fefcf8] p-3 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
             <div className="mb-2 flex items-center justify-between">
               <h2 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Platform Results</h2>
               <div className="flex items-center gap-2">
@@ -1677,6 +1846,7 @@ export default function HomePage() {
                     onRedo={() => patchCard(card.platform, { versionIndex: Math.min(card.versions.length - 1, card.versionIndex + 1) })}
                     onSelectVersion={(index) => patchCard(card.platform, { versionIndex: index })}
                     onPreviewChange={(title, body) => handlePreviewEdit(card.platform, title, body)}
+                    onPhraseBoost={(selectedText) => openPhraseBooster(card.platform, selectedText)}
                   />
                 ))}
               </div>
@@ -1696,12 +1866,13 @@ export default function HomePage() {
                 }
                 onSelectVersion={(index) => patchCard(activeCard.platform, { versionIndex: index })}
                 onPreviewChange={(title, body) => handlePreviewEdit(activeCard.platform, title, body)}
+                onPhraseBoost={(selectedText) => openPhraseBooster(activeCard.platform, selectedText)}
               />
             ) : (
-              <div className="grid h-[360px] place-items-center rounded-xl border border-dashed border-zinc-300 dark:border-zinc-700">
-                <div className="flex flex-col items-center gap-2 text-center">
-                  <Layers className="h-10 w-10 text-zinc-300 dark:text-zinc-600" />
-                  <p className="text-sm font-medium text-zinc-500 dark:text-zinc-400">No results yet</p>
+              <div className="grid h-[360px] place-items-center rounded-xl border border-dashed border-zinc-300 bg-gradient-to-b from-violet-50/30 to-transparent dark:border-zinc-700 dark:from-violet-950/10">
+                <div className="flex flex-col items-center gap-3 text-center">
+                  <Sparkles className="h-14 w-14 text-violet-300 dark:text-violet-600" />
+                  <p className="text-sm font-semibold text-zinc-600 dark:text-zinc-400">Ready to create</p>
                   <p className="max-w-xs text-xs text-zinc-400 dark:text-zinc-500">Write a draft and hit Generate. Accept cards to move them into the publish queue.</p>
                 </div>
               </div>
@@ -1714,7 +1885,16 @@ export default function HomePage() {
           Compose -&gt; Review (platform cards) -&gt; Publish
         </footer>
 
-        <section className="mt-4 rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+        <button
+          onClick={() => applyThemeMode(themeMode === "dark" ? "light" : "dark")}
+          className="fixed bottom-5 right-5 z-40 inline-flex h-11 w-11 items-center justify-center rounded-full border border-zinc-300 bg-white text-zinc-700 shadow-md transition-colors hover:border-violet-400 hover:text-violet-700 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:border-violet-500 dark:hover:text-violet-300"
+          title={themeMode === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+          aria-label={themeMode === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+        >
+          {themeMode === "dark" ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+        </button>
+
+        <section className="mt-4 rounded-2xl border border-zinc-300 bg-[#fefcf8] p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Advanced</h3>
             <button

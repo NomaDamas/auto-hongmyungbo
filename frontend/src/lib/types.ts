@@ -125,6 +125,12 @@ export type DraftRefineResponse = {
   polishedDraft: string;
 };
 
+export type PhraseBoostResponse = {
+  assistant: string;
+  suggestions: string[];
+  rewritten?: string;
+};
+
 export type StyleHistoryEntry = {
   id: string;
   label: string;

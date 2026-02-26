@@ -5,7 +5,7 @@
 @tailwind utilities;
 
 :root {
-  color-scheme: light dark;
+  color-scheme: light;
   --accent: #7c3aed;
   --accent-hover: #6d28d9;
   --accent-glow: rgba(124, 58, 237, 0.3);
@@ -24,24 +24,55 @@ body {
 body {
   font-family: "Manrope", "Pretendard", "Noto Sans KR", sans-serif;
   background:
-    radial-gradient(circle at 0% 0%, rgba(124, 58, 237, 0.06), transparent 30%),
-    radial-gradient(circle at 100% 0%, rgba(236, 72, 153, 0.06), transparent 34%),
-    radial-gradient(circle at 50% 100%, rgba(99, 102, 241, 0.04), transparent 40%),
-    #f8fafc;
+    radial-gradient(circle at 0% 0%, rgba(124, 58, 237, 0.14), transparent 35%),
+    radial-gradient(circle at 100% 0%, rgba(236, 72, 153, 0.14), transparent 38%),
+    radial-gradient(circle at 50% 100%, rgba(99, 102, 241, 0.10), transparent 45%),
+    #f4f2ee;
   color: #111827;
 }
 
-@media (prefers-color-scheme: dark) {
-  body {
-    background:
-      radial-gradient(circle at 0% 0%, rgba(124, 58, 237, 0.15), transparent 32%),
-      radial-gradient(circle at 100% 0%, rgba(236, 72, 153, 0.10), transparent 36%),
-      radial-gradient(circle at 50% 100%, rgba(99, 102, 241, 0.08), transparent 40%),
-      #09090b;
-    color: #e5e7eb;
-  }
+html.dark {
+  color-scheme: dark;
+}
+
+html.dark body {
+  background:
+    radial-gradient(circle at 0% 0%, rgba(124, 58, 237, 0.15), transparent 32%),
+    radial-gradient(circle at 100% 0%, rgba(236, 72, 153, 0.10), transparent 36%),
+    radial-gradient(circle at 50% 100%, rgba(99, 102, 241, 0.08), transparent 40%),
+    #09090b;
+  color: #e5e7eb;
 }
 
 .font-display {
   font-family: "Plus Jakarta Sans", "Manrope", sans-serif;
+}
+
+@layer utilities {
+  .gradient-text {
+    background: linear-gradient(135deg, #7c3aed, #d946ef);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .glass {
+    background: rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+  }
+
+  html.dark .glass {
+    background: rgba(24, 24, 27, 0.7);
+    border-color: rgba(63, 63, 70, 0.4);
+  }
+
+  .btn-lift {
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+  }
+  .btn-lift:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(124, 58, 237, 0.2);
+  }
 }

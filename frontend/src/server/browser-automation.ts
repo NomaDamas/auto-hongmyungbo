@@ -58,24 +58,44 @@ async function chatForDom(
   }
 
   // OpenAI-compatible API (openai, openrouter, grok, gemini)
-  const res = await fetch(`${client.baseUrl}/chat/completions`, {
+  const headers = {
+    "content-type": "application/json",
+    authorization: `Bearer ${client.apiKey}`,
+  };
+  const basePayload = {
+    model: client.model,
+    response_format: { type: "json_object" as const },
+    messages: [
+      { role: "system", content: system },
+      { role: "user", content: user },
+    ],
+  };
+  let res = await fetch(`${client.baseUrl}/chat/completions`, {
     method: "POST",
-    headers: {
-      "content-type": "application/json",
-      authorization: `Bearer ${client.apiKey}`,
-    },
+    headers,
     body: JSON.stringify({
-      model: client.model,
-      response_format: { type: "json_object" },
+      ...basePayload,
       temperature: 0.2,
-      max_tokens: 800,
-      messages: [
-        { role: "system", content: system },
-        { role: "user", content: user },
-      ],
+      max_completion_tokens: 800,
     }),
   });
-  if (!res.ok) throw new Error(`LLM request failed: ${res.status}`);
+  if (!res.ok) {
+    const firstText = await res.text();
+    const lower = firstText.toLowerCase();
+    const canRetryWithoutSampling =
+      res.status === 400 &&
+      (lower.includes("unsupported parameter") ||
+        lower.includes("unsupported value") ||
+        lower.includes("temperature") ||
+        lower.includes("top_p"));
+    if (!canRetryWithoutSampling) throw new Error(`LLM request failed: ${res.status}`);
+    res = await fetch(`${client.baseUrl}/chat/completions`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(basePayload),
+    });
+    if (!res.ok) throw new Error(`LLM request failed: ${res.status}`);
+  }
   const json = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> };
   return json.choices?.[0]?.message?.content || "{}";
 }
@@ -514,6 +534,10 @@ async function waitForContextClosed(context: any, page: any, timeoutMs: number):
 // ---------------------------------------------------------------------------
 
 const MANUAL_SUCCESS_PATTERNS: Record<string, { selectors: string[]; urlPattern?: RegExp }> = {
+  twitter: {
+    selectors: ['text=/your post was sent|post was sent|posted/i', '[data-testid="toast"]'],
+    urlPattern: /x\.com\/[^/]+\/status\/\d+/i,
+  },
   instagram: {
     selectors: ['text=/post shared|your post has been shared|shared/i', '[aria-label*="Post shared"]'],
     urlPattern: /instagram\.com\/p\//,
@@ -559,14 +583,20 @@ async function waitForManualCompletion(
   let successDetected = false;
   let contextClosed = false;
   let lastDom = "";
+  let finished = false;
+  let resolveClose: (() => void) | null = null;
 
   const patterns = MANUAL_SUCCESS_PATTERNS[platform];
 
+  const finish = () => {
+    if (finished) return;
+    finished = true;
+    contextClosed = true;
+    resolveClose?.();
+  };
+
   const closePromise = new Promise<void>((resolve) => {
-    const finish = () => {
-      contextClosed = true;
-      resolve();
-    };
+    resolveClose = resolve;
     context.once("close", () => {
       finish();
     });
@@ -602,12 +632,12 @@ async function waitForManualCompletion(
       if (contextClosed) break;
       try {
         if (page?.isClosed?.()) {
-          contextClosed = true;
+          finish();
           break;
         }
         const currentUrl = page.url();
         if (hasLeftManualFlow(currentUrl)) {
-          contextClosed = true;
+          finish();
           break;
         }
         // 1) Hardcoded selector check (fast, free)
@@ -651,10 +681,16 @@ async function waitForManualCompletion(
 }
 
 async function publishThreads(page: any, text: string): Promise<PublishResult> {
-  await page.goto("https://www.threads.net/", { waitUntil: "domcontentloaded" });
-  await page.waitForTimeout(1800);
+  // Try direct composer first (Threads UI changes frequently).
+  await page.goto("https://www.threads.net/intent/post", { waitUntil: "domcontentloaded" });
+  await page.waitForTimeout(1400);
+  const maybeLogin = page.url();
+  if (maybeLogin.includes("/login")) {
+    await page.goto("https://www.threads.net/", { waitUntil: "domcontentloaded" });
+    await page.waitForTimeout(1800);
+  }
   const plusEntry = page.locator(
-    'a[href*="/intent/post"], a[href*="/create"], button[aria-label*="New"], button[aria-label*="Create"], button:has-text("+"), a:has-text("+")',
+    'a[href*="/intent/post"], a[href*="/create"], button[aria-label*="New"], button[aria-label*="Create"], button:has-text("Start a thread"), button:has-text("+"), a:has-text("+")',
   );
   if (await plusEntry.count()) {
     await plusEntry.first().click().catch(() => {});
@@ -668,6 +704,7 @@ async function publishThreads(page: any, text: string): Promise<PublishResult> {
   const typed = await fillEditable(
     page,
     [
+      'div[data-pressable-container="true"] div[contenteditable="true"]',
       'div[contenteditable="true"][role="textbox"]',
       'div[contenteditable="true"]',
       'textarea[placeholder*="thread"]',
@@ -678,7 +715,9 @@ async function publishThreads(page: any, text: string): Promise<PublishResult> {
   );
   if (!typed) return { ok: false, error: "Threads editor not found. Login may be required." };
   await page.waitForTimeout(400);
-  const postBtn = page.locator('button:has-text("Post"), button:has-text("Share"), [data-testid*="post"], [aria-label*="Post"]');
+  const postBtn = page.locator(
+    'button:has-text("Post"), button:has-text("Share"), div[role="button"]:has-text("Post"), [data-testid*="post"], [aria-label*="Post"]',
+  );
   if (!(await postBtn.count())) return { ok: false, error: "Threads Post button not found." };
   await postBtn.first().click({ force: true });
   await page.waitForTimeout(2000);
@@ -942,6 +981,23 @@ export async function publishByBrowser(input: { platform: Platform; title: strin
       }
     }
     if (!result.ok) {
+      if (input.platform === "twitter" && context && page) {
+        const { successDetected } = await waitForManualCompletion(context, page, input.platform, 5 * 60 * 1000, input.llmClient);
+        const screenshotDataUrl = await captureScreenshotDataUrl(page);
+        if (successDetected) {
+          return {
+            ok: true,
+            postId: "manual-confirmed-twitter",
+            url: page.url(),
+            screenshotDataUrl,
+          };
+        }
+        return {
+          ok: false,
+          error: `${result.error || "X publish failed"} Could not confirm manual post completion.`,
+          screenshotDataUrl,
+        };
+      }
       if (manualFirstPlatforms.includes(input.platform)) {
         const { successDetected } = await waitForManualCompletion(context, page, input.platform, 10 * 60 * 1000, input.llmClient);
         const tag = successDetected ? "manual-confirmed" : "manual-unconfirmed";
@@ -968,6 +1024,18 @@ export async function publishByBrowser(input: { platform: Platform; title: strin
     return { ...result, screenshotDataUrl };
   } catch (e) {
     result = { ok: false, error: e instanceof Error ? e.message : String(e) };
+    if (input.platform === "twitter" && context && page) {
+      const { successDetected } = await waitForManualCompletion(context, page, input.platform, 5 * 60 * 1000, input.llmClient);
+      const screenshotDataUrl = await captureScreenshotDataUrl(page);
+      if (successDetected) {
+        return { ok: true, postId: "manual-confirmed-twitter", url: page.url(), screenshotDataUrl };
+      }
+      return {
+        ok: false,
+        error: `${result.error || "X publish failed"} Could not confirm manual post completion.`,
+        screenshotDataUrl,
+      };
+    }
     if (manualFirstPlatforms.includes(input.platform) && context && page) {
       const { successDetected } = await waitForManualCompletion(context, page, input.platform, 10 * 60 * 1000, input.llmClient);
       const tag = successDetected ? "manual-confirmed" : "manual-unconfirmed";
