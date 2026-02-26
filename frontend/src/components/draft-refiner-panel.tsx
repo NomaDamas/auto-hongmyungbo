@@ -112,7 +112,7 @@ export const DraftRefinerPanel = forwardRef<DraftRefinerPanelRef, Props>(functio
       setLoadingTypingText("");
       return;
     }
-    const script = "Organizing your draft...\nBuilding core message...\nStructuring key points...\nPolishing final version...";
+    const script = "Powering up your draft...\nBuilding core message...\nStructuring key points...\nPolishing final version...";
     let i = 0;
     const timer = window.setInterval(() => {
       i = i >= script.length ? 0 : i + 1;
@@ -179,7 +179,7 @@ export const DraftRefinerPanel = forwardRef<DraftRefinerPanelRef, Props>(functio
       {open && (
         <aside className="fixed left-4 top-20 z-50 h-[calc(100vh-6rem)] w-[min(560px,94vw)] overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-2xl dark:border-zinc-700/50 dark:bg-zinc-900">
           <div className="flex items-center justify-between border-b border-zinc-200 bg-zinc-50/50 px-3 py-2 dark:border-zinc-800 dark:bg-zinc-800/30">
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-violet-600 dark:text-violet-400">Draft Organizer</h3>
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-violet-600 dark:text-violet-400">Draft Booster</h3>
             <button
               type="button"
               onClick={() => setOpen(false)}
@@ -192,7 +192,7 @@ export const DraftRefinerPanel = forwardRef<DraftRefinerPanelRef, Props>(functio
             <div className="flex-1 space-y-2 overflow-y-auto p-3">
               {!messages.length && !loading && (
                 <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-2 text-xs text-zinc-600 dark:border-zinc-800 dark:bg-zinc-950/40 dark:text-zinc-300">
-                  Paste rough draft notes. I will organize them into a clean logical draft and give only a few focused discussion suggestions.
+                  Paste rough draft notes. I will power them up into a clean logical draft and give only a few focused discussion suggestions.
                 </div>
               )}
               {messages.map((m) => (
@@ -236,7 +236,7 @@ export const DraftRefinerPanel = forwardRef<DraftRefinerPanelRef, Props>(functio
                     <div className="rounded-lg border border-zinc-200 bg-white p-2 dark:border-zinc-800 dark:bg-zinc-900">
                       <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
                         <span className="mr-1 inline-flex h-4 w-4 items-center justify-center rounded bg-violet-100 text-[9px] font-bold text-violet-600 dark:bg-violet-500/20 dark:text-violet-400">A</span>
-                        Structure focus
+                        Hook Power-Up
                       </p>
                       <p className="text-xs font-medium text-zinc-700 dark:text-zinc-200">
                         Strong opening line: {result.attentionGuide.strongestHook}
@@ -255,7 +255,7 @@ export const DraftRefinerPanel = forwardRef<DraftRefinerPanelRef, Props>(functio
                     <div className="rounded-lg border border-zinc-200 bg-white p-2 dark:border-zinc-800 dark:bg-zinc-900">
                       <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
                         <span className="mr-1 inline-flex h-4 w-4 items-center justify-center rounded bg-violet-100 text-[9px] font-bold text-violet-600 dark:bg-violet-500/20 dark:text-violet-400">B</span>
-                        Missing info (quick answers)
+                        Quick Boost
                       </p>
                       <div className="space-y-2">
                         {result.questions.map((q) => (
@@ -286,7 +286,7 @@ export const DraftRefinerPanel = forwardRef<DraftRefinerPanelRef, Props>(functio
                   <div className="rounded-lg border border-zinc-200 bg-white p-2 dark:border-zinc-800 dark:bg-zinc-900">
                     <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
                       <span className="mr-1 inline-flex h-4 w-4 items-center justify-center rounded bg-violet-100 text-[9px] font-bold text-violet-600 dark:bg-violet-500/20 dark:text-violet-400">C</span>
-                      Organized draft
+                      Boosted Draft
                     </p>
                     <div className="max-h-[42vh] space-y-2 overflow-y-auto rounded-md border border-zinc-300 bg-zinc-50 p-2 dark:border-zinc-700 dark:bg-zinc-950">
                       {organizedSections.length ? (
@@ -322,7 +322,7 @@ export const DraftRefinerPanel = forwardRef<DraftRefinerPanelRef, Props>(functio
                     <div className="rounded-lg border border-zinc-200 bg-white p-2 dark:border-zinc-800 dark:bg-zinc-900">
                       <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
                         <span className="mr-1 inline-flex h-4 w-4 items-center justify-center rounded bg-violet-100 text-[9px] font-bold text-violet-600 dark:bg-violet-500/20 dark:text-violet-400">D</span>
-                        Discussion ideas (few + focused)
+                        Angle Boost
                       </p>
                       <select
                         value={selectedAngle.id}
@@ -359,13 +359,13 @@ export const DraftRefinerPanel = forwardRef<DraftRefinerPanelRef, Props>(functio
             </div>
             <div className="border-t border-zinc-200 p-3 dark:border-zinc-800">
               <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-                Discuss and refine
+                Keep Boosting
               </p>
               <div className="flex gap-2">
                 <textarea
                   value={chatInput}
                   onChange={(e) => setChatInput(e.target.value)}
-                  placeholder="Tell me what to improve (logic flow, tone, missing context, stronger conclusion...)"
+                  placeholder="What should I power up next? (logic flow, tone, missing context, stronger conclusion...)"
                   className="h-20 w-full rounded-md border-2 border-violet-300 bg-white px-3 py-2 text-sm shadow-sm outline-none focus:border-violet-500 dark:border-violet-500/50 dark:bg-zinc-950 dark:text-zinc-100"
                 />
                 <button

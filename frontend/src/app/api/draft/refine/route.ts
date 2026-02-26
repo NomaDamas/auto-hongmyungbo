@@ -42,6 +42,7 @@ export async function POST(request: Request) {
       language?: "auto" | "ko" | "en";
       platforms?: string[];
       context?: { answers?: Record<string, string> };
+      mode?: "aggro";
       model?: string;
       provider?: "openai" | "openrouter";
       generationConfig?: any;
@@ -49,6 +50,7 @@ export async function POST(request: Request) {
     if (!body.rawDraft?.trim()) return fail("rawDraft is required", 400);
     const language = ALLOWED_LANG.has(body.language || "auto") ? body.language : "auto";
     const platforms = (body.platforms || []).filter((p): p is any => ALLOWED_PLATFORMS.has(p));
+    const mode = body.mode === "aggro" ? "aggro" : undefined;
 
     const llm = makeClient({ headers: request.headers, provider: body.provider, model: body.model });
     const raw = await refineIdeaDraft({
@@ -59,6 +61,7 @@ export async function POST(request: Request) {
       platforms,
       answers: body.context?.answers,
       generationConfig: body.generationConfig,
+      mode,
     });
 
     const parsed = raw as any;
@@ -100,6 +103,24 @@ export async function POST(request: Request) {
       };
     }
     normalized.polishedDraft = ensureStructuredPolishedDraft(normalized);
+
+    if (mode === "aggro" && normalized.attentionGuide) {
+      if (!normalized.attentionGuide.hookOptions?.length) {
+        normalized.attentionGuide.hookOptions = [
+          "controversial take that makes people stop scrolling",
+          "bold claim that challenges conventional wisdom",
+          "provocative question nobody dares to ask",
+          "shocking statistic or fact that demands attention",
+          "unpopular opinion opener that sparks debate",
+        ];
+      }
+      if (!normalized.attentionGuide.riskNotes?.length) {
+        normalized.attentionGuide.riskNotes = [
+          "Warning: maximum aggro mode activated. Use at your own risk.",
+          "These hooks are designed to provoke. Review before posting.",
+        ];
+      }
+    }
 
     return ok(normalized);
   } catch (err) {

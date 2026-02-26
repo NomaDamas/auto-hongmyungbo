@@ -8,6 +8,7 @@ import type {
   LanguageOption,
   ModelOption,
   PerPlatformLanguageMap,
+  PhraseBoostResponse,
   Platform,
   ProviderOption,
   PublishJob,
@@ -76,11 +77,13 @@ export async function generatePosts(
   languageByPlatform?: PerPlatformLanguageMap,
   provider?: ProviderOption,
   generationConfig?: GenerationConfig,
+  signal?: AbortSignal,
 ): Promise<GenerateResponse> {
   const res = await apiFetch(`${API_URL}/api/generate`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ draft, userProfile, model, platforms, language, languageByPlatform, provider, generationConfig }),
+    signal,
   });
 
   if (!res.ok) {
@@ -261,6 +264,7 @@ export async function refineDraft(payload: {
   context?: {
     answers?: Record<string, string>;
   };
+  mode?: "aggro";
   model?: ModelOption;
   provider?: ProviderOption;
   generationConfig?: GenerationConfig;
@@ -294,4 +298,26 @@ export async function fetchSetupStatus(): Promise<SetupStatus> {
     };
   }
   return (await res.json()) as SetupStatus;
+}
+
+export async function boostPhrase(payload: {
+  draft: string;
+  targetText: string;
+  instruction: string;
+  history?: Array<{ role: "user" | "assistant"; text: string }>;
+  language?: DraftRefineLanguage;
+  provider?: ProviderOption;
+  model?: ModelOption;
+  generationConfig?: GenerationConfig;
+}): Promise<PhraseBoostResponse> {
+  const res = await apiFetch(`${API_URL}/api/phrase/boost`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const data = (await res.json().catch(() => ({}))) as { detail?: string };
+    throw new Error(data.detail || "Phrase boost failed");
+  }
+  return (await res.json()) as PhraseBoostResponse;
 }

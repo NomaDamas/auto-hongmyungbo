@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import { Check, ChevronDown, ChevronUp, Copy, Expand, Loader2, Mic, Pencil, RotateCcw, RotateCw, X } from "lucide-react";
+import { type MouseEvent as ReactMouseEvent, useEffect, useMemo, useRef, useState } from "react";
+import { Check, ChevronDown, ChevronUp, Copy, Expand, Loader2, Mic, Pencil, RotateCcw, RotateCw, Sparkles, X } from "lucide-react";
 import { PlatformPreview } from "@/components/platform-preview";
 import { getPlatformIcon } from "@/components/platform-icons";
 import { transformPreviewText } from "@/lib/preview-transform";
@@ -19,6 +19,7 @@ type Props = {
   onRedo: () => void;
   onSelectVersion: (index: number) => void;
   onPreviewChange: (title: string, body: string) => void;
+  onPhraseBoost?: (selectedText: string) => void;
 };
 
 function platformLabel(platform: Platform): string {
@@ -38,6 +39,7 @@ export function PlatformCard({
   onRedo,
   onSelectVersion,
   onPreviewChange,
+  onPhraseBoost,
 }: Props) {
   const [feedback, setFeedback] = useState("");
   // Keeps Preview (read-only) and Edit (editable) clearly separated.
@@ -46,6 +48,8 @@ export function PlatformCard({
   const [fullViewOpen, setFullViewOpen] = useState(false);
   const [fullViewWidth, setFullViewWidth] = useState<"desktop" | "mobile">("desktop");
   const [copyLabel, setCopyLabel] = useState("Copy");
+  const [phraseSelection, setPhraseSelection] = useState("");
+  const [phraseAnchor, setPhraseAnchor] = useState<{ x: number; y: number } | null>(null);
   const current = useMemo(() => card.versions[card.versionIndex], [card.versionIndex, card.versions]);
   const transformed = useMemo(() => transformPreviewText(card.platform, current.body), [card.platform, current.body]);
   const charCount = transformed.charCount;
@@ -54,12 +58,15 @@ export function PlatformCard({
   const [draftTitle, setDraftTitle] = useState(current.title);
   const [draftBody, setDraftBody] = useState(current.body);
   const editBodyRef = useRef<HTMLTextAreaElement | null>(null);
+  const cardRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
     setDraftTitle(current.title);
     setDraftBody(current.body);
     setViewMode("preview");
     setExpandedPreview(false);
+    setPhraseSelection("");
+    setPhraseAnchor(null);
   }, [current.title, current.body]);
 
   useEffect(() => {
@@ -88,12 +95,64 @@ export function PlatformCard({
     }
   };
 
+  const placePhraseAnchor = (clientX: number, clientY: number) => {
+    const rect = cardRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    setPhraseAnchor({
+      x: Math.max(16, Math.min(rect.width - 16, clientX - rect.left)),
+      y: Math.max(16, Math.min(rect.height - 16, clientY - rect.top)),
+    });
+  };
+
+  const capturePreviewSelection = (event: ReactMouseEvent<HTMLDivElement>) => {
+    if (!onPhraseBoost) return;
+    const text = window.getSelection()?.toString().trim() || "";
+    if (!text) {
+      setPhraseSelection("");
+      setPhraseAnchor(null);
+      return;
+    }
+    setPhraseSelection(text);
+    placePhraseAnchor(event.clientX, event.clientY);
+  };
+
+  const captureEditSelection = (event: ReactMouseEvent<HTMLTextAreaElement>) => {
+    if (!onPhraseBoost) return;
+    const el = event.currentTarget;
+    const start = el.selectionStart ?? 0;
+    const end = el.selectionEnd ?? start;
+    const text = el.value.slice(start, end).trim();
+    if (!text) {
+      setPhraseSelection("");
+      setPhraseAnchor(null);
+      return;
+    }
+    setPhraseSelection(text);
+    placePhraseAnchor(event.clientX, event.clientY);
+  };
+
   return (
     <article
+      ref={cardRef}
       className={`relative rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm transition-all dark:border-zinc-700/50 dark:bg-zinc-900 dark:shadow-glow-sm ${
         isCollapsing ? "scale-95 opacity-0" : ""
       }`}
     >
+      {onPhraseBoost && phraseSelection && phraseAnchor && (
+        <button
+          type="button"
+          onClick={() => {
+            onPhraseBoost(phraseSelection);
+            setPhraseSelection("");
+          }}
+          style={{ left: phraseAnchor.x, top: phraseAnchor.y }}
+          className="absolute z-20 -translate-x-1/2 -translate-y-1/2 rounded-full border border-violet-300 bg-white px-2 py-1 text-[11px] font-semibold text-violet-700 shadow-md transition-colors hover:bg-violet-50 dark:border-violet-500/50 dark:bg-zinc-900 dark:text-violet-300 dark:hover:bg-zinc-800"
+          title="Boost selected phrase"
+        >
+          <Sparkles className="mr-1 inline h-3 w-3" />
+          Phrase Booster
+        </button>
+      )}
       {card.isRefining && (
         <div className="absolute inset-0 z-10 grid place-items-center rounded-2xl bg-white/70 backdrop-blur-sm dark:bg-zinc-900/70">
           <div className="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-xs font-semibold dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100">
@@ -210,13 +269,15 @@ export function PlatformCard({
 
         {viewMode === "preview" && (
           <>
-            <PlatformPreview
-              platform={card.platform}
-              title={current.title}
-              text={transformed.normalizedText}
-              expanded={expandedPreview}
-              canExpand={canExpand}
-            />
+            <div onMouseUp={capturePreviewSelection}>
+              <PlatformPreview
+                platform={card.platform}
+                title={current.title}
+                text={transformed.normalizedText}
+                expanded={expandedPreview}
+                canExpand={canExpand}
+              />
+            </div>
             {canExpand && (
               <button
                 onClick={() => setExpandedPreview((v) => !v)}
@@ -253,6 +314,7 @@ export function PlatformCard({
               ref={editBodyRef}
               value={draftBody}
               onChange={(e) => setDraftBody(e.target.value)}
+              onMouseUp={captureEditSelection}
               className="min-h-[40vh] w-full resize-y overflow-hidden rounded-md border border-zinc-300 bg-white px-2 py-1 text-sm text-zinc-800 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-200"
             />
             <div className="flex justify-end gap-2">

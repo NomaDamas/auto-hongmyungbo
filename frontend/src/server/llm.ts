@@ -219,11 +219,11 @@ export function makeClient(opts: { headers: Headers; provider?: string; model?: 
   };
 }
 
-function generationOpts(config: GenerationConfigInput): { temperature: number; top_p: number; max_tokens: number } {
+function generationOpts(config: GenerationConfigInput): { temperature: number; top_p: number; max_completion_tokens: number } {
   return {
     temperature: Math.max(0, Math.min(2, config?.temperature ?? 0.7)),
     top_p: Math.max(0, Math.min(1, config?.topP ?? 1)),
-    max_tokens: Math.max(128, Math.round(config?.maxOutputTokens ?? 1500)),
+    max_completion_tokens: Math.max(128, Math.round(config?.maxOutputTokens ?? 1500)),
   };
 }
 
@@ -261,27 +261,56 @@ async function chatJson(input: {
     return parseJson(json.content?.find((b) => b.type === "text")?.text);
   }
 
-  const res = await fetch(`${input.baseUrl}/chat/completions`, {
+  const headers = {
+    "content-type": "application/json",
+    authorization: `Bearer ${input.apiKey}`,
+  };
+  const basePayload = {
+    model: input.model,
+    response_format: { type: "json_object" as const },
+    messages: [
+      { role: "system", content: input.system },
+      { role: "user", content: input.user },
+    ],
+  };
+
+  const firstPayload = {
+    ...basePayload,
+    ...generationOpts(input.generationConfig),
+  };
+
+  let res = await fetch(`${input.baseUrl}/chat/completions`, {
     method: "POST",
-    headers: {
-      "content-type": "application/json",
-      authorization: `Bearer ${input.apiKey}`,
-    },
-    body: JSON.stringify({
-      model: input.model,
-      response_format: { type: "json_object" },
-      ...generationOpts(input.generationConfig),
-      messages: [
-        { role: "system", content: input.system },
-        { role: "user", content: input.user },
-      ],
-    }),
+    headers,
+    body: JSON.stringify(firstPayload),
   });
 
   if (!res.ok) {
-    const t = await res.text();
-    throw new Error(`LLM request failed: ${res.status} ${t}`);
+    const firstText = await res.text();
+    const lower = firstText.toLowerCase();
+    const canRetryWithoutSampling =
+      res.status === 400 &&
+      (lower.includes("unsupported parameter") ||
+        lower.includes("unsupported value") ||
+        lower.includes("temperature") ||
+        lower.includes("top_p"));
+
+    if (!canRetryWithoutSampling) {
+      throw new Error(`LLM request failed: ${res.status} ${firstText}`);
+    }
+
+    // Some latest models only allow default sampling settings.
+    res = await fetch(`${input.baseUrl}/chat/completions`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(basePayload),
+    });
+    if (!res.ok) {
+      const retryText = await res.text();
+      throw new Error(`LLM request failed: ${res.status} ${retryText}`);
+    }
   }
+
   const json = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> };
   return parseJson(json.choices?.[0]?.message?.content);
 }
@@ -447,6 +476,7 @@ export async function refineIdeaDraft(input: {
   platforms?: string[];
   answers?: Record<string, string>;
   generationConfig?: GenerationConfigInput;
+  mode?: "aggro";
 }): Promise<unknown> {
   const langInstruction =
     input.language === "ko"
@@ -454,42 +484,71 @@ export async function refineIdeaDraft(input: {
       : input.language === "en"
         ? "Return all fields in English."
         : "Use the dominant language from draft.";
-  const prompt = [
-    "You are a senior writing coach.",
-    "Primary goal: organize the user's messy draft into a clear, logical structure.",
-    "Do not invent facts. If key facts are missing, ask concise questions.",
-    "Do NOT produce many ideas. Keep suggestions minimal and focused.",
-    "Prioritize coherence and argument flow over creativity.",
-    langInstruction,
-    "Return strict JSON:",
-    "{",
-    '  "brief": { "title?": "string", "coreMessage": "string", "audienceAssumption": "string", "keyPoints": ["3-5"], "cta": "string", "hashtags?": ["string"] },',
-    '  "questions": [{ "id": "string", "question": "string", "choices?": ["string"] }],',
-    '  "angles": [{ "id": "string", "label": "string", "preview": "string", "draftSnippet?": "string" }],',
-    '  "attentionGuide": { "strongestHook": "string", "hookOptions": ["<=3"], "ctaOptions": ["<=3"], "riskNotes": ["<=3"] },',
-    '  "polishedDraft": "string"',
-    "}",
-    "Constraints:",
-    "- questions: max 2",
-    "- angles: max 2",
-    "- keep each angle practical and close to the user's original intent",
-    "- polishedDraft must be clearly structured, not one long block",
-    "- polishedDraft format (plain text) should include section labels in this order:",
-    "  [Hook]",
-    "  [Core Message]",
-    "  [Key Points]",
-    "  - point 1",
-    "  - point 2",
-    "  - point 3",
-    "  [Body]",
-    "  [CTA]",
-    "- Body should be 2-4 short paragraphs with natural flow",
-    "- Keep concise and practical",
-    `Platforms: ${(input.platforms || []).join(", ") || "not specified"}`,
-    `Answers: ${JSON.stringify(input.answers || {})}`,
-    "Raw draft:",
-    input.rawDraft,
-  ].join("\n");
+
+  const isAggro = input.mode === "aggro";
+
+  const prompt = isAggro
+    ? [
+        "You are a provocative hook generator and attention-grabbing content strategist.",
+        "Your goal: generate extremely click-worthy, scroll-stopping hooks for the user's draft.",
+        "Be bold, controversial, and attention-grabbing — but stay truthful to the draft's core message.",
+        "Push the boundary of clickbait without crossing into misinformation.",
+        langInstruction,
+        "Return strict JSON:",
+        "{",
+        '  "brief": { "title?": "string", "coreMessage": "string", "audienceAssumption": "string", "keyPoints": ["3-5"], "cta": "string" },',
+        '  "questions": [],',
+        '  "angles": [{ "id": "string", "label": "string", "preview": "string", "draftSnippet?": "string" }],',
+        '  "attentionGuide": { "strongestHook": "string", "hookOptions": ["5 provocative hooks"], "ctaOptions": ["<=3"], "riskNotes": ["<=3 fun warnings"] },',
+        '  "polishedDraft": "string"',
+        "}",
+        "Constraints:",
+        "- hookOptions: exactly 5 provocative, scroll-stopping hook lines",
+        "- Each hook should be dramatically different in style (question, bold claim, controversy, shock value, FOMO)",
+        "- riskNotes should be fun warnings like 'This is pure aggro — review before posting!'",
+        "- angles: max 2 aggressive content angles",
+        "- polishedDraft: rewrite with the most aggressive hook applied",
+        "- polishedDraft format: [Hook] [Core Message] [Key Points] [Body] [CTA]",
+        `Platforms: ${(input.platforms || []).join(", ") || "not specified"}`,
+        "Raw draft:",
+        input.rawDraft,
+      ].join("\n")
+    : [
+        "You are a senior writing coach.",
+        "Primary goal: organize the user's messy draft into a clear, logical structure.",
+        "Do not invent facts. If key facts are missing, ask concise questions.",
+        "Do NOT produce many ideas. Keep suggestions minimal and focused.",
+        "Prioritize coherence and argument flow over creativity.",
+        langInstruction,
+        "Return strict JSON:",
+        "{",
+        '  "brief": { "title?": "string", "coreMessage": "string", "audienceAssumption": "string", "keyPoints": ["3-5"], "cta": "string", "hashtags?": ["string"] },',
+        '  "questions": [{ "id": "string", "question": "string", "choices?": ["string"] }],',
+        '  "angles": [{ "id": "string", "label": "string", "preview": "string", "draftSnippet?": "string" }],',
+        '  "attentionGuide": { "strongestHook": "string", "hookOptions": ["<=3"], "ctaOptions": ["<=3"], "riskNotes": ["<=3"] },',
+        '  "polishedDraft": "string"',
+        "}",
+        "Constraints:",
+        "- questions: max 2",
+        "- angles: max 2",
+        "- keep each angle practical and close to the user's original intent",
+        "- polishedDraft must be clearly structured, not one long block",
+        "- polishedDraft format (plain text) should include section labels in this order:",
+        "  [Hook]",
+        "  [Core Message]",
+        "  [Key Points]",
+        "  - point 1",
+        "  - point 2",
+        "  - point 3",
+        "  [Body]",
+        "  [CTA]",
+        "- Body should be 2-4 short paragraphs with natural flow",
+        "- Keep concise and practical",
+        `Platforms: ${(input.platforms || []).join(", ") || "not specified"}`,
+        `Answers: ${JSON.stringify(input.answers || {})}`,
+        "Raw draft:",
+        input.rawDraft,
+      ].join("\n");
 
   return chatJson({
     provider: input.client.provider,
@@ -500,4 +559,62 @@ export async function refineIdeaDraft(input: {
     user: prompt,
     generationConfig: input.generationConfig,
   });
+}
+
+export async function boostPhraseChat(input: {
+  client: { provider?: SupportedProvider; baseUrl: string; apiKey: string };
+  model: string;
+  draft: string;
+  targetText: string;
+  instruction: string;
+  language?: "auto" | "ko" | "en";
+  history?: Array<{ role: "user" | "assistant"; text: string }>;
+  generationConfig?: GenerationConfigInput;
+}): Promise<{ assistant: string; suggestions: string[]; rewritten?: string }> {
+  const languageRule =
+    input.language === "ko"
+      ? "Return Korean."
+      : input.language === "en"
+      ? "Return English."
+      : "Match the user's draft language.";
+  const historyBlock = (input.history || [])
+    .slice(-8)
+    .map((h) => `${h.role.toUpperCase()}: ${h.text}`)
+    .join("\n");
+  const userPrompt = [
+    "You are a social writing phrase coach.",
+    "Goal: make wording stronger, clearer, and more engaging without changing intent.",
+    "Avoid cringe, clickbait spam, fake facts, or exaggerated claims.",
+    languageRule,
+    "Return strict JSON only:",
+    '{ "assistant":"short coaching reply", "suggestions":["3-5 improved phrase options"], "rewritten":"optional full-sentence rewrite" }',
+    "",
+    "Current draft:",
+    input.draft,
+    "",
+    "Target phrase:",
+    input.targetText,
+    "",
+    "User request:",
+    input.instruction,
+    "",
+    "Recent chat history:",
+    historyBlock || "(none)",
+  ].join("\n");
+
+  const parsed = (await chatJson({
+    provider: input.client.provider,
+    baseUrl: input.client.baseUrl,
+    apiKey: input.client.apiKey,
+    model: input.model,
+    system: "You are concise, practical, and always output valid JSON.",
+    user: userPrompt,
+    generationConfig: input.generationConfig,
+  })) as { assistant?: string; suggestions?: string[]; rewritten?: string };
+
+  return {
+    assistant: String(parsed.assistant || "I prepared stronger phrase options you can use now."),
+    suggestions: Array.isArray(parsed.suggestions) ? parsed.suggestions.slice(0, 5).map((s) => String(s)) : [],
+    rewritten: parsed.rewritten ? String(parsed.rewritten) : undefined,
+  };
 }
