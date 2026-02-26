@@ -1,6 +1,10 @@
 # Auto-HongMyungbo (Open Source Local Edition)
 
-![Auto-HongMyungbo Preview](docs/images/ddalcak_myungbo.png)
+<img width="585" height="288" alt="image" src="https://github.com/user-attachments/assets/6a3c7260-d339-4ae3-b1ac-0e9faeb7e13a" />
+
+
+[![Watch the demo](https://img.youtube.com/vi/XuE7bIkd2qU/maxresdefault.jpg)](https://youtu.be/XuE7bIkd2qU)
+
 
 A local tool that turns one draft into multi-platform SNS posts, lets you refine them, and publish in sequence.
 
