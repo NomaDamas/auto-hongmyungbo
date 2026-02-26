@@ -1,17 +1,14 @@
-# Auto-HongMyungbo (Open Source Local Edition)
+# Auto-HongMyungbo (Open Source Local Edition) ⚽
 
 <img width="1230" height="444" alt="image" src="https://github.com/user-attachments/assets/a90d5fc5-457a-43c5-ba19-9d7af3c722df" />
 
 
-<video width="600" controls>
-  <source src="docs/images/demo.mp4" type="video/mp4">
-</video>
+<video src="./docs/images/demo.mp4" controls width="600"></video>
 
-[If the video does not render on your GitHub client, open it directly.](docs/images/demo.mp4)
 
 A local tool that turns one draft into multi-platform SNS posts, lets you refine them, and publish in sequence.
 
-## Table of Contents
+## Table of Contents 📚
 
 - [1. What This Project Does](#1-what-this-project-does)
 - [2. Easy Setup (First-Time Users)](#2-easy-setup-first-time-users)
@@ -22,7 +19,7 @@ A local tool that turns one draft into multi-platform SNS posts, lets you refine
 - [7. Common Errors and Fixes](#7-common-errors-and-fixes)
 - [8. Project Structure](#8-project-structure)
 
-## 1. What This Project Does
+## 1. What This Project Does 🚀
 
 - Runs UI + API together in a single Next.js app.
 - Stores state in a local file (`local_store.json`) without an external DB.
@@ -34,7 +31,7 @@ A local tool that turns one draft into multi-platform SNS posts, lets you refine
   - Manage Queue
   - Sequential publish (`Post Next Platform`, `Post All (Beta)`)
 
-## 2. Easy Setup (First-Time Users)
+## 2. Easy Setup (First-Time Users) 🛠️
 
 ### 2-1. Requirements
 
@@ -78,7 +75,7 @@ If you want Instagram auto-upload support:
 INSTAGRAM_MEDIA_PATH=docs/images/sample.jpg
 ```
 
-## 3. First Run
+## 3. First Run ▶️
 
 ```bash
 ./scripts/start_local.sh
@@ -92,7 +89,7 @@ Stop server:
 
 - `Ctrl + C` in the terminal running the app
 
-## 4. End-to-End Usage
+## 4. End-to-End Usage 🧭
 
 ### Step 1) Write Draft
 
@@ -147,7 +144,7 @@ If a publish fails:
 
 - You can retry from that platform or continue manually.
 
-## 5. Core Features at a Glance
+## 5. Core Features at a Glance ✨
 
 ### Preview vs Edit
 
@@ -169,14 +166,14 @@ If a publish fails:
 - Toggle with the sun/moon button (bottom-right)
 - Preference is saved in browser storage
 
-## 6. How Login and Publish Work
+## 6. How Login and Publish Work 🔐
 
 - Login state is determined from real browser session state.
 - Preflight login checks run before publish.
 - Manual-heavy platforms (for example Reddit) now detect leave/close events to reduce stuck states.
 - On success, items are removed from Queue; on failure, they remain for retry.
 
-## 7. Common Errors and Fixes
+## 7. Common Errors and Fixes 🧯
 
 ### 1) `OpenAI/OpenRouter not configured`
 
@@ -204,7 +201,7 @@ If a publish fails:
 
 - Check publish logs/status and refresh once
 
-## 8. Project Structure
+## 8. Project Structure 🧱
 
 ```text
 .
