@@ -1,51 +1,68 @@
-# Auto-HongMyungbo (Open Source Local Edition) ⚽
+# 🤖 Auto-HongMyungbo (Open Source Local Edition) ⚽
 
-<img width="1230" height="444" alt="image" src="https://github.com/user-attachments/assets/a90d5fc5-457a-43c5-ba19-9d7af3c722df" />
+> Write your idea once — Auto-HongMyungbo turns it into ready-to-post content for every SNS platform and publishes them for you.
 
+---
 
-<video src="./docs/images/demo.mp4" controls width="600"></video>
+## 📺 Demo Video
 
+<video src="./docs/images/demo.mp4" controls muted playsinline width="900">
+  Your browser does not support the video tag.
+</video>
 
-A local tool that turns one draft into multi-platform SNS posts, lets you refine them, and publish in sequence.
+---
 
-## Table of Contents 📚
+## 📋 Table of Contents
 
-- [1. What This Project Does](#1-what-this-project-does)
-- [2. Easy Setup (First-Time Users)](#2-easy-setup-first-time-users)
-- [3. First Run](#3-first-run)
-- [4. End-to-End Usage](#4-end-to-end-usage)
-- [5. Core Features at a Glance](#5-core-features-at-a-glance)
-- [6. How Login and Publish Work](#6-how-login-and-publish-work)
-- [7. Common Errors and Fixes](#7-common-errors-and-fixes)
-- [8. Project Structure](#8-project-structure)
+- [🚀 What Does This Do?](#what)
+- [🛠️ Setup (First-Time Users)](#setup)
+- [▶️ Running the App](#run)
+- [📖 End-to-End Usage](#usage)
+- [✨ Core Features at a Glance](#features)
+- [🔐 How Login and Publishing Work](#login)
+- [🧯 Common Errors and Fixes](#errors)
+- [🧱 Project Structure](#structure)
 
-## 1. What This Project Does 🚀
+---
 
-- Runs UI + API together in a single Next.js app.
-- Stores state in a local file (`local_store.json`) without an external DB.
-- Uses browser automation (Playwright) as the default publishing method.
-- Supported flow:
-  - Write Draft
-  - Generate per platform
-  - Preview/Edit
-  - Manage Queue
-  - Sequential publish (`Post Next Platform`, `Post All (Beta)`)
+<a name="what"></a>
 
-## 2. Easy Setup (First-Time Users) 🛠️
+## 🚀 What Does This Do?
 
-### 2-1. Requirements
+**Auto-HongMyungbo** automates SNS content creation and publishing — all running locally on your computer.
 
-- macOS / Linux / Windows (WSL recommended)
-- Git
-- Node.js 20+
-- Terminal
-- At least one LLM API key:
-  - OpenAI or OpenRouter (recommended baseline)
+| Step | What Happens |
+| ---- | ------------ |
+| ✍️ Write a draft | Paste your raw idea once |
+| 🤖 AI generates posts | Creates platform-specific versions automatically |
+| 👀 Preview & edit | Review and tweak each result |
+| 📤 Auto-publish | Browser automation posts them in sequence |
+
+All data is stored **locally on your machine** — nothing is sent to external servers.
+
+---
+
+<a name="setup"></a>
+
+## 🛠️ Setup (First-Time Users)
+
+### Requirements Checklist ✅
+
+- [ ] macOS / Linux / Windows (WSL recommended)
+- [ ] Git installed
+- [ ] Node.js 20+ installed
+- [ ] A terminal you can type in
+- [ ] At least one AI API key:
+  - 🌟 **OpenAI or OpenRouter** (recommended for beginners)
   - Anthropic / Grok / Gemini (optional)
 
-See `docs/API_KEYS.md` for API key setup.
+> 💡 Not sure how to get API keys? See [`docs/API_KEYS.md`](docs/API_KEYS.md).
 
-### 2-2. Install
+---
+
+### Step 1 — Clone & Install
+
+Open your terminal and run these commands one by one:
 
 ```bash
 git clone https://github.com/NomaDamas/auto-hongmyungbo.git
@@ -53,163 +70,212 @@ cd auto-hongmyungbo
 ./scripts/setup_local_easy.sh
 ```
 
-### 2-3. Create Environment File
+> ⏳ The first run downloads Playwright (browser automation). This may take a few minutes.
 
-Create `frontend/.env` or `frontend/.env.local`:
+---
+
+### Step 2 — Create Your Environment File
+
+Create a file called `frontend/.env` (or `frontend/.env.local`) and fill in your API keys:
 
 ```env
-# At least one is required
+# ✅ At least one of these is required
 OPENROUTER_API_KEY=your_key_here
 # or
 OPENAI_API_KEY=your_key_here
 
-# Optional
+# 🔽 Optional
 ANTHROPIC_API_KEY=your_key_here
 GROK_API_KEY=your_key_here
 GEMINI_API_KEY=your_key_here
 ```
 
-If you want Instagram auto-upload support:
+If you want Instagram auto-upload support, also add:
 
 ```env
 INSTAGRAM_MEDIA_PATH=docs/images/sample.jpg
 ```
 
-## 3. First Run ▶️
+---
+
+<a name="run"></a>
+
+## ▶️ Running the App
 
 ```bash
 ./scripts/start_local.sh
 ```
 
-Open in browser:
+Then open your browser and go to:
 
-- `http://localhost:3000`
+🌐 **http://localhost:3000**
 
-Stop server:
+To stop the server: press `Ctrl + C` in the terminal.
 
-- `Ctrl + C` in the terminal running the app
+---
 
-## 4. End-to-End Usage 🧭
+<a name="usage"></a>
 
-### Step 1) Write Draft
+## 📖 End-to-End Usage
 
-Paste your rough draft into the left `Draft` box.
+### 1️⃣ Write Your Draft
 
-### Step 2) Configure Options
+Paste your rough idea into the `Draft` box on the left.
 
-In `Options`, set:
+### 2️⃣ Configure Options
 
-- Provider
-- Model
-- API Keys
+In the `Options` panel, set:
+
+- **Provider** — OpenAI, OpenRouter, etc.
+- **Model** — which AI model to use
+- **API Keys** — your credentials
 - Thinking / Temperature / Token settings
 
-### Step 3) Optional Draft Enhancement
+### 3️⃣ Boost Your Draft (Optional)
 
-- `Draft Idea Booster`: structure your idea
-- `Aggro Pingpong`: stronger hook exploration
-- `Phrase Booster`: improve selected wording
-  - Select text in Draft to show the `Phrase Booster` button
-  - Click it to open a chat-style panel for wording improvements
+| Feature | What It Does |
+| ------- | ------------ |
+| `Draft Idea Booster` | Structures and strengthens your idea |
+| `Aggro Pingpong` | Explores more powerful hooks |
+| `Phrase Booster` | Refines a specific sentence you select |
 
-### Step 4) Generate by Platform
+> 💡 **Phrase Booster tip:** Highlight any text in the Draft box — a `Phrase Booster` button will appear. Click it to open a chat-style panel for targeted rewrites.
 
-Click `Generate N Platforms`.
+### 4️⃣ Generate for Each Platform
 
-- While generating, hover the button to reveal `Cancel`.
+Click **`Generate N Platforms`** — the AI rewrites your draft for every SNS.
 
-### Step 5) Review Results
+> Hover the button while it's running to reveal a `Cancel` option.
+
+### 5️⃣ Review Results
 
 In `Platform Results`:
 
-- Read in Preview
-- Edit directly
-- Accept / Reject
+- 👁️ Read in **Preview** mode
+- ✏️ Make changes in **Edit** mode
+- ✅ **Accept** → moves the card to your Queue
+- ❌ **Reject** → discards it
 
-Accepted cards move to Queue.
+### 6️⃣ Log In to Each Platform
 
-### Step 6) Login
+Click **`Browser Login`** for each platform once.
 
-Use each platform’s `Browser Login` once.
+> Even when a platform shows `Connected`, the app runs a quick login check before every publish.
 
-- Even when `Connected` is shown, preflight login verification runs before publish.
+### 7️⃣ Publish
 
-### Step 7) Publish
+| Button | What It Does |
+| ------ | ------------ |
+| `Post Next Platform` | Walks you through publishing one at a time |
+| `Post All (Beta)` | Publishes all queued platforms in sequence |
+| `Publish now` (on a card) | Publishes just that one platform immediately |
 
-- `Post Next Platform`: guided one-by-one publishing
-- `Post All (Beta)`: sequential publish for all queued cards
-- `Publish now` on each queue card: one-off publish
+If publishing fails, you can retry from that platform or finish manually.
 
-If a publish fails:
+---
 
-- You can retry from that platform or continue manually.
+<a name="features"></a>
 
-## 5. Core Features at a Glance ✨
+## ✨ Core Features at a Glance
 
-### Preview vs Edit
+### 👁️ Preview vs Edit
 
-- Preview: reading-focused
-- Edit: direct content editing
+| Mode | Purpose |
+| ---- | ------- |
+| **Preview** | Clean reading view |
+| **Edit** | Direct content editing |
 
-### Compare Mode
+### 🔀 Compare Mode
 
-- OFF (default): focused single-platform view
-- ON: side-by-side platform comparison
+- **OFF** (default) — focused single-platform view
+- **ON** — side-by-side comparison across platforms
 
-### Saved Drafts
+### 💾 Saved Drafts
 
-- Restore auto-saved draft history
-- Deleting also removes it from local history
+- Restore from auto-saved draft history
+- Deleting a draft also removes it from local history
 
-### Theme (Dark/Light)
+### 🌙 Dark / Light Theme
 
-- Toggle with the sun/moon button (bottom-right)
-- Preference is saved in browser storage
+- Toggle with the sun/moon button in the bottom-right corner
+- Your preference is saved in browser storage
 
-## 6. How Login and Publish Work 🔐
+---
 
-- Login state is determined from real browser session state.
-- Preflight login checks run before publish.
-- Manual-heavy platforms (for example Reddit) now detect leave/close events to reduce stuck states.
-- On success, items are removed from Queue; on failure, they remain for retry.
+<a name="login"></a>
 
-## 7. Common Errors and Fixes 🧯
+## 🔐 How Login and Publishing Work
 
-### 1) `OpenAI/OpenRouter not configured`
+- Login state is determined from your **real browser session** — no stored passwords.
+- A preflight login check runs automatically before every publish.
+- Manual-heavy platforms (e.g., Reddit) detect leave/close events to avoid getting stuck.
+- ✅ Successful publish → card removed from Queue
+- ❌ Failed publish → card stays in Queue for retry
 
-- Check `frontend/.env`
-- Restart server: `./scripts/start_local.sh`
+---
 
-### 2) `Playwright not installed`
+<a name="errors"></a>
+
+## 🧯 Common Errors and Fixes
+
+### ❗ 1) `OpenAI/OpenRouter not configured`
+
+- Double-check `frontend/.env` has a valid API key
+- Restart: `./scripts/start_local.sh`
+
+### ❗ 2) `Playwright not installed`
+
+Run the setup script again:
 
 ```bash
 ./scripts/setup_local_easy.sh
 ```
 
-### 3) `LLM request failed: unsupported parameter/value`
+### ❗ 3) `LLM request failed: unsupported parameter/value`
 
-- Some latest models restrict sampling parameters.
-- The app includes automatic fallback retries.
-- If it still fails, switch model and test again.
+- Some newer models restrict sampling parameters
+- The app retries automatically with fallback settings
+- If it keeps failing, switch to a different model in Options
 
-### 4) Connected login but publish fails
+### ❗ 4) Platform shows `Connected` but publish fails
 
-- Click `Disconnect` for that platform, then run `Browser Login` again
-- Platform UI changes can break automation; manual completion is still possible
+1. Click **`Disconnect`** for that platform
+2. Run **`Browser Login`** again
 
-### 5) Queue does not flush
+> Platform UI changes can sometimes break automation. Manual completion is always an option.
 
-- Check publish logs/status and refresh once
+### ❗ 5) Queue doesn't clear after publishing
 
-## 8. Project Structure 🧱
+- Check the publish log/status panel
+- Refresh the page once
+
+---
+
+<a name="structure"></a>
+
+## 🧱 Project Structure
 
 ```text
-.
-├── frontend/
-│   ├── src/app/api/      # Next.js API routes
+auto-hongmyungbo/
+├── 📁 frontend/
+│   ├── src/app/api/      # Next.js API routes (server communication)
 │   ├── src/components/   # UI components
-│   ├── src/lib/          # Client helpers/types
-│   └── src/server/       # LLM + store + automation logic
-├── scripts/              # Setup/run scripts
-└── docs/                 # Docs + images
+│   ├── src/lib/          # Client-side utilities & types
+│   └── src/server/       # AI (LLM) + local store + automation logic
+├── 📁 scripts/           # Setup and run scripts
+└── 📁 docs/              # Documentation & images
 ```
+
+---
+
+## 📄 License
+
+This project is licensed under the **GNU Affero General Public License v3.0 (AGPL-3.0)**.
+
+If you use or modify this project and provide it as a network service, you must also make the corresponding source code available under AGPL-3.0.
+
+See the full license text in [`LICENSE`](LICENSE).
+
+---
+
+Made with ❤️ by the Auto-HongMyungbo team
