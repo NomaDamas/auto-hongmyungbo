@@ -1,6 +1,6 @@
 # Auto-HongMyungbo (Open Source Local Edition)
 
-<img width="585" height="288" alt="image" src="https://github.com/user-attachments/assets/6a3c7260-d339-4ae3-b1ac-0e9faeb7e13a" />
+<img width="1230" height="444" alt="image" src="https://github.com/user-attachments/assets/a90d5fc5-457a-43c5-ba19-9d7af3c722df" />
 
 
 [![Watch the demo](https://img.youtube.com/vi/XuE7bIkd2qU/maxresdefault.jpg)](https://youtu.be/XuE7bIkd2qU)
