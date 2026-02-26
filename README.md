@@ -6,10 +6,6 @@
 
 ## 📺 Demo Video
 
-<video src="https://github.com/user-attachments/assets/d2640150-7402-49c0-96d1-b198d7d02130" controls muted playsinline width="900">
-  Your browser does not support the video tag.
-</video>
-
 [Open demo video link](https://github.com/user-attachments/assets/d2640150-7402-49c0-96d1-b198d7d02130)
 
 ---
