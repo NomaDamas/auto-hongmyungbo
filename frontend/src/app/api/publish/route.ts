@@ -1,7 +1,9 @@
 import { fail, ok } from "@/server/http";
 import { addPublishLog, createJob, getOAuthToken, listCardsForDraft, updateJob } from "@/server/store";
 import { publishToPlatform } from "@/server/publishers";
-import { publishByBrowser } from "@/server/browser-automation";
+import { publishByBrowser, DOM_CHEAP_MODELS, DOM_BASE_URLS, type LlmClient } from "@/server/browser-automation";
+import { makeClient } from "@/server/llm";
+import type { DomLlmProvider } from "@/lib/types";
 
 export const runtime = "nodejs";
 
@@ -32,15 +34,46 @@ export async function POST(request: Request) {
       publishMode: body.publishMode || "browser",
     });
 
+    // Build LLM client for DOM fallback — uses selected provider's cheapest model
+    let llmClient: LlmClient | undefined;
+    try {
+      const domProvider = (request.headers.get("x-dom-llm-provider") || "").trim() as DomLlmProvider;
+      const domApiKey = (request.headers.get("x-dom-llm-api-key") || "").trim();
+
+      if (domProvider && (domProvider === "anthropic" || domProvider === "grok" || domProvider === "gemini")) {
+        // Dedicated provider — needs its own API key
+        if (domApiKey) {
+          llmClient = {
+            provider: domProvider,
+            baseUrl: DOM_BASE_URLS[domProvider],
+            apiKey: domApiKey,
+            model: DOM_CHEAP_MODELS[domProvider],
+          };
+        }
+      } else {
+        // Fallback to openai/openrouter using existing keys
+        const client = makeClient({ headers: request.headers });
+        const prov = (domProvider === "openrouter" ? "openrouter" : client.provider) as DomLlmProvider;
+        llmClient = {
+          provider: prov,
+          baseUrl: client.baseUrl,
+          apiKey: client.apiKey,
+          model: DOM_CHEAP_MODELS[prov],
+        };
+      }
+    } catch {
+      // No LLM key available — fallback will be skipped
+    }
+
     const published = [];
     const failed = [];
     const mode = body.publishMode || "browser";
     for (const card of selected) {
-      let result: { ok: boolean; postId?: string; url?: string; error?: string } | null = null;
+      let result: { ok: boolean; postId?: string; url?: string; error?: string; screenshotDataUrl?: string } | null = null;
       if (mode === "browser") {
-        result = await publishByBrowser({ platform: card.platform as any, title: card.title, body: card.body });
+        result = await publishByBrowser({ platform: card.platform as any, title: card.title, body: card.body, llmClient });
       } else if (mode === "hybrid") {
-        const browserResult = await publishByBrowser({ platform: card.platform as any, title: card.title, body: card.body });
+        const browserResult = await publishByBrowser({ platform: card.platform as any, title: card.title, body: card.body, llmClient });
         if (browserResult.ok) {
           result = browserResult;
         }
@@ -71,7 +104,13 @@ export async function POST(request: Request) {
           postUrl: result.url,
           status: "success",
         });
-        published.push({ platform: card.platform, cardId: card.id, postId: result.postId, url: result.url });
+        published.push({
+          platform: card.platform,
+          cardId: card.id,
+          postId: result.postId,
+          url: result.url,
+          screenshotDataUrl: result.screenshotDataUrl,
+        });
       } else {
         const errorText = result?.error || "publish failed";
         addPublishLog({
@@ -83,7 +122,12 @@ export async function POST(request: Request) {
           status: "failed",
           errorText,
         });
-        failed.push({ platform: card.platform, cardId: card.id, error: errorText });
+        failed.push({
+          platform: card.platform,
+          cardId: card.id,
+          error: errorText,
+          screenshotDataUrl: result?.screenshotDataUrl,
+        });
       }
     }
 

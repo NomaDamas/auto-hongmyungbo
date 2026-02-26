@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Check, Copy, Expand, Loader2, Mic, Pencil, RotateCcw, RotateCw, X } from "lucide-react";
+import { Check, ChevronDown, ChevronUp, Copy, Expand, Loader2, Mic, Pencil, RotateCcw, RotateCw, X } from "lucide-react";
 import { PlatformPreview } from "@/components/platform-preview";
 import { getPlatformIcon } from "@/components/platform-icons";
 import { transformPreviewText } from "@/lib/preview-transform";
@@ -9,6 +9,7 @@ import type { CardState, Platform } from "@/lib/types";
 
 type Props = {
   card: CardState;
+  publishStateLabel?: "Draft" | "Ready" | "Publishing" | "Posted" | "Failed";
   isCollapsing?: boolean;
   onAccept: () => void;
   onReject: () => void;
@@ -20,8 +21,14 @@ type Props = {
   onPreviewChange: (title: string, body: string) => void;
 };
 
+function platformLabel(platform: Platform): string {
+  if (platform === "twitter") return "X";
+  return platform;
+}
+
 export function PlatformCard({
   card,
+  publishStateLabel,
   isCollapsing = false,
   onAccept,
   onReject,
@@ -99,10 +106,10 @@ export function PlatformCard({
         <div>
           <p className="flex items-center gap-1.5 text-base font-semibold capitalize text-zinc-900 dark:text-zinc-100">
             {(() => { const Icon = getPlatformIcon(card.platform); return <Icon className="h-4 w-4 text-violet-500" />; })()}
-            {card.platform}
+            {platformLabel(card.platform)}
           </p>
           <p className="text-[11px] uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-            {card.status} · version {card.versionIndex + 1}
+            {publishStateLabel || card.status} · version {card.versionIndex + 1}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-1 justify-end">
@@ -213,9 +220,23 @@ export function PlatformCard({
             {canExpand && (
               <button
                 onClick={() => setExpandedPreview((v) => !v)}
-                className="mt-1 rounded-md px-1 py-1 text-[11px] font-medium text-zinc-600 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-700"
+                className={`mt-2 inline-flex items-center gap-1 rounded-md px-2.5 py-1.5 text-[11px] font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-violet-400/60 ${
+                  expandedPreview
+                    ? "border border-zinc-300 bg-white text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800"
+                    : "bg-violet-600 text-white hover:bg-violet-700 dark:bg-violet-500 dark:hover:bg-violet-600"
+                }`}
               >
-                {expandedPreview ? "Collapse" : "Read more"}
+                {expandedPreview ? (
+                  <>
+                    <ChevronUp className="h-3 w-3" />
+                    Collapse
+                  </>
+                ) : (
+                  <>
+                    <ChevronDown className="h-3 w-3" />
+                    Read more
+                  </>
+                )}
               </button>
             )}
           </>
@@ -301,7 +322,7 @@ export function PlatformCard({
           <div className={`w-full rounded-2xl border border-zinc-200 bg-white p-4 shadow-xl dark:border-zinc-800 dark:bg-zinc-900 ${fullViewWidth === "mobile" ? "max-w-md" : "max-w-3xl"}`}>
             <div className="mb-2 flex items-start justify-between gap-2">
               <div>
-                <p className="text-sm font-semibold capitalize text-zinc-900 dark:text-zinc-100">{card.platform} full preview</p>
+                <p className="text-sm font-semibold capitalize text-zinc-900 dark:text-zinc-100">{platformLabel(card.platform)} full preview</p>
                 <p className="text-xs text-zinc-500 dark:text-zinc-400">{charCount} chars</p>
               </div>
               <div className="flex gap-1">

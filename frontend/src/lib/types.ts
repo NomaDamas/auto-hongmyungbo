@@ -125,6 +125,29 @@ export type DraftRefineResponse = {
   polishedDraft: string;
 };
 
+export type StyleHistoryEntry = {
+  id: string;
+  label: string;
+  text: string;
+  createdAt: string;
+};
+
+export type StyleHistoryMap = Partial<Record<Platform, StyleHistoryEntry[]>>;
+
+export type DomLlmProvider = "openai" | "openrouter" | "anthropic" | "grok" | "gemini";
+
+export type DomLlmConfig = {
+  provider: DomLlmProvider;
+  apiKey?: string; // runtime key (for anthropic/grok/gemini)
+};
+
+export type SavedDraftSnapshot = {
+  id: string;
+  draft: string;
+  cards: CardState[];
+  createdAt: string;
+};
+
 export type SetupStatus = {
   llm: {
     envOpenAI: boolean;

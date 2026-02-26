@@ -5,6 +5,7 @@ export type PublishResult = {
   postId?: string;
   url?: string;
   error?: string;
+  screenshotDataUrl?: string;
 };
 
 async function asJson(res: Response): Promise<Record<string, unknown>> {

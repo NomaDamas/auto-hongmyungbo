@@ -1,4 +1,5 @@
 import type {
+  DomLlmProvider,
   DraftRefineLanguage,
   DraftRefineResponse,
   GenerateResponse,
@@ -19,10 +20,17 @@ import type {
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "";
 let runtimeOpenAIKey = "";
 let runtimeOpenRouterKey = "";
+let runtimeDomLlmProvider: DomLlmProvider = "openai";
+let runtimeDomLlmApiKeys: Partial<Record<DomLlmProvider, string>> = {};
 
 export function configureRuntimeApiKeys(keys: { openaiApiKey?: string; openrouterApiKey?: string }) {
   runtimeOpenAIKey = (keys.openaiApiKey || "").trim();
   runtimeOpenRouterKey = (keys.openrouterApiKey || "").trim();
+}
+
+export function configureDomLlm(provider: DomLlmProvider, apiKeys: Partial<Record<DomLlmProvider, string>>) {
+  runtimeDomLlmProvider = provider;
+  runtimeDomLlmApiKeys = apiKeys;
 }
 
 function mergeHeaders(initHeaders?: HeadersInit): Record<string, string> {
@@ -45,6 +53,9 @@ async function apiFetch(input: string, init?: RequestInit): Promise<Response> {
   const mergedHeaders = mergeHeaders(init?.headers);
   if (runtimeOpenAIKey) mergedHeaders["x-openai-api-key"] = runtimeOpenAIKey;
   if (runtimeOpenRouterKey) mergedHeaders["x-openrouter-api-key"] = runtimeOpenRouterKey;
+  if (runtimeDomLlmProvider) mergedHeaders["x-dom-llm-provider"] = runtimeDomLlmProvider;
+  const domKey = runtimeDomLlmApiKeys[runtimeDomLlmProvider];
+  if (domKey) mergedHeaders["x-dom-llm-api-key"] = domKey;
 
   return fetch(input, {
     credentials: "include",
@@ -151,6 +162,26 @@ export async function startBrowserLogin(platform: Platform, waitMs = 120000): Pr
     throw new Error(data.detail || "Failed to start browser login session");
   }
   return (await res.json()) as { ok: boolean; message: string };
+}
+
+export async function getBrowserLoginSession(platform: Platform): Promise<{ connected: boolean }> {
+  const res = await apiFetch(`${API_URL}/api/automation/session/${platform}`);
+  if (!res.ok) {
+    const data = (await res.json().catch(() => ({}))) as { detail?: string };
+    throw new Error(data.detail || "Failed to check browser login session");
+  }
+  return (await res.json()) as { connected: boolean };
+}
+
+export async function disconnectBrowserLogin(platform: Platform): Promise<{ ok: boolean }> {
+  const res = await apiFetch(`${API_URL}/api/automation/logout/${platform}`, {
+    method: "POST",
+  });
+  if (!res.ok) {
+    const data = (await res.json().catch(() => ({}))) as { detail?: string };
+    throw new Error(data.detail || "Failed to disconnect browser login session");
+  }
+  return (await res.json()) as { ok: boolean };
 }
 
 export async function getJob(jobId: number): Promise<PublishJob> {
