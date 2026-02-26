@@ -14,9 +14,9 @@ export type LlmClient = {
 const DOM_CHEAP_MODELS: Record<DomLlmProvider, string> = {
   openai: "gpt-4o-mini",
   openrouter: "openai/gpt-4o-mini",
-  anthropic: "claude-haiku-4-5-20251001",
-  grok: "grok-3-mini-fast",
-  gemini: "gemini-2.0-flash",
+  anthropic: "claude-haiku-4-5",
+  grok: "grok-4.1-fast",
+  gemini: "gemini-3-flash-preview",
 };
 
 const DOM_BASE_URLS: Record<DomLlmProvider, string> = {

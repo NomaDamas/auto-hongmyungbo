@@ -68,17 +68,19 @@ const OPENROUTER_MODELS: ModelOption[] = [
   "google/gemini-3.1-pro-preview",
 ];
 const ANTHROPIC_MODELS: ModelOption[] = [
-  "claude-3-5-sonnet-latest",
-  "claude-3-5-haiku-latest",
-  "claude-3-opus-latest",
+  "claude-sonnet-4-5",
+  "claude-opus-4-6",
+  "claude-haiku-4-5",
 ];
 const GROK_MODELS: ModelOption[] = [
-  "grok-3-mini-fast",
-  "grok-3-fast",
+  "grok-4.1",
+  "grok-4.1-fast",
+  "grok-4.1-thinking",
 ];
 const GEMINI_MODELS: ModelOption[] = [
-  "gemini-2.0-flash",
-  "gemini-1.5-pro",
+  "gemini-3.1-pro-preview",
+  "gemini-3-pro-preview",
+  "gemini-3-flash-preview",
 ];
 const MODEL_OPTIONS_BY_PROVIDER: Record<ProviderOption, ModelOption[]> = {
   openai: OPENAI_MODELS,

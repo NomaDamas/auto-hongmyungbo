@@ -143,9 +143,9 @@ function pickProvider(model: string, preferred?: string): SupportedProvider {
 export function getModel(preferredModel: string | undefined, provider: SupportedProvider): string {
   if (preferredModel && preferredModel.trim()) return preferredModel.trim();
   if (provider === "openrouter") return "openai/gpt-4o-mini";
-  if (provider === "anthropic") return "claude-3-5-sonnet-latest";
-  if (provider === "grok") return "grok-3-mini-fast";
-  if (provider === "gemini") return "gemini-2.0-flash";
+  if (provider === "anthropic") return "claude-sonnet-4-5";
+  if (provider === "grok") return "grok-4.1";
+  if (provider === "gemini") return "gemini-3-flash-preview";
   return "gpt-4o-mini";
 }
 

@@ -21,10 +21,10 @@ export async function GET(request: Request) {
       : provider === "openai"
       ? "gpt-4o-mini"
       : provider === "anthropic"
-      ? "claude-3-5-sonnet-latest"
+      ? "claude-sonnet-4-5"
       : provider === "grok"
-      ? "grok-3-mini-fast"
-      : "gemini-2.0-flash";
+      ? "grok-4.1"
+      : "gemini-3-flash-preview";
   return ok({
     provider,
     defaultModel,

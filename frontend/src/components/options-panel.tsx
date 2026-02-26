@@ -7,8 +7,8 @@ const DOM_LLM_PROVIDERS: { value: DomLlmProvider; label: string; cheapModel: str
   { value: "openai", label: "OpenAI", cheapModel: "gpt-4o-mini" },
   { value: "openrouter", label: "OpenRouter", cheapModel: "openai/gpt-4o-mini" },
   { value: "anthropic", label: "Anthropic", cheapModel: "claude-haiku-4-5" },
-  { value: "grok", label: "Grok (xAI)", cheapModel: "grok-3-mini-fast" },
-  { value: "gemini", label: "Gemini (Google)", cheapModel: "gemini-2.0-flash" },
+  { value: "grok", label: "Grok (xAI)", cheapModel: "grok-4.1-fast" },
+  { value: "gemini", label: "Gemini (Google)", cheapModel: "gemini-3-flash-preview" },
 ];
 
 type Props = {
