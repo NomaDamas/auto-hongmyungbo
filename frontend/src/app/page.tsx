@@ -67,6 +67,26 @@ const OPENROUTER_MODELS: ModelOption[] = [
   "google/gemini-3-flash-preview",
   "google/gemini-3.1-pro-preview",
 ];
+const ANTHROPIC_MODELS: ModelOption[] = [
+  "claude-3-5-sonnet-latest",
+  "claude-3-5-haiku-latest",
+  "claude-3-opus-latest",
+];
+const GROK_MODELS: ModelOption[] = [
+  "grok-3-mini-fast",
+  "grok-3-fast",
+];
+const GEMINI_MODELS: ModelOption[] = [
+  "gemini-2.0-flash",
+  "gemini-1.5-pro",
+];
+const MODEL_OPTIONS_BY_PROVIDER: Record<ProviderOption, ModelOption[]> = {
+  openai: OPENAI_MODELS,
+  openrouter: OPENROUTER_MODELS,
+  anthropic: ANTHROPIC_MODELS,
+  grok: GROK_MODELS,
+  gemini: GEMINI_MODELS,
+};
 
 const EMPTY_CONTEXTS: Record<Platform, string> = {
   reddit: "",
@@ -426,12 +446,21 @@ export default function HomePage() {
     const init = async () => {
       try {
         const providerInfo = await fetchProvider();
-        const initialProvider = providerInfo.provider === "openrouter" ? "openrouter" : "openai";
+        const initialProvider: ProviderOption = ["openai", "openrouter", "anthropic", "grok", "gemini"].includes(providerInfo.provider)
+          ? providerInfo.provider
+          : "openrouter";
         const candidateProviders = providerInfo.availableProviders?.length ? providerInfo.availableProviders : [initialProvider];
         const normalizedProviders = candidateProviders.filter(
-          (p): p is ProviderOption => p === "openai" || p === "openrouter",
+          (p): p is ProviderOption => p === "openai" || p === "openrouter" || p === "anthropic" || p === "grok" || p === "gemini",
         );
-        const providers: ProviderOption[] = Array.from(new Set<ProviderOption>([...normalizedProviders, "openai", "openrouter"]));
+        const providers: ProviderOption[] = Array.from(new Set<ProviderOption>([
+          ...normalizedProviders,
+          "openai",
+          "openrouter",
+          "anthropic",
+          "grok",
+          "gemini",
+        ]));
         setAvailableProviders(providers);
         setProvider(initialProvider);
         setSelectedModel(providerInfo.defaultModel);
@@ -1293,7 +1322,7 @@ export default function HomePage() {
         openaiApiKey={openaiApiKey}
         openrouterApiKey={openrouterApiKey}
         availableProviders={availableProviders}
-        modelOptionsByProvider={{ openai: OPENAI_MODELS, openrouter: OPENROUTER_MODELS }}
+        modelOptionsByProvider={MODEL_OPTIONS_BY_PROVIDER}
         domLlmProvider={domLlmProvider}
         domLlmApiKeys={domLlmApiKeys}
         onClose={() => setOptionsOpen(false)}
@@ -1308,7 +1337,7 @@ export default function HomePage() {
           domLlmApiKeys: nextDomApiKeys,
         }) => {
           setProvider(nextProvider);
-          const nextModels = nextProvider === "openrouter" ? OPENROUTER_MODELS : OPENAI_MODELS;
+          const nextModels = MODEL_OPTIONS_BY_PROVIDER[nextProvider] || OPENAI_MODELS;
           setSelectedModel(nextModel.trim() || nextModels[0]);
           setGenerationConfig(nextConfig);
           setOpenaiApiKey(nextOpenaiApiKey);

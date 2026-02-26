@@ -53,6 +53,9 @@ async function apiFetch(input: string, init?: RequestInit): Promise<Response> {
   const mergedHeaders = mergeHeaders(init?.headers);
   if (runtimeOpenAIKey) mergedHeaders["x-openai-api-key"] = runtimeOpenAIKey;
   if (runtimeOpenRouterKey) mergedHeaders["x-openrouter-api-key"] = runtimeOpenRouterKey;
+  if (runtimeDomLlmApiKeys.anthropic) mergedHeaders["x-anthropic-api-key"] = runtimeDomLlmApiKeys.anthropic;
+  if (runtimeDomLlmApiKeys.grok) mergedHeaders["x-grok-api-key"] = runtimeDomLlmApiKeys.grok;
+  if (runtimeDomLlmApiKeys.gemini) mergedHeaders["x-gemini-api-key"] = runtimeDomLlmApiKeys.gemini;
   if (runtimeDomLlmProvider) mergedHeaders["x-dom-llm-provider"] = runtimeDomLlmProvider;
   const domKey = runtimeDomLlmApiKeys[runtimeDomLlmProvider];
   if (domKey) mergedHeaders["x-dom-llm-api-key"] = domKey;
@@ -247,7 +250,7 @@ export async function getThreads(limitPerPlatform = 20): Promise<SocialThread[]>
 
 export async function fetchProvider(): Promise<{ provider: ProviderOption; defaultModel: string; availableProviders: ProviderOption[] }> {
   const res = await apiFetch(`${API_URL}/api/provider`);
-  if (!res.ok) return { provider: "openrouter", defaultModel: "openai/gpt-4o-mini", availableProviders: ["openrouter"] };
+  if (!res.ok) return { provider: "openrouter", defaultModel: "openai/gpt-4o-mini", availableProviders: ["openrouter", "openai", "anthropic", "grok", "gemini"] };
   return res.json();
 }
 

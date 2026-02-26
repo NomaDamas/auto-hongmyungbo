@@ -1,7 +1,7 @@
 export type Platform = "reddit" | "linkedin" | "twitter" | "instagram" | "threads" | "youtube" | "tiktok";
 
 export type ModelOption = string;
-export type ProviderOption = "openai" | "openrouter";
+export type ProviderOption = "openai" | "openrouter" | "anthropic" | "grok" | "gemini";
 export type ReasoningEffortOption = "minimal" | "low" | "medium" | "high";
 export type LanguageOption = "auto" | "korean" | "english" | "japanese";
 export type LanguageSettingOption = LanguageOption | "per_platform";

@@ -1,4 +1,5 @@
 import type { GenerationConfig, Platform, UserProfile } from "@/lib/types";
+type SupportedProvider = "openai" | "openrouter" | "anthropic" | "grok" | "gemini";
 type GenerationConfigInput =
   | {
       thinkingMode?: boolean;
@@ -128,29 +129,39 @@ function parseJson<T>(raw: string | null | undefined): T {
   return JSON.parse(payload || "{}");
 }
 
-function pickProvider(model: string, preferred?: string): "openai" | "openrouter" {
+function pickProvider(model: string, preferred?: string): SupportedProvider {
   const p = (preferred || "").toLowerCase();
+  if (p === "anthropic") return "anthropic";
+  if (p === "grok") return "grok";
+  if (p === "gemini") return "gemini";
   if (p === "openrouter") return "openrouter";
   if (p === "openai") return "openai";
   if ((model || "").includes("/")) return "openrouter";
   return process.env.OPENROUTER_API_KEY ? "openrouter" : "openai";
 }
 
-export function getModel(preferredModel: string | undefined, provider: "openai" | "openrouter"): string {
+export function getModel(preferredModel: string | undefined, provider: SupportedProvider): string {
   if (preferredModel && preferredModel.trim()) return preferredModel.trim();
-  return provider === "openrouter" ? "openai/gpt-4o-mini" : "gpt-4o-mini";
+  if (provider === "openrouter") return "openai/gpt-4o-mini";
+  if (provider === "anthropic") return "claude-3-5-sonnet-latest";
+  if (provider === "grok") return "grok-3-mini-fast";
+  if (provider === "gemini") return "gemini-2.0-flash";
+  return "gpt-4o-mini";
 }
 
-export function availableProvidersFromHeaders(headers: Headers): Array<"openai" | "openrouter"> {
-  const out = new Set<"openai" | "openrouter">();
+export function availableProvidersFromHeaders(headers: Headers): SupportedProvider[] {
+  const out = new Set<SupportedProvider>();
   if (process.env.OPENAI_API_KEY || headers.get("x-openai-api-key")) out.add("openai");
   if (process.env.OPENROUTER_API_KEY || headers.get("x-openrouter-api-key")) out.add("openrouter");
+  if (process.env.ANTHROPIC_API_KEY || headers.get("x-anthropic-api-key")) out.add("anthropic");
+  if (process.env.GROK_API_KEY || process.env.XAI_API_KEY || headers.get("x-grok-api-key")) out.add("grok");
+  if (process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || headers.get("x-gemini-api-key")) out.add("gemini");
   if (!out.size) out.add("openai");
   return [...out];
 }
 
 export function makeClient(opts: { headers: Headers; provider?: string; model?: string }): {
-  provider: "openai" | "openrouter";
+  provider: SupportedProvider;
   model: string;
   apiKey: string;
   baseUrl: string;
@@ -158,6 +169,9 @@ export function makeClient(opts: { headers: Headers; provider?: string; model?: 
   const provider = pickProvider(opts.model || "", opts.provider);
   const openaiKey = (opts.headers.get("x-openai-api-key") || process.env.OPENAI_API_KEY || "").trim();
   const openrouterKey = (opts.headers.get("x-openrouter-api-key") || process.env.OPENROUTER_API_KEY || "").trim();
+  const anthropicKey = (opts.headers.get("x-anthropic-api-key") || process.env.ANTHROPIC_API_KEY || "").trim();
+  const grokKey = (opts.headers.get("x-grok-api-key") || process.env.GROK_API_KEY || process.env.XAI_API_KEY || "").trim();
+  const geminiKey = (opts.headers.get("x-gemini-api-key") || process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || "").trim();
 
   if (provider === "openrouter") {
     if (!openrouterKey) throw new Error("OpenRouter API key is not configured");
@@ -169,10 +183,37 @@ export function makeClient(opts: { headers: Headers; provider?: string; model?: 
     };
   }
 
+  if (provider === "anthropic") {
+    if (!anthropicKey) throw new Error("Anthropic API key is not configured");
+    return {
+      provider,
+      model: getModel(opts.model, provider),
+      apiKey: anthropicKey,
+      baseUrl: "https://api.anthropic.com",
+    };
+  }
+  if (provider === "grok") {
+    if (!grokKey) throw new Error("Grok (xAI) API key is not configured");
+    return {
+      provider,
+      model: getModel(opts.model, provider),
+      apiKey: grokKey,
+      baseUrl: "https://api.x.ai/v1",
+    };
+  }
+  if (provider === "gemini") {
+    if (!geminiKey) throw new Error("Gemini API key is not configured");
+    return {
+      provider,
+      model: getModel(opts.model, provider),
+      apiKey: geminiKey,
+      baseUrl: "https://generativelanguage.googleapis.com/v1beta/openai",
+    };
+  }
   if (!openaiKey) throw new Error("OpenAI API key is not configured");
   return {
-    provider,
-    model: getModel(opts.model, provider),
+    provider: "openai",
+    model: getModel(opts.model, "openai"),
     apiKey: openaiKey,
     baseUrl: "https://api.openai.com/v1",
   };
@@ -187,6 +228,7 @@ function generationOpts(config: GenerationConfigInput): { temperature: number; t
 }
 
 async function chatJson(input: {
+  provider?: SupportedProvider;
   baseUrl: string;
   apiKey: string;
   model: string;
@@ -194,6 +236,31 @@ async function chatJson(input: {
   user: string;
   generationConfig?: GenerationConfigInput;
 }): Promise<unknown> {
+  if (input.provider === "anthropic") {
+    const res = await fetch(`${input.baseUrl}/v1/messages`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-api-key": input.apiKey,
+        "anthropic-version": "2023-06-01",
+      },
+      body: JSON.stringify({
+        model: input.model,
+        max_tokens: Math.max(128, Math.round(input.generationConfig?.maxOutputTokens ?? 1500)),
+        temperature: Math.max(0, Math.min(2, input.generationConfig?.temperature ?? 0.7)),
+        top_p: Math.max(0, Math.min(1, input.generationConfig?.topP ?? 1)),
+        system: `${input.system}\n\nReturn strict JSON only.`,
+        messages: [{ role: "user", content: input.user }],
+      }),
+    });
+    if (!res.ok) {
+      const t = await res.text();
+      throw new Error(`LLM request failed: ${res.status} ${t}`);
+    }
+    const json = (await res.json()) as { content?: Array<{ type?: string; text?: string }> };
+    return parseJson(json.content?.find((b) => b.type === "text")?.text);
+  }
+
   const res = await fetch(`${input.baseUrl}/chat/completions`, {
     method: "POST",
     headers: {
@@ -259,7 +326,7 @@ function styleBlock(platform: Platform, profile?: UserProfile): string {
 }
 
 export async function generatePlatformCard(input: {
-  client: { baseUrl: string; apiKey: string };
+  client: { provider?: SupportedProvider; baseUrl: string; apiKey: string };
   model: string;
   platform: Platform;
   draft: string;
@@ -296,6 +363,7 @@ export async function generatePlatformCard(input: {
   ].join("\n\n");
 
   const parsed = (await chatJson({
+    provider: input.client.provider,
     baseUrl: input.client.baseUrl,
     apiKey: input.client.apiKey,
     model: input.model,
@@ -312,7 +380,7 @@ export async function generatePlatformCard(input: {
 }
 
 export async function refineCard(input: {
-  client: { baseUrl: string; apiKey: string };
+  client: { provider?: SupportedProvider; baseUrl: string; apiKey: string };
   model: string;
   platform: Platform;
   originalDraft: string;
@@ -355,6 +423,7 @@ export async function refineCard(input: {
   ].join("\n\n");
 
   const parsed = (await chatJson({
+    provider: input.client.provider,
     baseUrl: input.client.baseUrl,
     apiKey: input.client.apiKey,
     model: input.model,
@@ -371,7 +440,7 @@ export async function refineCard(input: {
 }
 
 export async function refineIdeaDraft(input: {
-  client: { baseUrl: string; apiKey: string };
+  client: { provider?: SupportedProvider; baseUrl: string; apiKey: string };
   model: string;
   rawDraft: string;
   language?: "auto" | "ko" | "en";
@@ -423,6 +492,7 @@ export async function refineIdeaDraft(input: {
   ].join("\n");
 
   return chatJson({
+    provider: input.client.provider,
     baseUrl: input.client.baseUrl,
     apiKey: input.client.apiKey,
     model: input.model,
