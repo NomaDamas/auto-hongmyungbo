@@ -4,10 +4,9 @@
 
 
 <video width="600" controls>
-  <source src="docs/images/demo.mp4" type="video/mp4">
+  <source src="./docs/images/demo.mp4" type="video/mp4">
 </video>
 
-[If the video does not render on your GitHub client, open it directly.](docs/images/demo.mp4)
 
 A local tool that turns one draft into multi-platform SNS posts, lets you refine them, and publish in sequence.
 
