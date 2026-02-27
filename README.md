@@ -276,6 +276,4 @@ If you use or modify this project and provide it as a network service, you must 
 
 See the full license text in [`LICENSE`](LICENSE).
 
----
 
-Made with ❤️ by the Auto-HongMyungbo team
