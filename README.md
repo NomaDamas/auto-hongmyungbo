@@ -1,279 +1,190 @@
-# 🤖 Auto-HongMyungbo (Open Source Local Edition) ⚽
+# 🤖 Auto-HongMyungbo ⚽
 
-> Write your idea once — Auto-HongMyungbo turns it into ready-to-post content for every SNS platform and publishes them for you.
+> One draft in, platform-ready posts out.
+> Refine, compare, and publish across multiple SNS platforms from one local workspace.
 
----
+![Auto-HongMyungbo Preview](docs/images/ddalcak_myungbo.png)
 
-## 📺 Demo Video
+[![GitHub stars](https://img.shields.io/github/stars/NomaDamas/auto-hongmyungbo?style=flat-square)](https://github.com/NomaDamas/auto-hongmyungbo/stargazers)
+[![GitHub issues](https://img.shields.io/github/issues/NomaDamas/auto-hongmyungbo?style=flat-square)](https://github.com/NomaDamas/auto-hongmyungbo/issues)
+[![GitHub pull requests](https://img.shields.io/github/issues-pr/NomaDamas/auto-hongmyungbo?style=flat-square)](https://github.com/NomaDamas/auto-hongmyungbo/pulls)
+[![License: AGPL v3](https://img.shields.io/badge/License-AGPLv3-blue.svg?style=flat-square)](LICENSE)
+[![Node.js](https://img.shields.io/badge/node-%3E%3D20-339933?style=flat-square&logo=node.js&logoColor=white)](https://nodejs.org/)
 
-[Open demo video link](https://github.com/user-attachments/assets/d2640150-7402-49c0-96d1-b198d7d02130)
+## 📺 Demo
 
----
+[Watch the demo video](https://github.com/user-attachments/assets/d2640150-7402-49c0-96d1-b198d7d02130)
 
-## 📋 Table of Contents
-
-- [🚀 What Does This Do?](#what)
-- [🛠️ Setup (First-Time Users)](#setup)
-- [▶️ Running the App](#run)
-- [📖 End-to-End Usage](#usage)
-- [✨ Core Features at a Glance](#features)
-- [🔐 How Login and Publishing Work](#login)
-- [🧯 Common Errors and Fixes](#errors)
-- [🧱 Project Structure](#structure)
-
----
-
-<a name="what"></a>
-
-## 🚀 What Does This Do?
-
-**Auto-HongMyungbo** automates SNS content creation and publishing — all running locally on your computer.
-
-| Step | What Happens |
-| ---- | ------------ |
-| ✍️ Write a draft | Paste your raw idea once |
-| 🤖 AI generates posts | Creates platform-specific versions automatically |
-| 👀 Preview & edit | Review and tweak each result |
-| 📤 Auto-publish | Browser automation posts them in sequence |
-
-All data is stored **locally on your machine** — nothing is sent to external servers.
-
----
-
-<a name="setup"></a>
-
-## 🛠️ Setup (First-Time Users)
-
-### Requirements Checklist ✅
-
-- [ ] macOS / Linux / Windows (WSL recommended)
-- [ ] Git installed
-- [ ] Node.js 20+ installed
-- [ ] A terminal you can type in
-- [ ] At least one AI API key:
-  - 🌟 **OpenAI or OpenRouter** (recommended for beginners)
-  - Anthropic / Grok / Gemini (optional)
-
-> 💡 Not sure how to get API keys? See [`docs/API_KEYS.md`](docs/API_KEYS.md).
-
----
-
-### Step 1 — Clone & Install
-
-Open your terminal and run these commands one by one:
+## ⚡ Quick Install
 
 ```bash
 git clone https://github.com/NomaDamas/auto-hongmyungbo.git
 cd auto-hongmyungbo
 ./scripts/setup_local_easy.sh
+./scripts/start_local.sh
 ```
 
-> ⏳ The first run downloads Playwright (browser automation). This may take a few minutes.
+Open: `http://localhost:3000`
 
----
+## 🔗 Quick Links
 
-### Step 2 — Create Your Environment File
+- [What is this?](#-what-is-this)
+- [Why this over alternatives?](#-why-this-over-alternatives)
+- [Setup (first-time users)](#-setup-first-time-users)
+- [Basic commands](#-basic-commands)
+- [How to use](#-how-to-use)
+- [Docs and support](#-docs-and-support)
+- [Contributing](#-contributing)
+- [Growth playbook](#-growth-playbook-for-maintainers)
 
-Create a file called `frontend/.env` (or `frontend/.env.local`) and fill in your API keys:
+## 🎯 What Is This?
+
+Auto-HongMyungbo is a local-first OSS tool for creators and indie builders who want to:
+
+- write one messy idea once
+- turn it into platform-specific drafts (Reddit, LinkedIn, X, Threads, etc.)
+- refine tone and structure quickly
+- publish in sequence with browser automation
+
+### Core flow
+
+1. Write a draft
+2. Generate platform posts
+3. Preview/Edit/Compare
+4. Accept to queue
+5. Publish one-by-one or batch
+
+## 🥊 Why This Over Alternatives?
+
+| Capability | Manual copy/paste workflow | Single-platform AI writer | Auto-HongMyungbo |
+| --- | --- | --- | --- |
+| One draft to many platforms | ❌ | ❌ | ✅ |
+| Platform-specific output in one UI | ❌ | ⚠️ Partial | ✅ |
+| Side-by-side review before posting | ❌ | ❌ | ✅ |
+| Queue-based multi-platform publish flow | ❌ | ❌ | ✅ |
+| Local-first (no external DB required) | ✅ | ⚠️ Varies | ✅ |
+| Open-source and customizable | ⚠️ Varies | ❌ | ✅ |
+
+If your pain is "I rewrite the same post 5 times," this project is built for that exact problem.
+
+## 🛠️ Setup (First-Time Users)
+
+### Requirements
+
+- macOS / Linux / Windows (WSL recommended)
+- Git
+- Node.js 20+
+- At least one LLM API key
+  - OpenAI or OpenRouter recommended
+  - Anthropic / Grok / Gemini optional
+
+API key guide: [`docs/API_KEYS.md`](docs/API_KEYS.md)
+
+### Environment file
+
+Create `frontend/.env` (or `frontend/.env.local`):
 
 ```env
-# ✅ At least one of these is required
+# At least one is required
 OPENROUTER_API_KEY=your_key_here
 # or
 OPENAI_API_KEY=your_key_here
 
-# 🔽 Optional
+# Optional providers
 ANTHROPIC_API_KEY=your_key_here
 GROK_API_KEY=your_key_here
 GEMINI_API_KEY=your_key_here
-```
 
-If you want Instagram auto-upload support, also add:
-
-```env
+# Optional: for Instagram media upload flow
 INSTAGRAM_MEDIA_PATH=docs/images/sample.jpg
 ```
 
----
-
-<a name="run"></a>
-
-## ▶️ Running the App
+## ⌨️ Basic Commands
 
 ```bash
-./scripts/start_local.sh
-```
-
-Then open your browser and go to:
-
-🌐 **http://localhost:3000**
-
-To stop the server: press `Ctrl + C` in the terminal.
-
----
-
-<a name="usage"></a>
-
-## 📖 End-to-End Usage
-
-### 1️⃣ Write Your Draft
-
-Paste your rough idea into the `Draft` box on the left.
-
-### 2️⃣ Configure Options
-
-In the `Options` panel, set:
-
-- **Provider** — OpenAI, OpenRouter, etc.
-- **Model** — which AI model to use
-- **API Keys** — your credentials
-- Thinking / Temperature / Token settings
-
-### 3️⃣ Boost Your Draft (Optional)
-
-| Feature | What It Does |
-| ------- | ------------ |
-| `Draft Idea Booster` | Structures and strengthens your idea |
-| `Aggro Pingpong` | Explores more powerful hooks |
-| `Phrase Booster` | Refines a specific sentence you select |
-
-> 💡 **Phrase Booster tip:** Highlight any text in the Draft box — a `Phrase Booster` button will appear. Click it to open a chat-style panel for targeted rewrites.
-
-### 4️⃣ Generate for Each Platform
-
-Click **`Generate N Platforms`** — the AI rewrites your draft for every SNS.
-
-> Hover the button while it's running to reveal a `Cancel` option.
-
-### 5️⃣ Review Results
-
-In `Platform Results`:
-
-- 👁️ Read in **Preview** mode
-- ✏️ Make changes in **Edit** mode
-- ✅ **Accept** → moves the card to your Queue
-- ❌ **Reject** → discards it
-
-### 6️⃣ Log In to Each Platform
-
-Click **`Browser Login`** for each platform once.
-
-> Even when a platform shows `Connected`, the app runs a quick login check before every publish.
-
-### 7️⃣ Publish
-
-| Button | What It Does |
-| ------ | ------------ |
-| `Post Next Platform` | Walks you through publishing one at a time |
-| `Post All (Beta)` | Publishes all queued platforms in sequence |
-| `Publish now` (on a card) | Publishes just that one platform immediately |
-
-If publishing fails, you can retry from that platform or finish manually.
-
----
-
-<a name="features"></a>
-
-## ✨ Core Features at a Glance
-
-### 👁️ Preview vs Edit
-
-| Mode | Purpose |
-| ---- | ------- |
-| **Preview** | Clean reading view |
-| **Edit** | Direct content editing |
-
-### 🔀 Compare Mode
-
-- **OFF** (default) — focused single-platform view
-- **ON** — side-by-side comparison across platforms
-
-### 💾 Saved Drafts
-
-- Restore from auto-saved draft history
-- Deleting a draft also removes it from local history
-
-### 🌙 Dark / Light Theme
-
-- Toggle with the sun/moon button in the bottom-right corner
-- Your preference is saved in browser storage
-
----
-
-<a name="login"></a>
-
-## 🔐 How Login and Publishing Work
-
-- Login state is determined from your **real browser session** — no stored passwords.
-- A preflight login check runs automatically before every publish.
-- Manual-heavy platforms (e.g., Reddit) detect leave/close events to avoid getting stuck.
-- ✅ Successful publish → card removed from Queue
-- ❌ Failed publish → card stays in Queue for retry
-
----
-
-<a name="errors"></a>
-
-## 🧯 Common Errors and Fixes
-
-### ❗ 1) `OpenAI/OpenRouter not configured`
-
-- Double-check `frontend/.env` has a valid API key
-- Restart: `./scripts/start_local.sh`
-
-### ❗ 2) `Playwright not installed`
-
-Run the setup script again:
-
-```bash
+# one-time local setup
 ./scripts/setup_local_easy.sh
+
+# start app
+./scripts/start_local.sh
+
+# frontend only
+cd frontend
+npm run dev
+
+# production build check
+npm run build
 ```
 
-### ❗ 3) `LLM request failed: unsupported parameter/value`
+## 📖 How To Use
 
-- Some newer models restrict sampling parameters
-- The app retries automatically with fallback settings
-- If it keeps failing, switch to a different model in Options
+1. **Draft**: paste your raw idea.
+2. **Options**: set provider/model/API key.
+3. **Refine (optional)**:
+   - Draft Idea Booster
+   - Aggro Pingpong
+   - Phrase Booster
+4. **Generate**: click `Generate N Platforms`.
+5. **Review**: Preview/Edit each platform card.
+6. **Queue**: Accept cards you want to publish.
+7. **Login**: run `Browser Login` per platform once.
+8. **Publish**:
+   - `Post Next Platform`
+   - `Post All (Beta)`
+   - `Publish now` on each queue card
 
-### ❗ 4) Platform shows `Connected` but publish fails
+## 🧭 Docs and Support
 
-1. Click **`Disconnect`** for that platform
-2. Run **`Browser Login`** again
+- API keys: [`docs/API_KEYS.md`](docs/API_KEYS.md)
+- Publish env checklist: [`docs/PUBLISH_ENV_CHECKLIST.md`](docs/PUBLISH_ENV_CHECKLIST.md)
+- Monorepo/GitHub notes: [`docs/MONOREPO_GITHUB.md`](docs/MONOREPO_GITHUB.md)
+- Report bugs / request features: [GitHub Issues](https://github.com/NomaDamas/auto-hongmyungbo/issues)
+- Ongoing changes: [Pull Requests](https://github.com/NomaDamas/auto-hongmyungbo/pulls)
 
-> Platform UI changes can sometimes break automation. Manual completion is always an option.
+## 🤝 Contributing
 
-### ❗ 5) Queue doesn't clear after publishing
+Contributions are welcome.
 
-- Check the publish log/status panel
-- Refresh the page once
+- Start with a small issue or bug fix.
+- Open a branch from `main`.
+- Submit a PR with clear before/after behavior.
+- Keep changes focused and easy to review.
 
----
+If you are new, documentation and UX fixes are great first PRs.
 
-<a name="structure"></a>
+## 📈 Growth Playbook (For Maintainers)
+
+To drive network effects (more users -> more feedback -> better product -> more users):
+
+1. **Build around real pain**
+   - target "rewrite once, post everywhere" pain
+   - prioritize workflows users repeat weekly
+2. **Ship and measure in public**
+   - share every meaningful release with examples/GIF/video
+   - track where users drop off (setup, login, publish)
+3. **Distribute where users already gather**
+   - relevant Subreddits
+   - Hacker News / GeekNews
+   - Awesome lists in this domain
+4. **Tight feedback loop**
+   - convert repeated issue patterns into quick UX wins
+   - keep README/install flow brutally simple
 
 ## 🧱 Project Structure
 
 ```text
 auto-hongmyungbo/
-├── 📁 frontend/
-│   ├── src/app/api/      # Next.js API routes (server communication)
+├── frontend/
+│   ├── src/app/api/      # Next.js API routes
 │   ├── src/components/   # UI components
-│   ├── src/lib/          # Client-side utilities & types
-│   └── src/server/       # AI (LLM) + local store + automation logic
-├── 📁 scripts/           # Setup and run scripts
-└── 📁 docs/              # Documentation & images
+│   ├── src/lib/          # client helpers/types
+│   └── src/server/       # LLM + local store + automation
+├── scripts/              # setup/run scripts
+├── docs/                 # docs + images
+└── LICENSE
 ```
-
----
 
 ## 📄 License
 
-This project is licensed under the **GNU Affero General Public License v3.0 (AGPL-3.0)**.
-
-If you use or modify this project and provide it as a network service, you must also make the corresponding source code available under AGPL-3.0.
-
-See the full license text in [`LICENSE`](LICENSE).
-
----
-
-Made with ❤️ by the Auto-HongMyungbo team
+This project is licensed under **GNU Affero General Public License v3.0 (AGPL-3.0)**.
+See [`LICENSE`](LICENSE).
