@@ -276,4 +276,7 @@ If you use or modify this project and provide it as a network service, you must 
 
 See the full license text in [`LICENSE`](LICENSE).
 
-
+---
+## 📬 Contact
+- For questions, errors, or support, feel free to reach out:
+- Email: developerminsing@gmail.com
