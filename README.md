@@ -1,5 +1,3 @@
-<img width="1230" height="444" alt="홍명보명" src="https://github.com/user-attachments/assets/cda16148-8607-4b72-9a3e-f556e2c16f4d" />
-
 # 🤖 Auto-HongMyungbo (Open Source Local Edition) ⚽
 
 > One draft in, platform-ready posts out.
