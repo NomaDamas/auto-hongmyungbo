@@ -21,6 +21,7 @@ export function defaultSettings(): Settings {
     ],
     platforms: [...ALL_PLATFORMS],
     theme: "dark",
+    asideProfileId: "",
   };
 }
 

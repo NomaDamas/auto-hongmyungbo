@@ -36,11 +36,18 @@ export function PublishTray() {
     if (!text.trim()) return toast.error(`${PLATFORMS[p].label} 글이 비어 있습니다.`);
     const c = countFor(p, text);
     if (c.limit !== null && c.used > c.limit) return toast.error(`${PLATFORMS[p].label} 글자수 초과 (${c.used}/${c.limit})`);
+    const { aside, asideLogins } = useStore.getState();
+    if (!aside?.installed || !aside.signedIn || asideLogins[p] === "signed-out") {
+      toast.error(`Aside에서 ${PLATFORMS[p].label} 로그인이 필요합니다.`);
+      useStore.setState({ asideOpen: true });
+      return;
+    }
     const file = `${project.dir}/${p}.md`;
     const id = `${p}-${Date.now()}`;
+    const profile = settings.asideProfileId ? ` --profile ${shellQuote(settings.asideProfileId)}` : "";
     useStore.getState().setPublish(p, { status: "ready", at: new Date().toISOString() });
     useStore.setState((s) => ({
-      runTabs: [...s.runTabs, { id, label: `Aside · ${PLATFORMS[p].label}`, command: `aside ${shellQuote(asideTask(p, file))}`, platform: p }],
+      runTabs: [...s.runTabs, { id, label: `Aside · ${PLATFORMS[p].label}`, command: `aside${profile} ${shellQuote(asideTask(p, file))}`, platform: p }],
       dockTab: `run:${id}`,
       dockOpen: true,
     }));

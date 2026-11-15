@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { toast } from "sonner";
-import type { DocId, PlatformId, ProjectData, ProjectMeta, ProjectSummary, PublishState, Settings } from "@shared/types";
+import type { AsideLoginState, AsideStatus, DocId, PlatformId, ProjectData, ProjectMeta, ProjectSummary, PublishState, Settings } from "@shared/types";
 import { hashText } from "@shared/text";
 import { docLabel } from "@shared/platforms";
 
@@ -15,10 +15,10 @@ export interface Proposal {
 /** A prompt sent to a web chat whose reply should be pulled back into the editor. */
 export interface PendingReply {
   tabId: string;
-  doc: DocId;
-  /** Selected excerpt the reply should replace; empty = whole doc. */
+  /** Docs the reply should land in; multi-doc replies come back as `=== doc ===` sections. */
+  docs: DocId[];
+  /** Selected excerpt the reply should replace (single-doc only); empty = whole doc. */
   selection: string;
-  kind: "generate" | "rewrite";
 }
 
 /** Dock tab ids: `web:<id>`, `harness:<id>`, `run:<id>` (one-off commands such as Aside publishing). */
@@ -46,6 +46,12 @@ interface State {
   paletteOpen: boolean;
   settingsOpen: boolean;
   historyDoc: DocId | null;
+  /** Docs the intent bar applies to. */
+  scope: DocId[];
+  aside: AsideStatus | null;
+  asideLogins: Partial<Record<PlatformId, AsideLoginState>>;
+  asideChecking: boolean;
+  asideOpen: boolean;
 
   init(): Promise<void>;
   updateSettings(patch: Partial<Settings>): Promise<void>;
@@ -59,6 +65,8 @@ interface State {
   rejectProposal(doc: DocId): void;
   markFresh(doc: PlatformId): void;
   setPublish(doc: PlatformId, state: PublishState): void;
+  setBrief(brief: string): void;
+  refreshAside(checkLogins?: boolean): Promise<void>;
   set(partial: Partial<State>): void;
 }
 
@@ -96,12 +104,18 @@ export const useStore = create<State>((set, get) => {
     paletteOpen: false,
     settingsOpen: false,
     historyDoc: null,
+    scope: ["master"],
+    aside: null,
+    asideLogins: {},
+    asideChecking: false,
+    asideOpen: false,
 
     async init() {
       const settings = await window.api.settings.get();
       set({ settings, dockTab: settings.webTabs[0] ? `web:${settings.webTabs[0].id}` : "" });
       document.documentElement.classList.toggle("dark", settings.theme === "dark");
       await get().refreshProjects();
+      void get().refreshAside();
       window.api.projects.onFileChanged(({ slug, doc, content }) => {
         const { project, proposals } = get();
         if (project?.slug !== slug) return;
@@ -131,13 +145,13 @@ export const useStore = create<State>((set, get) => {
 
     async createProject(title) {
       const project = await window.api.projects.create(title);
-      set({ project, proposals: {}, selections: {}, focusDoc: "master", runTabs: [], pendingReply: null });
+      set({ project, proposals: {}, selections: {}, focusDoc: "master", scope: ["master"], runTabs: [], pendingReply: null });
       await get().refreshProjects();
     },
 
     async openProject(slug) {
       const project = await window.api.projects.open(slug);
-      set({ project, proposals: {}, selections: {}, focusDoc: "master", runTabs: [], pendingReply: null });
+      set({ project, proposals: {}, selections: {}, focusDoc: "master", scope: ["master"], runTabs: [], pendingReply: null });
     },
 
     closeProject() {
@@ -158,19 +172,22 @@ export const useStore = create<State>((set, get) => {
       if (!project) return;
       const baseline = proposals[doc]?.baseline ?? project.docs[doc];
       if (proposed === baseline) return;
-      set({ proposals: { ...proposals, [doc]: { id: crypto.randomUUID(), baseline, proposed, source } }, focusDoc: doc });
+      // Focus follows a single incoming change; batch results leave focus where the user is.
+      const batch = Object.keys(proposals).length > 0;
+      set({ proposals: { ...proposals, [doc]: { id: crypto.randomUUID(), baseline, proposed, source } }, ...(batch ? {} : { focusDoc: doc }) });
     },
 
     async resolveProposal(doc, finalText) {
       const { project, proposals } = get();
       const prop = proposals[doc];
       if (!project || !prop) return;
-      await window.api.projects.snapshot(project.slug, doc, prop.baseline, `before ${prop.source}`);
+      // Commit state synchronously; bulk accept resolves several docs concurrently and must not clobber each other.
       const { [doc]: _, ...rest } = proposals;
       set({ proposals: rest, project: { ...project, docs: { ...project.docs, [doc]: finalText } } });
       clearTimeout(saveTimers.get(doc));
-      await window.api.projects.writeDoc(project.slug, doc, finalText);
       if (doc !== "master") get().markFresh(doc);
+      await window.api.projects.snapshot(project.slug, doc, prop.baseline, `before ${prop.source}`);
+      await window.api.projects.writeDoc(project.slug, doc, finalText);
     },
 
     rejectProposal(doc) {
@@ -193,6 +210,28 @@ export const useStore = create<State>((set, get) => {
       const p = get().project;
       if (!p) return;
       writeMeta({ ...p.meta, publish: { ...p.meta.publish, [doc]: state } });
+    },
+
+    setBrief(brief) {
+      const p = get().project;
+      if (!p || (p.meta.brief ?? "") === brief) return;
+      writeMeta({ ...p.meta, brief });
+    },
+
+    async refreshAside(checkLogins = false) {
+      const status = await window.api.aside.status().catch(() => null);
+      set({ aside: status });
+      if (!checkLogins || !status?.installed || !status.signedIn) return;
+      set({ asideChecking: true });
+      try {
+        const s = get().settings!;
+        const logins = await window.api.aside.checkLogins(s.platforms, s.asideProfileId || undefined);
+        set({ asideLogins: { ...get().asideLogins, ...logins } });
+      } catch (e) {
+        toast.error(`Aside 로그인 확인 실패: ${(e as Error).message}`);
+      } finally {
+        set({ asideChecking: false });
+      }
     },
 
     set(partial) {

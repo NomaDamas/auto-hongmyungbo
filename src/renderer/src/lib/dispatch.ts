@@ -2,7 +2,7 @@ import { toast } from "sonner";
 import type { DocId, PlatformId } from "@shared/types";
 import { docLabel } from "@shared/platforms";
 import { useStore, type PendingReply } from "@/store";
-import { generateAll, parseSections, rewrite, updateFromMaster, type RewriteAction, type Target } from "./prompts";
+import { intent, parseSections, propagate, type Preset, type Target } from "./prompts";
 import { sendToWeb, waitForReply } from "./web-bridge";
 import { sendToTerminal } from "./term-bridge";
 
@@ -22,24 +22,24 @@ export function cancelPending(): void {
   useStore.setState({ pendingReply: null });
 }
 
-/** Apply a chat reply to the editor as a reviewable proposal. */
-export function applyReply(reply: string, pending: Pick<PendingReply, "doc" | "selection" | "kind">): void {
-  const { project, propose, settings } = useStore.getState();
+/** Route a chat reply into the target docs as reviewable proposals. */
+export function applyReply(reply: string, pending: Pick<PendingReply, "docs" | "selection">): void {
+  const { project, propose, proposals } = useStore.getState();
   if (!project || !reply.trim()) return;
   const sections = parseSections(reply);
   if (sections) {
-    const enabled = settings?.platforms ?? [];
-    const docs = (Object.keys(sections) as PlatformId[]).filter((p) => enabled.includes(p));
-    for (const p of docs) propose(p, sections[p]!, "web AI");
-    toast.success(`${docs.length}개 플랫폼 초안 도착`, { description: "각 열에서 diff를 검토하세요." });
+    const docs = (Object.keys(sections) as DocId[]).filter((d) => pending.docs.includes(d) && sections[d]);
+    for (const d of docs) propose(d, sections[d]!, "web AI");
+    if (docs.length > 1) toast.success(`${docs.length}개 열에 제안 도착`, { description: "상단 검토 바에서 한 번에 수락하거나 열마다 검토하세요." });
     return;
   }
-  const current = useStore.getState().proposals[pending.doc]?.proposed ?? project.docs[pending.doc];
+  const doc = pending.docs[0];
+  const current = proposals[doc]?.proposed ?? project.docs[doc];
   const next = pending.selection && current.includes(pending.selection) ? current.replace(pending.selection, reply.trim()) : reply.trim();
-  propose(pending.doc, next, "web AI");
+  propose(doc, next, "web AI");
 }
 
-async function dispatch(build: (t: Target) => string, pending: Omit<PendingReply, "tabId">): Promise<void> {
+async function dispatch(prompt: (t: Target) => string, pending: Omit<PendingReply, "tabId">): Promise<void> {
   const t = activeTarget();
   const { autoSubmit, project } = useStore.getState();
   if (!project) return;
@@ -48,26 +48,25 @@ async function dispatch(build: (t: Target) => string, pending: Omit<PendingReply
     useStore.setState({ dockOpen: true });
     return;
   }
-  const prompt = build(t.target);
+  const text = prompt(t.target);
   useStore.setState({ dockOpen: true });
 
   if (t.target === "harness") {
-    sendToTerminal(t.id, prompt, autoSubmit);
-    toast.message("하네스로 전송", { description: "파일이 바뀌면 diff로 표시됩니다." });
+    sendToTerminal(t.id, text, autoSubmit);
+    toast.message("하네스로 전송", { description: "파일이 바뀌면 각 열에 diff로 표시됩니다." });
     return;
   }
 
   cancelPending();
   try {
-    const before = await sendToWeb(t.id, prompt, autoSubmit);
+    const before = await sendToWeb(t.id, text, autoSubmit);
+    useStore.setState({ pendingReply: { ...pending, tabId: t.id } });
     if (!autoSubmit) {
       toast.message("입력창에 넣었습니다", { description: "직접 전송한 뒤 '응답 가져오기'를 누르세요." });
-      useStore.setState({ pendingReply: { ...pending, tabId: t.id } });
       return;
     }
     const ctl = new AbortController();
     inflight = ctl;
-    useStore.setState({ pendingReply: { ...pending, tabId: t.id } });
     const reply = await waitForReply(t.id, before, ctl.signal);
     if (inflight !== ctl) return;
     inflight = null;
@@ -80,30 +79,35 @@ async function dispatch(build: (t: Target) => string, pending: Omit<PendingReply
   }
 }
 
-export function runGenerate(): Promise<void> {
+/** Current text for a doc, including an unreviewed proposal (so chained intents build on it). */
+function textOf(doc: DocId): string {
+  const { project, proposals } = useStore.getState();
+  return proposals[doc]?.proposed ?? project?.docs[doc] ?? "";
+}
+
+/** 일괄 전파: master → every enabled platform (fresh or updated) in one prompt. */
+export function runPropagate(only?: PlatformId[]): Promise<void> {
   const { project, settings } = useStore.getState();
   if (!project?.docs.master.trim()) {
     toast.error("원문을 먼저 쓰세요.");
     return Promise.resolve();
   }
-  const platforms = settings?.platforms ?? [];
-  return dispatch((t) => generateAll(project.docs.master, platforms, t), { doc: "master", selection: "", kind: "generate" });
+  const platforms = only ?? settings?.platforms ?? [];
+  const current = Object.fromEntries(platforms.map((p) => [p, textOf(p)]));
+  return dispatch((t) => propagate(project.docs.master, current, platforms, project.meta.brief ?? "", t), { docs: platforms, selection: "" });
 }
 
-export function runRewrite(doc: DocId, action: RewriteAction, custom?: string): Promise<void> {
-  const { project, selections, proposals } = useStore.getState();
+/** One intent applied to the given docs (or the intent bar's scope). */
+export function runIntent(instruction: string, preset?: Preset, docs?: DocId[]): Promise<void> {
+  const { project, selections, scope } = useStore.getState();
   if (!project) return Promise.resolve();
-  const text = proposals[doc]?.proposed ?? project.docs[doc];
-  if (!text.trim()) {
-    toast.error(`${docLabel(doc)}이(가) 비어 있습니다.`);
+  const targets = (docs ?? scope).filter((d) => textOf(d).trim());
+  if (targets.length === 0) {
+    toast.error(`${(docs ?? scope).map(docLabel).join(", ")}이(가) 비어 있습니다.`);
     return Promise.resolve();
   }
-  const selection = selections[doc] ?? "";
-  return dispatch((t) => rewrite({ doc, action, text, selection, custom }, t), { doc, selection, kind: "rewrite" });
-}
-
-export function runUpdateFromMaster(doc: PlatformId): Promise<void> {
-  const { project } = useStore.getState();
-  if (!project) return Promise.resolve();
-  return dispatch((t) => updateFromMaster(doc, project.docs.master, project.docs[doc], t), { doc, selection: "", kind: "rewrite" });
+  if (!instruction.trim() && !preset) return Promise.resolve();
+  const texts = Object.fromEntries(targets.map((d) => [d, textOf(d)]));
+  const selection = targets.length === 1 ? (selections[targets[0]] ?? "") : "";
+  return dispatch((t) => intent({ docs: targets, texts, instruction, preset, selection, brief: project.meta.brief ?? "" }, t), { docs: targets, selection });
 }

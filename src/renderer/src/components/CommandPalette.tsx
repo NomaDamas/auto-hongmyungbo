@@ -3,12 +3,13 @@ import { Command } from "cmdk";
 import type { DocId } from "@shared/types";
 import { docLabel } from "@shared/platforms";
 import { useStore } from "@/store";
-import { ACTIONS, type RewriteAction } from "@/lib/prompts";
-import { runGenerate, runRewrite } from "@/lib/dispatch";
+import { PRESETS, type Preset } from "@/lib/prompts";
+import { runIntent, runPropagate } from "@/lib/dispatch";
 
 export function CommandPalette() {
   const open = useStore((s) => s.paletteOpen);
   const focusDoc = useStore((s) => s.focusDoc);
+  const scope = useStore((s) => s.scope);
   const settings = useStore((s) => s.settings)!;
   const project = useStore((s) => s.project);
   const [query, setQuery] = useState("");
@@ -42,25 +43,31 @@ export function CommandPalette() {
         <Command.List className="max-h-[360px] overflow-y-auto p-1.5">
           <Command.Empty className="px-3 py-2 text-[13px] text-[var(--muted)]">일치하는 명령 없음</Command.Empty>
           {project && query.trim() && (
-            <Command.Group heading="자유 지시">
-              <Item value={`custom ${query}`} onSelect={() => run(() => runRewrite(focusDoc, "humanize", query))}>
-                “{query}” → {docLabel(focusDoc)}
+            <Command.Group heading="의도 전달">
+              <Item value={`custom ${query}`} onSelect={() => run(() => runIntent(query))}>
+                “{query}” → {scope.map(docLabel).join(" · ")}
+              </Item>
+              <Item value={`custom all ${query}`} onSelect={() => run(() => runIntent(query, undefined, settings.platforms))}>
+                “{query}” → 모든 플랫폼
               </Item>
             </Command.Group>
           )}
           {project && (
-            <Command.Group heading={`${docLabel(focusDoc)} 다듬기`}>
-              {(Object.keys(ACTIONS) as RewriteAction[]).map((a) => (
-                <Item key={a} value={`action ${ACTIONS[a].label} ${a}`} onSelect={() => run(() => runRewrite(focusDoc, a))}>
-                  {ACTIONS[a].label}
+            <Command.Group heading={`${scope.map(docLabel).join(" · ")} 다듬기`}>
+              {(Object.keys(PRESETS) as Preset[]).map((a) => (
+                <Item key={a} value={`action ${PRESETS[a].label} ${a}`} onSelect={() => run(() => runIntent("", a))}>
+                  {PRESETS[a].label}
                 </Item>
               ))}
             </Command.Group>
           )}
           {project && (
             <Command.Group heading="작업">
-              <Item value="generate all 전체 생성" shortcut="⌘↵" onSelect={() => run(runGenerate)}>
-                원문 → 모든 플랫폼 생성
+              <Item value="propagate 원문 전파 전체 생성" shortcut="⌘↵" onSelect={() => run(() => runPropagate())}>
+                원문 → 모든 플랫폼 전파
+              </Item>
+              <Item value="aside 연결 로그인" onSelect={() => run(() => useStore.setState({ asideOpen: true }))}>
+                Aside 연결 · 로그인 관리
               </Item>
               {docs.map((d, i) => (
                 <Item key={d} value={`focus ${docLabel(d)} ${d}`} shortcut={`⌘${i + 1}`} onSelect={() => run(() => useStore.setState({ focusDoc: d, soloDoc: d }))}>

@@ -5,15 +5,15 @@ import type { DocId } from "@shared/types";
 import { docLabel } from "@shared/platforms";
 import { isStale, useStore } from "@/store";
 import { countFor } from "@/lib/count";
-import { ACTIONS, type RewriteAction } from "@/lib/prompts";
-import { cancelPending, runRewrite, runUpdateFromMaster } from "@/lib/dispatch";
+import { PRESETS, type Preset } from "@/lib/prompts";
+import { cancelPending, runIntent, runPropagate } from "@/lib/dispatch";
 import { DocEditor, resolveAll } from "./DocEditor";
 import { PlatformIcon } from "./PlatformIcon";
 
-const QUICK: RewriteAction[] = ["humanize", "shorter", "hook"];
+const QUICK: Preset[] = ["humanize", "shorter", "hook"];
 
 const PLACEHOLDER: Record<DocId, string> = {
-  master: "생각나는 대로 쓰세요. 이 원문에서 플랫폼별 글이 만들어집니다.\n\n⌘↵ 전체 생성 · ⌘K 명령",
+  master: "생각나는 대로 쓰세요. 이 원문이 모든 플랫폼으로 전파됩니다.\n\n아래 입력창에 의도를 적거나 ⌘↵로 원문 전파",
   linkedin: "아직 비어 있음 — 원문에서 생성하거나 직접 쓰세요.",
   x: "아직 비어 있음",
   threads: "아직 비어 있음",
@@ -32,15 +32,22 @@ export function DocColumn({ doc }: { doc: DocId }) {
   const count = countFor(doc, text);
   const over = count.limit !== null && count.used > count.limit;
   const stale = doc !== "master" && isStale(project, doc);
-  const waiting = pending?.doc === doc || (pending?.kind === "generate" && doc !== "master");
+  const waiting = !!pending?.docs.includes(doc);
+  const inScope = useStore((s) => s.scope.includes(doc));
 
   return (
     <section
       className={clsx(
         "@container flex h-full min-w-0 flex-col border-r border-[var(--border)] last:border-r-0",
         focused && "bg-[var(--surface-2)]",
+        inScope && "shadow-[inset_0_2px_0_var(--accent)]",
       )}
-      onMouseDown={() => useStore.setState({ focusDoc: doc })}
+      onMouseDown={(e) => {
+        const s = useStore.getState();
+        // Clicking a column makes it the intent target; ⌘/⇧-click adds it to the current scope.
+        const scope = e.metaKey || e.shiftKey ? (s.scope.includes(doc) ? s.scope : [...s.scope, doc]) : s.scope.length > 1 && s.scope.includes(doc) ? s.scope : [doc];
+        useStore.setState({ focusDoc: doc, scope });
+      }}
     >
       <header className="flex h-11 shrink-0 items-center gap-1.5 overflow-hidden border-b border-[var(--border)] px-3">
         <PlatformIcon doc={doc} />
@@ -50,8 +57,8 @@ export function DocColumn({ doc }: { doc: DocId }) {
         {stale && (
           <button
             className="pill pill-warning hover:brightness-110"
-            title="원문이 바뀌었습니다. 클릭하면 변경분을 반영하도록 요청합니다."
-            onClick={() => void runUpdateFromMaster(doc)}
+            title="원문이 바뀌었습니다. 클릭하면 이 플랫폼에 원문을 전파합니다."
+            onClick={() => void runPropagate([doc])}
           >
             <RefreshCw size={11} /> 원문 변경됨
           </button>
@@ -109,19 +116,19 @@ export function DocColumn({ doc }: { doc: DocId }) {
       </div>
 
       <footer className="flex h-10 shrink-0 items-center gap-0.5 overflow-hidden border-t border-[var(--border)] px-1.5">
-        {/* Narrow column: one primary action; wider columns show the rest. ⌘K always has all. */}
+        {/* Narrow column: one primary action; wider columns show the rest. The intent bar has everything. */}
         {QUICK.map((a, i) => (
           <button
             key={a}
             className={clsx("btn btn-xs btn-ghost", i > 0 && "hidden @[300px]:inline-flex")}
-            onClick={() => void runRewrite(doc, a)}
+            onClick={() => void runIntent("", a, [doc])}
             title={selection ? "선택 영역에 적용" : "전체에 적용"}
           >
-            {ACTIONS[a].label}
+            {PRESETS[a].label}
           </button>
         ))}
         {over && doc !== "master" && (
-          <button className="btn btn-xs btn-ghost text-[var(--error)]" onClick={() => void runRewrite(doc, "fit")}>
+          <button className="btn btn-xs btn-ghost text-[var(--error)]" onClick={() => void runIntent("", "fit", [doc])}>
             글자수 맞추기
           </button>
         )}

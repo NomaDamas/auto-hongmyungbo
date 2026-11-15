@@ -20,28 +20,41 @@ There is no LLM API key and no backend.
 ## Layout
 
 ```
-┌──────────────── ⌘K · Generate all · Auto-send ─────────── Aside publish [in][X][@][r] ┐
-│ Source │ LinkedIn  │ X         │ Threads │ Reddit ║ [ChatGPT][Claude][Gemini] │ [Claude Code][Codex][omp] │
-│ draft  │ 1204/3000 │ 271/280   │ 480/500 │ title  ║                                                       │
-│        │ +added ── │ ⚠ source  │         │        ║   Embedded web (persistent login) / terminal (project cwd)  │
-│        │ −deleted  │   changed │         │        ║                                                       │
-│        │ [accept][reject]                        ║  [Grab selection] [Grab reply → diff]                 │
-│ Humanize · Shorter · Stronger hook · char gauge  ║                                                       │
+┌─ ← Title · [Propagate source] · Auto-send ───────────── [in][X][@][r] publish · [Aside ●] ⌘K ⚙ ┐
+│ 4 columns have changes [LinkedIn][X][Threads][Reddit]           [Accept all] [Reject all]       │
+│ Source │ LinkedIn  │ X        │ Threads │ Reddit ║ [ChatGPT][Claude][Gemini] │ [Claude Code][Codex][omp] │
+│        │ +added    │ ⚠ source │         │        ║                                                       │
+│        │ −deleted  │  changed │         │        ║  Embedded web (persistent login) / terminal (project cwd) │
+├────────┴───────────┴──────────┴─────────┴────────╢                                                       │
+│ Apply to: (Source)(LinkedIn)(X)(Threads)(Reddit)(All platforms)   Brief ●   ║  [Grab selection] [Grab reply]  │
+│ [ Say what you want…                                    ↑ ] [Propagate source] ║                            │
+│ Humanize · Shorter · Stronger hook · Casual · Professional · EN · KO   → ChatGPT  ║                        │
 └──────────────────────────────────────────────────╨───────────────────────────────────────────────────────┘
 ```
 
+Auto-HongMyungbo is a **multiplexer**: it connects your writing intent to whatever AI you already use, and each AI's reply back into the right column. It does no generation itself.
+
 | Feature | What it does |
 |---|---|
-| **Platform columns** | Source, LinkedIn, X, Threads, Reddit. Resizable. ⌘1–5 shows one column at a time, ⌘0 shows them all. |
-| **Diff review** | An AI reply or a harness file edit appears in that column as a unified diff. Accept or reject per chunk, or press ⌘⇧↵ to accept all and ⌘⇧⌫ to reject all. Unresolved changes can't be published. |
-| **Selection edits** | Select a passage and click Humanize, Shorter, or Stronger hook (or use ⌘K) to rewrite only that passage. |
-| **Embedded AI web** | ChatGPT, Claude, and Gemini share one persistent login session. Prompts are typed in and sent automatically. Replies are parsed and routed to each column as a diff. If parsing fails, use Grab reply or Grab selection. |
-| **Harness terminals** | Claude Code, Codex, and omp run in your login shell with the project folder as the working directory. When the harness edits `linkedin.md` and similar files, a file watcher turns the change into a diff. |
-| **Character limits** | X uses `twitter-text` weighted counting, where Korean characters count as 2. Reddit shows the title's length separately. Over the limit, a Fit to limit button appears. |
-| **Source changed** | If the source draft changes after a platform post was generated from it, the post shows a "Source changed" badge. Click it to request an update for just the changed parts. |
-| **Version history** | The previous version is saved automatically every time you accept a change. Restoring a version also goes through a diff. |
-| **Aside publishing** | Each platform button runs `aside "<publish task>"` in a terminal tab inside the dock. Aside always stops before the final Post button to confirm with you. |
-| **Humanize (Korean/English)** | Inside harnesses, the installed skills are used: [im-not-ai](https://github.com/epoko77-ai/im-not-ai) (Korean) and [humanizer](https://github.com/blader/humanizer) (English). Web chats can't load skills, so a condensed version of those rules is sent with the prompt. |
+| **Intent bar** | Pick target columns with chips (click = only this column, ⇧/⌘-click = add or remove; clicking a column also targets it), write the intent in one line, and press ↵. It goes to the active dock tab. With multiple targets, each column gets its own result as a diff. ↑ recalls recent intents, ⌘L focuses the input. |
+| **Brief** | A standing intent for this post: audience, tone, things to always keep. It is automatically prepended to every request. Stored in `project.json`. |
+| **Propagate source** | Sends the source to every platform in one request (⌘↵). Empty columns are written fresh. Columns with content are updated, keeping your own edits where the source didn't change. When the source changes, the "Source changed" badge on a column propagates to that column only. |
+| **Bulk review** | When two or more columns have changes, a review bar appears at the top: Accept all / Reject all, or review chunk by chunk in each column. |
+| **Diff review** | An AI reply or a harness file edit shows up in its column as a unified diff. Accept or reject per chunk. Unresolved changes can't be published. |
+| **Embedded AI web** | ChatGPT, Claude, and Gemini share one persistent login session. Prompts are typed and sent automatically. Replies keep their markdown structure (lists, headings) and are routed into each column. If that fails, use Grab reply / Grab selection. |
+| **Harness terminals** | Claude Code, Codex, and omp run in your login shell with the project folder as the working directory. File changes are turned into diffs. |
+| **Aside connection** | The Aside button opens a panel showing the Aside account, a browser profile picker, and per-platform login status. Login status is checked by opening a logged-in-only page in Aside and seeing whether it redirects. Logging in also happens in the Aside browser (password autofill, 2FA). Publishing is blocked when not logged in. |
+| **Aside publishing** | Each platform button runs `aside [--profile] "<publish task>"` in a dock terminal. Aside always stops before the final Post button to confirm. |
+| **Character limits** | X is counted with weighted `twitter-text` (Korean counts double). Reddit shows the title separately. Over the limit, a Fit to limit button appears. |
+| **Version history** | The previous version is saved automatically every time you accept a change. Restoring also goes through a diff. |
+| **Humanizing (Korean/English)** | Harnesses use the [im-not-ai](https://github.com/epoko77-ai/im-not-ai) and [humanizer](https://github.com/blader/humanizer) skills. Web chats get a condensed version of those rules. |
+
+### Aside security model
+
+Aside owns every login credential: cookies, passwords, and 2FA stay inside the Aside browser profile. This app:
+- Calls only the official CLI (`aside account status`, `aside host profiles`, `aside repl`) via `execFile` with no shell.
+- Never reads `~/.aside/cli/auth.json`, cookies, or passwords. Of the status data, it passes only name, email, and profile labels to the UI.
+- Puts only fixed login and check URLs into REPL scripts. User text is never interpolated into code.
 
 ## Install & run
 
@@ -82,8 +95,9 @@ The folder is plain markdown, so you can also edit it in another editor or from 
 
 | Key | Action |
 |---|---|
-| ⌘K | Command palette (free-form instructions, actions, tab switching) |
-| ⌘↵ | Source → generate all platforms |
+| ⌘K | Command palette (free-form intents, presets, tab switching, Aside connection) |
+| ⌘L | Focus the intent input |
+| ⌘↵ | Propagate source → all platforms |
 | ⌘⇧↵ / ⌘⇧⌫ | Accept all / reject all changes in the current column |
 | ⌘↵ / ⌘⌫ (inside a diff) | Accept / reject the chunk under the cursor |
 | ⌘1–5 / ⌘0 | Show one column / show all columns |
@@ -97,13 +111,13 @@ Electron · React 19 · Vite (electron-vite) · Tailwind 4 · CodeMirror 6 + `@c
 ## Structure
 
 ```
-src/main/        Electron main: settings, project folders + file watcher, pty, webview session
+src/main/        Electron main: settings, project folders + file watcher, pty, webview session, Aside CLI bridge (aside.ts)
 src/preload/     IPC bridge (window.api)
 src/shared/      types, platform rules, AGENTS.md template
-src/renderer/    UI: columns (DocColumn/DocEditor), dock (Dock/Terminal), palette, publish tray
-  lib/prompts.ts      Prompt builders (web vs. harness), humanize rules, section parsing
-  lib/web-bridge.ts   Composer, send, and reply DOM adapters for ChatGPT, Claude, and Gemini
-  lib/dispatch.ts     Sends to the active dock tab → collects the reply → creates the diff proposal
+src/renderer/    UI: columns (DocColumn/DocEditor), IntentBar, ReviewBar, AsidePanel, dock (Dock/Terminal), palette, publish tray
+  lib/prompts.ts      Intent and propagate prompts (web vs. harness), humanize rules, section parsing
+  lib/web-bridge.ts   Composer/send/reply DOM adapters for ChatGPT, Claude, and Gemini, plus reply → markdown conversion
+  lib/dispatch.ts     runIntent / runPropagate: send to the active dock tab → collect the reply → create per-column diff proposals
 ```
 
 When a site redesign breaks the web adapters, edit the selector lists in `ADAPTERS` in `web-bridge.ts`. Until then, Grab reply / Grab selection still work.

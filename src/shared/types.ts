@@ -14,6 +14,8 @@ export interface ProjectMeta {
   /** Hash of master.md at the time each platform doc was last derived from it. */
   derivedFrom: Partial<Record<PlatformId, string>>;
   publish: Partial<Record<PlatformId, PublishState>>;
+  /** Standing intent for this post (audience, tone, must-keeps); prepended to every prompt. */
+  brief?: string;
 }
 
 export interface ProjectSummary {
@@ -55,6 +57,19 @@ export interface Settings {
   harnesses: HarnessConfig[];
   platforms: PlatformId[];
   theme: "dark" | "light";
+  /** Aside browser profile used for publishing and login checks; empty = Aside default. */
+  asideProfileId: string;
+}
+
+export type AsideLoginState = "signed-in" | "signed-out" | "error";
+
+/** Non-secret Aside facts surfaced to the UI. Tokens and cookies never leave the Aside process. */
+export interface AsideStatus {
+  installed: boolean;
+  signedIn: boolean;
+  email?: string;
+  name?: string;
+  profiles: { id: string; label: string; connected: boolean }[];
 }
 
 export interface FileChangedEvent {
@@ -102,6 +117,11 @@ export interface Api {
   clipboard: {
     read(): Promise<string>;
     write(text: string): void;
+  };
+  aside: {
+    status(): Promise<AsideStatus>;
+    checkLogins(platforms: PlatformId[], profileId?: string): Promise<Partial<Record<PlatformId, AsideLoginState>>>;
+    openLogin(platform: PlatformId, profileId?: string): Promise<void>;
   };
   openExternal(url: string): void;
 }

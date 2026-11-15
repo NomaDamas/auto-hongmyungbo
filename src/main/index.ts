@@ -1,9 +1,6 @@
 import { app, BrowserWindow, clipboard, dialog, ipcMain, session, shell } from "electron";
 import { join } from "node:path";
-
-// HMB_USER_DATA isolates settings/logins (second profile or a clean test run).
-if (process.env.HMB_USER_DATA) app.setPath("userData", process.env.HMB_USER_DATA);
-import type { DocId, ProjectMeta, Settings } from "@shared/types";
+import type { DocId, PlatformId, ProjectMeta, Settings } from "@shared/types";
 import { getSettings, setSettings } from "./settings";
 import {
   createProject,
@@ -18,6 +15,10 @@ import {
   writeMeta,
 } from "./projects";
 import { killAllPtys, killPty, resizePty, spawnPty, writePty } from "./pty";
+import { asideCheckLogins, asideOpenLogin, asideStatus } from "./aside";
+
+// HMB_USER_DATA isolates settings/logins (second profile or a clean test run).
+if (process.env.HMB_USER_DATA) app.setPath("userData", process.env.HMB_USER_DATA);
 
 /** Shared login partition for every embedded AI web tab, persisted across restarts. */
 const WEB_PARTITION = "persist:ai-web";
@@ -103,6 +104,10 @@ function registerIpc(): void {
 
   ipcMain.handle("clipboard:read", () => clipboard.readText());
   ipcMain.on("clipboard:write", (_e, text: string) => clipboard.writeText(text));
+
+  ipcMain.handle("aside:status", () => asideStatus());
+  ipcMain.handle("aside:checkLogins", (_e, platforms: PlatformId[], profileId?: string) => asideCheckLogins(platforms, profileId));
+  ipcMain.handle("aside:openLogin", (_e, platform: PlatformId, profileId?: string) => asideOpenLogin(platform, profileId));
 
   ipcMain.on("openExternal", (_e, url: string) => {
     if (/^https?:\/\//.test(url)) void shell.openExternal(url);

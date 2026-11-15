@@ -37,6 +37,11 @@ const api: Api = {
     read: () => ipcRenderer.invoke("clipboard:read"),
     write: (text) => ipcRenderer.send("clipboard:write", text),
   },
+  aside: {
+    status: () => ipcRenderer.invoke("aside:status"),
+    checkLogins: (platforms, profileId) => ipcRenderer.invoke("aside:checkLogins", platforms, profileId),
+    openLogin: (platform, profileId) => ipcRenderer.invoke("aside:openLogin", platform, profileId),
+  },
   openExternal: (url) => ipcRenderer.send("openExternal", url),
 };
 

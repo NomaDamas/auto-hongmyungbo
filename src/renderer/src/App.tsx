@@ -1,10 +1,11 @@
 import { useEffect } from "react";
 import { Group, Panel, Separator, usePanelRef } from "react-resizable-panels";
-import { ChevronLeft, Command as CommandIcon, PanelRightClose, PanelRightOpen, Settings as SettingsIcon, Wand2 } from "lucide-react";
+import { ChevronLeft, Command as CommandIcon, PanelRightClose, PanelRightOpen, Radio, Settings as SettingsIcon, ShieldCheck } from "lucide-react";
 import { Toaster } from "sonner";
+import clsx from "clsx";
 import type { DocId } from "@shared/types";
 import { useStore } from "@/store";
-import { runGenerate } from "@/lib/dispatch";
+import { runPropagate } from "@/lib/dispatch";
 import { resolveAll } from "@/components/DocEditor";
 import { DocColumn } from "@/components/DocColumn";
 import { Dock } from "@/components/Dock";
@@ -13,6 +14,9 @@ import { PublishTray } from "@/components/PublishTray";
 import { CommandPalette } from "@/components/CommandPalette";
 import { HistoryPanel } from "@/components/HistoryPanel";
 import { SettingsDialog } from "@/components/SettingsDialog";
+import { IntentBar } from "@/components/IntentBar";
+import { ReviewBar } from "@/components/ReviewBar";
+import { AsidePanel } from "@/components/AsidePanel";
 
 export function App() {
   const settings = useStore((s) => s.settings);
@@ -61,7 +65,10 @@ export function App() {
         resolveAll(s.focusDoc, "reject");
       } else if (e.key === "Enter" && !s.proposals[s.focusDoc]) {
         e.preventDefault();
-        void runGenerate();
+        void runPropagate();
+      } else if (e.key === "l") {
+        e.preventDefault();
+        document.querySelector<HTMLTextAreaElement>("[data-intent-input]")?.focus();
       } else if (e.key === "0") {
         e.preventDefault();
         useStore.setState({ soloDoc: null });
@@ -87,15 +94,14 @@ export function App() {
               <ChevronLeft size={15} />
             </button>
             <span className="truncate text-[13px] font-semibold">{project.meta.title}</span>
-            <button className="no-drag btn btn-sm btn-primary ml-3" onClick={() => void runGenerate()} title="원문 → 모든 플랫폼 (⌘↵)">
-              <Wand2 size={13} /> 전체 생성
+            <button className="no-drag btn btn-sm btn-primary ml-3" onClick={() => void runPropagate()} title="원문 → 모든 플랫폼에 한 번에 (⌘↵)">
+              <Radio size={13} /> 원문 전파
             </button>
             <label className="no-drag ml-1 flex items-center gap-1.5 text-[12px] text-[var(--muted)]" title="끄면 프롬프트를 입력창에만 넣고 직접 전송합니다">
               <input type="checkbox" checked={autoSubmit} onChange={(e) => useStore.setState({ autoSubmit: e.target.checked })} />
               자동 전송
             </label>
-            <div className="no-drag ml-auto flex items-center gap-3">
-              <span className="text-[11px] text-[var(--muted)]">Aside 게시</span>
+            <div className="no-drag ml-auto flex items-center gap-2">
               <PublishTray />
             </div>
           </>
@@ -103,6 +109,7 @@ export function App() {
           <span className="text-[13px] font-semibold">Auto-HongMyungbo</span>
         )}
         <div className={`no-drag flex items-center gap-0.5 ${project ? "" : "ml-auto"}`}>
+          <AsideButton />
           <button className="icon-btn" onClick={() => useStore.setState({ paletteOpen: true })} title="명령 (⌘K)">
             <CommandIcon size={14} />
           </button>
@@ -118,15 +125,19 @@ export function App() {
       <Group orientation="horizontal" className="min-h-0 flex-1">
         <Panel id="main" minSize="35" defaultSize="62">
           {project ? (
-            <Group orientation="horizontal" key={docs.join(",")}>
-              {docs.map((d, i) => (
-                <WithSeparator key={d} index={i}>
-                  <Panel id={d} minSize="12" defaultSize={d === "master" && docs.length > 1 ? "24" : undefined}>
-                    <DocColumn doc={d} />
-                  </Panel>
-                </WithSeparator>
-              ))}
-            </Group>
+            <div className="flex h-full flex-col">
+              <ReviewBar />
+              <Group orientation="horizontal" key={docs.join(",")} className="min-h-0 flex-1">
+                {docs.map((d, i) => (
+                  <WithSeparator key={d} index={i}>
+                    <Panel id={d} minSize="12" defaultSize={d === "master" && docs.length > 1 ? "24" : undefined}>
+                      <DocColumn doc={d} />
+                    </Panel>
+                  </WithSeparator>
+                ))}
+              </Group>
+              <IntentBar />
+            </div>
           ) : (
             <Home />
           )}
@@ -141,6 +152,7 @@ export function App() {
       <CommandPalette />
       <HistoryPanel />
       <SettingsDialog />
+      <AsidePanel />
       <Toaster theme={settings.theme} position="bottom-center" richColors closeButton />
     </div>
   );
@@ -152,5 +164,26 @@ function WithSeparator({ index, children }: { index: number; children: React.Rea
       {index > 0 && <Separator className="sep" />}
       {children}
     </>
+  );
+}
+
+/** Aside connection status at a glance; opens the connection hub. */
+function AsideButton() {
+  const aside = useStore((s) => s.aside);
+  const logins = useStore((s) => s.asideLogins);
+  const platforms = useStore((s) => s.settings?.platforms ?? []);
+  const needLogin = platforms.filter((p) => logins[p] === "signed-out").length;
+  const ok = aside?.installed && aside.signedIn;
+  return (
+    <button
+      className={clsx("btn btn-xs mr-1 gap-1.5", !ok && "text-[var(--warning)]")}
+      onClick={() => useStore.setState({ asideOpen: true })}
+      title="Aside 연결 · 플랫폼 로그인 관리"
+    >
+      <ShieldCheck size={12} />
+      Aside
+      <span className={clsx("h-1.5 w-1.5 rounded-full", ok ? (needLogin ? "bg-[var(--warning)]" : "bg-[var(--success)]") : "bg-[var(--error)]")} />
+      {needLogin > 0 && <span className="text-[var(--warning)]">로그인 {needLogin}</span>}
+    </button>
   );
 }

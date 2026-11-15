@@ -151,8 +151,9 @@ function WebPane({ id, url }: { id: string; url: string }) {
     try {
       const text = mode === "reply" ? await grabLatestReply(id) : await grabSelection(id);
       if (!text) return toast.error(mode === "reply" ? "가져올 응답이 없습니다." : "웹에서 텍스트를 먼저 선택하세요.");
+      // Pending multi-doc request → route by sections; otherwise drop into the focused column.
       const { pendingReply, selections } = useStore.getState();
-      const target = pendingReply?.tabId === id ? pendingReply : { doc: focusDoc, selection: selections[focusDoc] ?? "", kind: "rewrite" as const };
+      const target = pendingReply?.tabId === id ? pendingReply : { docs: [focusDoc], selection: selections[focusDoc] ?? "" };
       useStore.setState({ pendingReply: null });
       applyReply(text, target);
     } catch (e) {

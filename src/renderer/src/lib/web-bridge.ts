@@ -17,7 +17,7 @@ const ADAPTERS: Adapter[] = [
   {
     match: /chatgpt\.com|chat\.openai\.com/,
     composer: ["#prompt-textarea", "div.ProseMirror[contenteditable=true]", 'textarea[name="prompt"]'],
-    send: ["button[data-testid=send-button]", "#composer-submit-button", 'button[aria-label*="Send prompt"]'],
+    send: ["button[data-testid=send-button]", "#composer-submit-button", 'button[aria-label="Send message"]', 'button[aria-label*="Send prompt"]'],
     reply: ['[data-message-author-role="assistant"] .markdown', '[data-message-author-role="assistant"]'],
     busy: ['button[data-testid="stop-button"]'],
   },
@@ -40,7 +40,7 @@ const ADAPTERS: Adapter[] = [
 const GENERIC: Adapter = {
   match: /./,
   composer: ['div[contenteditable="true"]', "textarea"],
-  send: ['button[type="submit"]', 'button[aria-label*="Send"]', 'button[aria-label*="send"]'],
+  send: ['button[aria-label*="Send"]', 'button[aria-label*="send"]'],
   reply: ["main article:last-of-type", "main"],
   busy: [],
 };
@@ -98,20 +98,33 @@ async function lastReply(v: WebviewTag, a: Adapter, probe?: string): Promise<{ t
   return run(
     v,
     `${FIND}
+     // Reply DOM → markdown-ish text: keeps bullets, numbered lists, headings and paragraphs
+     // (innerText flattens <li> and drops '#'), and skips buttons/menus/sr-only labels.
+     const SKIP = "button, [role=button], [role=menu], svg, .sr-only, [aria-hidden=true], style, script";
+     const md = (el) => {
+       if (el.nodeType === 3) return el.textContent;
+       if (el.nodeType !== 1 || el.matches(SKIP)) return "";
+       const tag = el.tagName;
+       const inner = () => [...el.childNodes].map(md).join("");
+       if (/^H[1-6]$/.test(tag)) return "\\n\\n" + "#".repeat(Number(tag[1])) + " " + inner().trim() + "\\n\\n";
+       if (tag === "BR") return "\\n";
+       if (tag === "LI") {
+         const ol = el.parentElement?.tagName === "OL";
+         const n = ol ? [...el.parentElement.children].indexOf(el) + 1 + ". " : "- ";
+         return "\\n" + n + inner().trim();
+       }
+       if (tag === "UL" || tag === "OL") return "\\n" + inner() + "\\n\\n";
+       if (tag === "P" || tag === "DIV" || tag === "BLOCKQUOTE" || tag === "PRE" || tag === "SECTION" || tag === "ARTICLE") return "\\n\\n" + inner() + "\\n\\n";
+       return inner();
+     };
+     const prose = (el) => md(el).replace(/[ \\t]+\\n/g, "\\n").replace(/\\n\\s*\\n(\\s*\\n)+/g, "\\n\\n").trim();
      const busy = !!find(args.busy);
      const r = find(args.reply);
-     if (r) return { text: r[r.length - 1].innerText.trim(), count: r.length, busy };
+     if (r) return { text: prose(r[r.length - 1]), count: r.length, busy };
      if (!args.probe) return { text: "", count: 0, busy };
      const inComposer = (e) => e.closest("form, textarea, [contenteditable=true]") || args.composer.some((s) => e.closest(s));
      const hits = [...document.body.querySelectorAll("*")].filter((e) => e.children.length < 50 && !inComposer(e) && e.innerText && e.innerText.includes(args.probe));
      const user = hits.filter((e) => !hits.some((o) => o !== e && e.contains(o))).pop();
-     // Prose text of a node: drop buttons/menus/sr-only labels (Copy, Edit, Share...) from a clone.
-     const prose = (el) => {
-       const c = el.cloneNode(true);
-       c.querySelectorAll("button, [role=button], [role=menu], svg, .sr-only, [aria-hidden=true]").forEach((n) => n.remove());
-       document.body.appendChild(c); c.style.cssText = "position:fixed;left:-99999px;top:0;width:600px";
-       const t = c.innerText.trim(); c.remove(); return t;
-     };
      for (let x = user; x && x !== document.body; x = x.parentElement) {
        for (let s = x.nextElementSibling; s; s = s.nextElementSibling) {
          if (s.contains(user)) continue;
@@ -155,16 +168,18 @@ export async function sendToWeb(id: string, text: string, submit: boolean): Prom
   }
   if (submit) {
     await sleep(400);
+    // Prefer a send button inside the composer's own form (page-wide submit buttons may be modal "Dismiss").
     const clicked = await run<boolean>(
       v,
       `${FIND}
-       const b = find(args.send);
-       if (!b) return false;
-       const btn = b[b.length - 1];
-       if (btn.disabled) return false;
-       btn.click();
-       return true;`,
-      { send: a.send },
+       const c = find(args.composer);
+       const form = c && c[c.length - 1].closest("form");
+       const scoped = form ? args.send.flatMap((s) => [...form.querySelectorAll(s)]) : [];
+       const btn = scoped.find((b) => !b.disabled) ?? (find(args.send) ?? []).filter((b) => !b.disabled).pop();
+       if (btn) { btn.click(); return true; }
+       if (form) { form.requestSubmit(); return true; }
+       return false;`,
+      { send: a.send, composer: a.composer },
     );
     if (!clicked) {
       v.sendInputEvent({ type: "keyDown", keyCode: "Return" });

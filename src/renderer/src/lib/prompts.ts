@@ -4,9 +4,9 @@ import { PLATFORMS, docFile, docLabel } from "@shared/platforms";
 /** Where a prompt is going: a chat web UI (paste text, reply comes back) or a harness in the project folder (edits files). */
 export type Target = "web" | "harness";
 
-export type RewriteAction = "humanize" | "shorter" | "hook" | "casual" | "professional" | "translate-en" | "translate-ko" | "fit";
+export type Preset = "humanize" | "shorter" | "hook" | "casual" | "professional" | "translate-en" | "translate-ko" | "fit";
 
-export const ACTIONS: Record<RewriteAction, { label: string; instruction: string }> = {
+export const PRESETS: Record<Preset, { label: string; instruction: string }> = {
   humanize: { label: "윤문", instruction: "" },
   shorter: { label: "짧게", instruction: "Make it about 30% shorter without losing the key point." },
   hook: { label: "훅 강화", instruction: "Rewrite the opening so the first line stops the scroll. Keep the rest." },
@@ -14,7 +14,7 @@ export const ACTIONS: Record<RewriteAction, { label: string; instruction: string
   professional: { label: "전문적", instruction: "Make the tone more professional and credible, still human." },
   "translate-en": { label: "영어로", instruction: "Translate into natural, native-sounding English." },
   "translate-ko": { label: "한국어로", instruction: "Translate into natural Korean (not translationese)." },
-  fit: { label: "글자수 맞추기", instruction: "" },
+  fit: { label: "글자수 맞추기", instruction: "Fit within the platform's character limit. Cut, don't cram." },
 };
 
 const HANGUL = /[\uac00-\ud7a3]/g;
@@ -49,112 +49,135 @@ function humanizeRules(korean: boolean): string {
   ].join("\n");
 }
 
-function platformSpec(p: PlatformId): string {
-  const d = PLATFORMS[p];
-  return `${d.label} (max ${d.limit} chars${p === "x" ? ", CJK counts as 2" : ""}): ${d.guide}`;
+function spec(doc: DocId): string {
+  if (doc === "master") return "Source draft (no platform limit)";
+  const d = PLATFORMS[doc];
+  return `${d.label} (max ${d.limit} chars${doc === "x" ? ", CJK counts as 2" : ""}): ${d.guide}`;
 }
 
 /** Section markers survive markdown rendering in every chat UI and are parsed by parseSections. */
-export function sectionMarker(p: PlatformId): string {
-  return `=== ${p} ===`;
+function marker(doc: DocId): string {
+  return `=== ${doc} ===`;
 }
 
-export function generateAll(master: string, platforms: PlatformId[], target: Target): string {
+function briefBlock(brief: string): string[] {
+  return brief.trim() ? ["Standing brief from the author (always follow):", brief.trim(), ""] : [];
+}
+
+function sectionsOutput(docs: DocId[]): string[] {
+  return [
+    "Output ONLY the results, each under its own marker line exactly like this, nothing before or after:",
+    ...docs.map((d) => `${marker(d)}\n<${docLabel(d)}>`),
+  ];
+}
+
+/**
+ * 일괄 전파: derive every platform post from the master draft. Existing posts are updated
+ * (keeping the author's edits where the source didn't change); empty ones are written fresh.
+ */
+export function propagate(master: string, current: Partial<Record<PlatformId, string>>, platforms: PlatformId[], brief: string, target: Target): string {
   if (target === "harness") {
-    return `Read master.md and write ${platforms.map(docFile).join(", ")} following AGENTS.md. Edit the files in place; reply with one line per file when done.`;
+    return [
+      `Propagate master.md to ${platforms.map(docFile).join(", ")} following AGENTS.md.`,
+      "Empty files: write from scratch. Non-empty files: update to reflect master.md, keep my manual wording where the source didn't change.",
+      ...(brief.trim() ? [`Standing brief: ${brief.trim()}`] : []),
+      "Edit the files in place; reply with one line per file when done.",
+    ].join("\n");
   }
   return [
-    "Turn my draft into platform-specific posts. Same language as the draft unless told otherwise.",
+    ...briefBlock(brief),
+    "Turn my source draft into platform posts. Same language as the draft unless told otherwise.",
+    "Where a current post exists, update it to reflect the draft and keep my wording where the draft didn't change. Where it's empty, write it fresh.",
     "",
-    ...platforms.map((p) => `- ${platformSpec(p)}`),
+    ...platforms.map((p) => `- ${spec(p)}`),
     "",
-    "Output ONLY the posts, each under its own marker line exactly like this, nothing before or after:",
-    ...platforms.map((p) => `${sectionMarker(p)}\n<${PLATFORMS[p].label} post>`),
+    ...sectionsOutput(platforms),
     "",
-    "Draft:",
+    "Source draft:",
     '"""',
     master,
     '"""',
+    "",
+    "Current posts:",
+    ...platforms.flatMap((p) => [marker(p), current[p]?.trim() || "(empty)"]),
   ].join("\n");
 }
 
-export function updateFromMaster(doc: PlatformId, master: string, current: string, target: Target): string {
-  if (target === "harness") {
-    return `master.md changed. Update ${docFile(doc)} so it reflects the new master.md, keeping my manual edits and its ${PLATFORMS[doc].label} style. Edit in place.`;
-  }
-  return [
-    `My source draft changed. Update my ${PLATFORMS[doc].label} post to reflect it. Keep my wording where the source did not change.`,
-    platformSpec(doc),
-    "Output ONLY the updated post.",
-    "",
-    "New source draft:",
-    '"""',
-    master,
-    '"""',
-    "",
-    `Current ${PLATFORMS[doc].label} post:`,
-    '"""',
-    current,
-    '"""',
-  ].join("\n");
-}
-
-export interface RewriteRequest {
-  doc: DocId;
-  action: RewriteAction;
-  /** Full document text. */
-  text: string;
-  /** Selected excerpt; empty = whole document. */
+export interface IntentRequest {
+  docs: DocId[];
+  texts: Partial<Record<DocId, string>>;
+  /** Free-form intent from the user. Empty when a preset is used alone. */
+  instruction: string;
+  preset?: Preset;
+  /** Selected excerpt; only honored when exactly one doc is targeted. */
   selection: string;
-  custom?: string;
+  brief: string;
 }
 
-export function rewrite(req: RewriteRequest, target: Target): string {
-  const { doc, action, text, selection, custom } = req;
-  const scope = selection || text;
-  const korean = isKorean(scope);
-  const platform = doc === "master" ? null : doc;
-  let instruction = custom?.trim() || ACTIONS[action].instruction;
-  if (action === "fit" && platform) instruction = `Fit within ${PLATFORMS[platform].limit} characters${platform === "x" ? " (CJK counts as 2)" : ""}. Cut, don't cram.`;
+/** One intent → one or many docs. Multi-doc web prompts come back as marked sections. */
+export function intent(req: IntentRequest, target: Target): string {
+  const { docs, texts, preset, brief } = req;
+  const selection = docs.length === 1 ? req.selection : "";
+  const sample = selection || docs.map((d) => texts[d] ?? "").join("\n");
+  const korean = isKorean(sample);
+  const humanize = preset === "humanize";
+  const instruction = [preset && !humanize ? PRESETS[preset].instruction : "", req.instruction.trim()].filter(Boolean).join(" ");
 
   if (target === "harness") {
-    const file = docFile(doc);
-    const what = selection ? `this passage in ${file}:\n"""\n${selection}\n"""` : `${file}`;
-    const how =
-      action === "humanize" && !custom
-        ? korean
-          ? "Use the humanize-korean skill (im-not-ai) if available."
-          : "Use the humanizer skill if available."
-        : instruction;
-    return `Rewrite ${what}\n${how}\nEdit the file in place and change nothing else.`;
+    const files = docs.map(docFile).join(", ");
+    const what = selection ? `this passage in ${files}:\n"""\n${selection}\n"""` : files;
+    const skill = humanize ? (korean ? "Use the humanize-korean skill (im-not-ai) if available." : "Use the humanizer skill if available.") : "";
+    return [
+      `Rewrite ${what}`,
+      ...[skill, instruction].filter(Boolean),
+      ...(brief.trim() ? [`Standing brief: ${brief.trim()}`] : []),
+      docs.length > 1 ? "Apply it to each file, keeping each platform's rules from AGENTS.md." : "",
+      "Edit in place and change nothing else.",
+    ]
+      .filter(Boolean)
+      .join("\n");
+  }
+
+  const head = [...briefBlock(brief), ...(humanize ? [humanizeRules(korean)] : []), ...(instruction ? [`Instruction: ${instruction}`] : [])];
+
+  if (docs.length === 1) {
+    const doc = docs[0];
+    return [
+      ...head,
+      `Context: ${spec(doc)}`,
+      selection ? "Rewrite ONLY the excerpt below. Output ONLY the rewritten excerpt, no quotes, no commentary." : "Output ONLY the rewritten text, no commentary.",
+      "",
+      '"""',
+      selection || texts[doc] || "",
+      '"""',
+    ].join("\n");
   }
 
   return [
-    action === "humanize" && !custom ? humanizeRules(korean) : instruction,
-    platform ? `Context: this is a ${platformSpec(platform)}` : `Context: this is my ${docLabel(doc)} draft.`,
-    selection
-      ? "Rewrite ONLY the excerpt below. Output ONLY the rewritten excerpt, no quotes, no commentary."
-      : "Output ONLY the rewritten text, no commentary.",
+    ...head,
+    "Apply the instruction to every text below. Keep each one's platform style and limit:",
+    ...docs.map((d) => `- ${spec(d)}`),
     "",
-    '"""',
-    scope,
-    '"""',
+    ...sectionsOutput(docs),
+    "",
+    "Texts:",
+    ...docs.flatMap((d) => [marker(d), texts[d]?.trim() || "(empty)"]),
   ].join("\n");
 }
 
 /**
- * Split a chat reply into per-platform sections using `=== platform ===` markers.
+ * Split a chat reply into per-doc sections using `=== doc ===` markers.
  * Returns null when no markers are present (the reply is a single document).
  */
-export function parseSections(reply: string): Partial<Record<PlatformId, string>> | null {
-  const re = /^\s*[#*>`]*\s*={3,}\s*(linkedin|x|threads|reddit)\s*={3,}\s*[*`]*\s*$/gim;
+export function parseSections(reply: string): Partial<Record<DocId, string>> | null {
+  const re = /^\s*[#*>`]*\s*={3,}\s*(master|linkedin|x|threads|reddit)\s*={3,}\s*[*`]*\s*$/gim;
   const hits = [...reply.matchAll(re)];
   if (hits.length === 0) return null;
-  const out: Partial<Record<PlatformId, string>> = {};
+  const out: Partial<Record<DocId, string>> = {};
   hits.forEach((m, i) => {
     const start = (m.index ?? 0) + m[0].length;
     const end = i + 1 < hits.length ? (hits[i + 1].index ?? reply.length) : reply.length;
-    out[m[1].toLowerCase() as PlatformId] = reply.slice(start, end).trim();
+    out[m[1].toLowerCase() as DocId] = reply.slice(start, end).trim();
   });
   return out;
 }
