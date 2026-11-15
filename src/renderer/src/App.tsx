@@ -17,12 +17,14 @@ import { OnboardingWizard } from "@/components/OnboardingWizard";
 import { Sidebar } from "@/components/Sidebar";
 import { EditorArea, focusEditorTab } from "@/components/EditorArea";
 import { EmbedInbox } from "@/components/EmbedInbox";
+import { InsightsBoard } from "@/components/InsightsBoard";
 
 export function App() {
   const settings = useStore((s) => s.settings);
   const project = useStore((s) => s.project);
   const dockOpen = useStore((s) => s.dockOpen);
   const sidebarOpen = useStore((s) => s.sidebarOpen);
+  const mode = useStore((s) => s.mode);
 
   useEffect(() => {
     void useStore.getState().init();
@@ -42,6 +44,11 @@ export function App() {
       if (!e.metaKey && !e.ctrlKey) return;
       const key = e.key.toLowerCase();
       const s = useStore.getState();
+      if (e.shiftKey && /^Digit[1-3]$/.test(e.code)) {
+        e.preventDefault();
+        s.setMode((["post", "comment", "insights"] as const)[Number(e.code.slice(-1)) - 1]);
+        return;
+      }
       if (key === "k") {
         e.preventDefault();
         useStore.setState({ paletteOpen: !s.paletteOpen });
@@ -84,12 +91,13 @@ export function App() {
   if (!settings) return null;
   return (
     <div className="flex h-screen flex-col">
-      <header className="drag flex h-12 shrink-0 items-center gap-2 pl-[84px] pr-3">
+      <header className="drag relative flex h-12 shrink-0 items-center gap-2 pl-[84px] pr-3">
         <button className="no-drag icon-btn" onClick={() => useStore.setState({ sidebarOpen: !sidebarOpen })} title="사이드바 (⌘B)">
           {sidebarOpen ? <PanelLeftClose size={15} /> : <PanelLeftOpen size={15} />}
         </button>
         <span className="max-w-[320px] truncate text-[13px] font-medium">{project?.meta.title ?? "Auto-HongMyungbo"}</span>
-        {project && (
+        {project && <ModeSwitch />}
+        {project && mode !== "insights" && (
           <button className="no-drag btn btn-sm btn-primary ml-2" onClick={() => void runPropagate()} title="원문 → 모든 플랫폼 (⌘↵)">
             <Radio size={13} /> 원문 전파
           </button>
@@ -103,9 +111,15 @@ export function App() {
           <Panel id="editor" minSize="35" defaultSize="64">
             {project ? (
               <div className="flex h-full min-w-0 flex-col">
-                <EditorArea />
-                <EmbedInbox />
-                <IntentBar />
+                {mode === "insights" ? (
+                  <InsightsBoard />
+                ) : (
+                  <>
+                    <EditorArea />
+                    <EmbedInbox />
+                    <IntentBar />
+                  </>
+                )}
               </div>
             ) : (
               <div className="flex h-full flex-col items-center justify-center gap-4 text-center">
@@ -145,6 +159,30 @@ export function App() {
       <PreviewModal />
       <OnboardingWizard />
       <Toaster theme={settings.theme} position="bottom-center" richColors closeButton />
+    </div>
+  );
+}
+
+function ModeSwitch() {
+  const mode = useStore((s) => s.mode);
+  const modes = [
+    ["post", "글", "⌘⇧1"],
+    ["comment", "댓글", "⌘⇧2"],
+    ["insights", "인사이트", "⌘⇧3"],
+  ] as const;
+  return (
+    <div className="no-drag absolute left-1/2 flex -translate-x-1/2 rounded-full border border-[var(--border)] bg-[var(--surface-2)] p-0.5" aria-label="작업 모드">
+      {modes.map(([value, label, shortcut]) => (
+        <button
+          key={value}
+          className={`h-6 rounded-full px-3 text-[11.5px] ${mode === value ? "bg-[var(--surface-3)] font-medium text-[var(--fg)]" : "text-[var(--muted)] hover:text-[var(--fg)]"}`}
+          onClick={() => useStore.getState().setMode(value)}
+          title={`${label} 모드 (${shortcut})`}
+          aria-pressed={mode === value}
+        >
+          {label}
+        </button>
+      ))}
     </div>
   );
 }

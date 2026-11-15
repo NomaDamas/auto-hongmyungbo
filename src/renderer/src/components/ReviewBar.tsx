@@ -22,6 +22,7 @@ export function ReviewBar() {
             onClick={() => {
               const { platform, variant } = parseDoc(d);
               const tab = platform ? PLATFORMS[platform].tab : "master";
+              if (platform) useStore.getState().setMode(variant);
               useStore.setState((s) => ({
                 activeDoc: d,
                 tabSelection: platform ? { ...s.tabSelection, [tab]: platform } : s.tabSelection,

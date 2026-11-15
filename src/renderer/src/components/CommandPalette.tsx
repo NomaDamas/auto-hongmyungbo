@@ -86,6 +86,17 @@ export function CommandPalette() {
               </Item>
             </Command.Group>
           )}
+          <Command.Group heading="보기 모드">
+            <Item value="mode post 글 모드" shortcut="⌘⇧1" onSelect={() => run(() => useStore.getState().setMode("post"))}>
+              글 모드
+            </Item>
+            <Item value="mode comment 댓글 모드" shortcut="⌘⇧2" onSelect={() => run(() => useStore.getState().setMode("comment"))}>
+              댓글 모드
+            </Item>
+            <Item value="mode insights 인사이트 모드" shortcut="⌘⇧3" onSelect={() => run(() => useStore.getState().setMode("insights"))}>
+              인사이트 모드
+            </Item>
+          </Command.Group>
           <Command.Group heading="에디터 패널">
             {TABS.map((tab, index) => (
               <Item key={tab.id} value={`focus panel ${tab.label} ${tab.id}`} shortcut={`⌘${index + 1}`} onSelect={() => run(() => focusEditorTab(tab.id))}>

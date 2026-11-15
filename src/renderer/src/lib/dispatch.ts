@@ -174,7 +174,7 @@ export function runIntent(instruction: string, preset?: Preset, docs?: DocId[]):
   const { project, selections, activeDoc } = useStore.getState();
   if (!project) return Promise.resolve();
   const requested = docs ?? [activeDoc];
-  const targets = requested.filter((d) => textOf(d).trim());
+  const targets = requested.filter((doc) => textOf(doc).trim() || (!!instruction.trim() && parseDoc(doc).variant === "comment"));
   if (targets.length === 0) {
     toast.error(`${requested.map(docLabel).join(", ")}이(가) 비어 있습니다.`);
     return Promise.resolve();

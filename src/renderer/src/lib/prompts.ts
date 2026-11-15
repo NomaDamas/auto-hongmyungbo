@@ -244,9 +244,10 @@ export function intent(req: IntentRequest, target: Target): string {
     const files = docs.map(docFile).join(", ");
     const what = selection ? `this passage in ${files}:\n"""\n${selection}\n"""` : files;
     const skill = humanize ? (korean ? "Use the humanize-korean skill (im-not-ai) if available." : "Use the humanizer skill if available.") : "";
+    const empty = !selection && docs.every((doc) => !(texts[doc] ?? "").trim());
     return [
       ...sourceBlock(req.source, target),
-      `Rewrite ${what}`,
+      `${empty ? "Write" : "Rewrite"} ${what}`,
       ...[skill, instruction].filter(Boolean),
       ...(brief.trim() ? [`Standing brief: ${brief.trim()}`] : []),
       docs.length > 1 ? "Apply it to each file, keeping each platform's rules from AGENTS.md." : "",
@@ -265,10 +266,15 @@ export function intent(req: IntentRequest, target: Target): string {
 
   if (docs.length === 1) {
     const doc = docs[0];
+    const empty = !selection && !(texts[doc] ?? "").trim();
     return [
       ...head,
       `Context: ${spec(doc)}`,
-      selection ? "Rewrite ONLY the excerpt below. Output ONLY the rewritten excerpt, no quotes, no commentary." : "Output ONLY the rewritten text, no commentary.",
+      selection
+        ? "Rewrite ONLY the excerpt below. Output ONLY the rewritten excerpt, no quotes, no commentary."
+        : empty
+          ? "Follow the instruction and output ONLY the requested new text, no quotes or commentary."
+          : "Output ONLY the rewritten text, no commentary.",
       "",
       '"""',
       selection || texts[doc] || "",

@@ -11,7 +11,7 @@ import { CommentBubble } from "./previews/common";
 
 export function PreviewModal() {
   const previewDoc = useStore((s) => s.previewDoc);
-  const activeDoc = useStore((s) => s.activeDoc);
+  const mode = useStore((s) => s.mode);
   const project = useStore((s) => s.project);
   const proposal = useStore((s) => (s.previewDoc ? s.proposals[s.previewDoc] : undefined));
   const commentProposal = useStore((s) => (s.previewDoc ? s.proposals[commentDoc(s.previewDoc)] : undefined));
@@ -41,7 +41,7 @@ export function PreviewModal() {
   const blog = PLATFORMS[previewDoc].tab === "blog";
   const commentId = commentDoc(previewDoc);
   const comment = commentProposal?.proposed ?? project.docs[commentId] ?? "";
-  const showComment = activeDoc === commentId || !!comment.trim();
+  const showComment = mode === "comment" || !!comment.trim();
 
   const preview = () => {
     switch (previewDoc) {
