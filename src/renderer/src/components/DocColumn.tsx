@@ -38,9 +38,9 @@ export function DocColumn({ doc }: { doc: DocId }) {
   return (
     <section
       className={clsx(
-        "@container flex h-full min-w-0 flex-col border-r border-[var(--border)] last:border-r-0",
-        focused && "bg-[var(--surface-2)]",
-        inScope && "shadow-[inset_0_2px_0_var(--accent)]",
+        "@container m-1 flex h-[calc(100%-8px)] min-w-0 flex-col overflow-hidden rounded-[12px] border bg-[var(--surface-2)] transition-colors",
+        inScope ? "border-[var(--border-strong)]" : "border-[var(--border)]",
+        focused && "bg-[var(--surface-3)]",
       )}
       onMouseDown={(e) => {
         const s = useStore.getState();
@@ -49,9 +49,10 @@ export function DocColumn({ doc }: { doc: DocId }) {
         useStore.setState({ focusDoc: doc, scope });
       }}
     >
-      <header className="flex h-11 shrink-0 items-center gap-1.5 overflow-hidden border-b border-[var(--border)] px-3">
+      <header className="flex h-11 shrink-0 items-center gap-1.5 overflow-hidden px-3">
         <PlatformIcon doc={doc} />
-        <span className="truncate text-[13px] font-semibold">{docLabel(doc)}</span>
+        <span className="truncate text-[13px] font-medium">{docLabel(doc)}</span>
+        {inScope && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--focus)]" title="의도 적용 대상" />}
         {publish?.status === "posted" && <span className="pill pill-success">게시됨</span>}
         {publish?.status === "ready" && <span className="pill pill-accent">게시 대기</span>}
         {stale && (
@@ -84,9 +85,9 @@ export function DocColumn({ doc }: { doc: DocId }) {
       </header>
 
       {proposal && (
-        <div className="flex shrink-0 flex-wrap items-center gap-x-2 gap-y-1 border-b border-[var(--border)] bg-[var(--accent-soft)] px-3 py-1.5 text-[12px]">
+        <div className="mx-2 mb-1 flex shrink-0 flex-wrap items-center gap-x-2 gap-y-1 rounded-[10px] bg-[var(--surface-3)] px-2.5 py-1.5 text-[12px]">
           <span className="flex min-w-0 items-center gap-1.5">
-            <Sparkles size={13} className="shrink-0 text-[var(--accent)]" />
+            <Sparkles size={13} className="shrink-0" />
             <b className="truncate">{proposal.source}</b>
             <span className="hidden truncate text-[var(--muted)] @[340px]:inline">수정 제안 · 덩어리별 수락/거절 또는 직접 편집</span>
           </span>
@@ -115,7 +116,7 @@ export function DocColumn({ doc }: { doc: DocId }) {
         )}
       </div>
 
-      <footer className="flex h-10 shrink-0 items-center gap-0.5 overflow-hidden border-t border-[var(--border)] px-1.5">
+      <footer className="flex h-10 shrink-0 items-center gap-0.5 overflow-hidden px-1.5">
         {/* Narrow column: one primary action; wider columns show the rest. The intent bar has everything. */}
         {QUICK.map((a, i) => (
           <button
@@ -132,7 +133,7 @@ export function DocColumn({ doc }: { doc: DocId }) {
             글자수 맞추기
           </button>
         )}
-        {selection && <span className="ml-1 truncate text-[11px] text-[var(--accent)]">선택 {selection.length}자</span>}
+        {selection && <span className="ml-1 truncate text-[11px] text-[var(--focus)]">선택 {selection.length}자</span>}
         <div className="ml-auto flex shrink-0 items-center gap-2 text-[11px] tabular-nums text-[var(--muted)]">
           {count.note && <span className="hidden @[260px]:inline">{count.note}</span>}
           <CountGauge used={count.used} limit={count.limit} />

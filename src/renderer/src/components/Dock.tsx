@@ -29,7 +29,7 @@ export function Dock() {
   const select = (id: string) => useStore.setState({ dockTab: id });
 
   return (
-    <div className="flex h-full min-w-0 flex-col bg-[var(--surface)]">
+    <div className="flex h-full min-w-0 flex-col bg-[var(--surface-2)]">
       <nav className="flex h-11 shrink-0 items-center gap-0.5 overflow-x-auto border-b border-[var(--border)] px-2">
         {settings.webTabs.map((t) => (
           <Tab key={t.id} active={dockTab === `web:${t.id}`} onClick={() => select(`web:${t.id}`)} icon={<Globe size={13} />}>
@@ -103,7 +103,7 @@ function Tab(props: { active: boolean; onClick: () => void; icon: React.ReactNod
     <button
       onClick={props.onClick}
       className={clsx(
-        "group flex h-7 shrink-0 items-center gap-1.5 rounded-md px-2.5 text-[12px] transition-colors",
+        "group flex h-7 shrink-0 items-center gap-1.5 rounded-full px-3 text-[12px] transition-colors",
         props.active ? "bg-[var(--surface-3)] text-[var(--fg)]" : "text-[var(--muted)] hover:bg-[var(--surface-2)] hover:text-[var(--fg)]",
       )}
     >

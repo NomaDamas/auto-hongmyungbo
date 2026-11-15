@@ -122,6 +122,7 @@ export interface Api {
     status(): Promise<AsideStatus>;
     checkLogins(platforms: PlatformId[], profileId?: string): Promise<Partial<Record<PlatformId, AsideLoginState>>>;
     openLogin(platform: PlatformId, profileId?: string): Promise<void>;
+    openImporter(profileId?: string): Promise<void>;
   };
   openExternal(url: string): void;
 }

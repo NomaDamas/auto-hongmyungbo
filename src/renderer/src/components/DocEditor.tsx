@@ -8,9 +8,9 @@ import type { DocId } from "@shared/types";
 import { useStore, type Proposal } from "@/store";
 
 const baseTheme = EditorView.theme({
-  "&": { height: "100%", fontSize: "14.5px", backgroundColor: "transparent" },
-  ".cm-scroller": { fontFamily: "var(--font-prose)", lineHeight: "1.75" },
-  ".cm-content": { padding: "16px 18px 120px", caretColor: "var(--accent)" },
+  "&": { height: "100%", fontSize: "14px", backgroundColor: "transparent" },
+  ".cm-scroller": { fontFamily: "var(--font-prose)", lineHeight: "1.7" },
+  ".cm-content": { padding: "4px 12px 120px", caretColor: "var(--fg)" },
   ".cm-gutters": { display: "none" },
   ".cm-activeLine": { backgroundColor: "transparent" },
   "&.cm-focused": { outline: "none" },

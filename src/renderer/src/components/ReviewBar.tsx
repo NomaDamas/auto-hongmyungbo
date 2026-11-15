@@ -12,7 +12,7 @@ export function ReviewBar() {
   if (docs.length < 2) return null;
   const all = (mode: "accept" | "reject") => docs.forEach((d) => resolveAll(d, mode));
   return (
-    <div className="flex h-9 shrink-0 items-center gap-2 border-b border-[var(--border)] bg-[var(--accent-soft)] px-3 text-[12px]">
+    <div className="mx-1 mb-1 flex h-10 shrink-0 items-center gap-2 rounded-[12px] border border-[var(--border-strong)] bg-[var(--surface-3)] px-3 text-[12px]">
       <span className="font-medium">{docs.length}개 열에 수정 제안</span>
       <div className="flex gap-1">
         {docs.map((d) => (

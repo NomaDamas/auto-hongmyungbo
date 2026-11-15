@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { CheckCircle2, CircleAlert, CircleDashed, ExternalLink, Loader2, LogIn, RefreshCw, ShieldCheck, X as XIcon } from "lucide-react";
+import { CheckCircle2, CircleAlert, CircleDashed, Download, ExternalLink, Loader2, LogIn, RefreshCw, ShieldCheck, X as XIcon } from "lucide-react";
 import { toast } from "sonner";
 import type { PlatformId } from "@shared/types";
 import { PLATFORMS } from "@shared/platforms";
@@ -38,10 +38,10 @@ export function AsidePanel() {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onMouseDown={close}>
-      <div className="w-[520px] rounded-xl border border-[var(--border)] bg-[var(--surface)] shadow-2xl" onMouseDown={(e) => e.stopPropagation()}>
+    <div className="scrim items-center justify-center" onMouseDown={close}>
+      <div className="glass w-[520px]" onMouseDown={(e) => e.stopPropagation()}>
         <header className="flex h-12 items-center gap-2 border-b border-[var(--border)] px-5">
-          <ShieldCheck size={16} className="text-[var(--accent)]" />
+          <ShieldCheck size={16} />
           <span className="font-semibold">Aside 연결</span>
           <button className="icon-btn ml-auto" onClick={close}>
             <XIcon size={15} />
@@ -96,7 +96,14 @@ export function AsidePanel() {
               <section>
                 <div className="mb-2 flex items-center">
                   <h3 className="font-semibold">플랫폼 로그인</h3>
-                  <button className="btn btn-xs btn-ghost ml-auto" disabled={checking} onClick={() => void useStore.getState().refreshAside(true)}>
+                  <button
+                    className="btn btn-xs btn-ghost ml-auto"
+                    onClick={() => void window.api.aside.openImporter(profileId).catch((e: Error) => toast.error(e.message))}
+                    title="Chrome·Safari·Firefox·Arc의 로그인/쿠키를 Aside가 직접 가져옵니다"
+                  >
+                    <Download size={12} /> 브라우저에서 가져오기
+                  </button>
+                  <button className="btn btn-xs btn-ghost" disabled={checking} onClick={() => void useStore.getState().refreshAside(true)}>
                     {checking ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />} 다시 확인
                   </button>
                 </div>

@@ -26,8 +26,8 @@ export function SettingsDialog() {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onMouseDown={close}>
-      <div className="flex max-h-[85vh] w-[640px] flex-col rounded-xl border border-[var(--border)] bg-[var(--surface)] shadow-2xl" onMouseDown={(e) => e.stopPropagation()}>
+    <div className="scrim items-center justify-center" onMouseDown={close}>
+      <div className="glass flex max-h-[85vh] w-[640px] flex-col" onMouseDown={(e) => e.stopPropagation()}>
         <header className="flex h-12 items-center border-b border-[var(--border)] px-5">
           <span className="font-semibold">설정</span>
           <button className="icon-btn ml-auto" onClick={close}>

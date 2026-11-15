@@ -1,39 +1,56 @@
 @import "tailwindcss";
+@import "@fontsource-variable/geist";
+@import "@fontsource-variable/geist-mono";
 
 @custom-variant dark (&:where(.dark, .dark *));
 
+/*
+ * Design language taken from the Aside browser bundle (aside_resources.pak importer UI):
+ * zinc base, white-alpha surfaces/borders, white pill primary buttons, Geist type,
+ * frosted overlays (blur 36px + deep shadow), 120ms transitions.
+ */
 :root {
-  --bg: #fbfbfa;
+  --bg: #fafafa;
   --surface: #ffffff;
-  --surface-2: #f5f5f3;
-  --surface-3: #ebebe8;
-  --border: #e5e5e2;
-  --fg: #1c1c1e;
-  --muted: #8a8a8e;
-  --accent: #5b5bd6;
-  --accent-soft: color-mix(in srgb, var(--accent) 10%, transparent);
-  --success: #2f9e5b;
-  --warning: #c98a00;
-  --error: #d93f3f;
-  --term-bg: #1a1a1f;
+  --surface-2: rgba(9, 9, 11, 0.03);
+  --surface-3: rgba(9, 9, 11, 0.07);
+  --border: rgba(9, 9, 11, 0.09);
+  --border-strong: rgba(9, 9, 11, 0.18);
+  --fg: rgba(9, 9, 11, 0.88);
+  --muted: rgba(9, 9, 11, 0.5);
+  --accent: #18181b;
+  --accent-fg: #fafafa;
+  --accent-soft: rgba(9, 9, 11, 0.05);
+  --focus: #3b82f6;
+  --success: #16a34a;
+  --warning: #ca8a04;
+  --error: #dc2626;
+  --term-bg: #18181b;
+  --overlay: rgba(255, 255, 255, 0.78);
+  --font-ui: "Geist Variable", "Pretendard Variable", -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", sans-serif;
   --font-prose: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", sans-serif;
-  --font-mono: "JetBrains Mono", "SF Mono", Menlo, monospace;
+  --font-mono: "Geist Mono Variable", "SF Mono", Menlo, monospace;
   color-scheme: light;
 }
 
 .dark {
-  --bg: #0b0b0f;
-  --surface: #111116;
-  --surface-2: #16161c;
-  --surface-3: #22222a;
-  --border: #26262e;
-  --fg: #e8e8ea;
-  --muted: #7c7c86;
-  --accent: #8b8bf5;
-  --success: #4cc38a;
-  --warning: #e5b33d;
-  --error: #f06a6a;
-  --term-bg: #0b0b0f;
+  --bg: #09090b;
+  --surface: #111113;
+  --surface-2: rgba(255, 255, 255, 0.03);
+  --surface-3: rgba(255, 255, 255, 0.08);
+  --border: rgba(255, 255, 255, 0.08);
+  --border-strong: rgba(255, 255, 255, 0.18);
+  --fg: rgba(255, 255, 255, 0.88);
+  --muted: rgba(255, 255, 255, 0.48);
+  --accent: #fafafa;
+  --accent-fg: #0a0a0a;
+  --accent-soft: rgba(255, 255, 255, 0.06);
+  --focus: #60a5fa;
+  --success: #4ade80;
+  --warning: #facc15;
+  --error: #f87171;
+  --term-bg: #09090b;
+  --overlay: rgba(24, 24, 27, 0.72);
   color-scheme: dark;
 }
 
@@ -44,10 +61,15 @@ body,
   margin: 0;
   background: var(--bg);
   color: var(--fg);
-  font-family: var(--font-prose);
+  font-family: var(--font-ui);
   font-size: 14px;
   -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
   user-select: none;
+}
+
+* {
+  transition-duration: 120ms;
 }
 
 .cm-editor,
@@ -65,41 +87,50 @@ textarea,
 }
 
 @layer components {
+  /* Buttons: Aside uses pill-shaped controls; primary = solid near-white (dark) / near-black (light). */
   .btn {
-    @apply inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-md border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1 text-[12.5px] font-medium transition-colors hover:bg-[var(--surface-2)] disabled:cursor-not-allowed disabled:opacity-40;
+    @apply inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-[var(--border)] bg-[var(--surface-2)] px-3 py-1 text-[12.5px] font-medium text-[var(--fg)] transition-colors hover:bg-[var(--surface-3)] disabled:cursor-not-allowed disabled:opacity-40;
   }
   .btn-sm {
-    @apply px-2.5 py-1 text-[12px];
+    @apply px-3 py-1 text-[12px];
   }
   .btn-xs {
-    @apply rounded px-2 py-0.5 text-[11.5px];
+    @apply px-2.5 py-0.5 text-[11.5px];
   }
   .btn-primary {
-    @apply border-transparent bg-[var(--accent)] text-white hover:bg-[var(--accent)] hover:brightness-110;
+    @apply border-transparent bg-[var(--accent)] text-[var(--accent-fg)] hover:bg-[var(--accent)] hover:opacity-90;
   }
   .btn-ghost {
     @apply border-transparent bg-transparent text-[var(--muted)] hover:bg-[var(--surface-3)] hover:text-[var(--fg)];
   }
   .icon-btn {
-    @apply inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-[var(--muted)] transition-colors hover:bg-[var(--surface-3)] hover:text-[var(--fg)];
+    @apply inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[var(--muted)] transition-colors hover:bg-[var(--surface-3)] hover:text-[var(--fg)];
   }
   .input {
-    @apply rounded-md border border-[var(--border)] bg-[var(--surface-2)] px-2.5 py-1.5 text-[13px] outline-none focus:border-[var(--accent)];
+    @apply rounded-xl border border-[var(--border)] bg-[var(--surface-2)] px-3 py-1.5 text-[13px] text-[var(--fg)] outline-none transition-colors placeholder:text-[var(--muted)] focus:border-[var(--border-strong)] focus:bg-[var(--surface-3)];
   }
   .pill {
     @apply inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full px-2 py-0.5 text-[10.5px] font-medium;
   }
   .pill-success {
-    @apply bg-[color-mix(in_srgb,var(--success)_15%,transparent)] text-[var(--success)];
+    @apply bg-[color-mix(in_srgb,var(--success)_14%,transparent)] text-[var(--success)];
   }
   .pill-warning {
-    @apply bg-[color-mix(in_srgb,var(--warning)_15%,transparent)] text-[var(--warning)];
+    @apply bg-[color-mix(in_srgb,var(--warning)_14%,transparent)] text-[var(--warning)];
   }
   .pill-accent {
-    @apply bg-[var(--accent-soft)] text-[var(--accent)];
+    @apply bg-[var(--surface-3)] text-[var(--fg)];
   }
-  .sep {
-    @apply w-px bg-[var(--border)] transition-colors data-[separator=active]:bg-[var(--accent)] data-[separator=hover]:bg-[var(--accent)];
+  /* Invisible hit area between floating panels; shows a hairline while hovered/dragged. */
+  .sep-ghost {
+    @apply relative w-1 bg-transparent after:absolute after:inset-y-3 after:left-1/2 after:w-px after:-translate-x-1/2 after:rounded-full after:bg-transparent after:transition-colors data-[separator=active]:after:bg-[var(--border-strong)] data-[separator=hover]:after:bg-[var(--border-strong)];
+  }
+  /* Frosted overlay surface (Aside importer window: blur 36px, deep shadow, 15px radius). */
+  .glass {
+    @apply rounded-[15px] border border-[var(--border)] bg-[var(--overlay)] shadow-[0_16px_36px_3px_rgba(0,0,0,0.5)] backdrop-blur-[36px];
+  }
+  .scrim {
+    @apply fixed inset-0 z-50 flex bg-black/30 backdrop-blur-[2px];
   }
 }
 
@@ -130,25 +161,25 @@ textarea,
   padding: 2px 0 4px;
 }
 .cm-chunkButtons button {
-  font: 500 11px var(--font-prose);
-  border-radius: 4px;
-  padding: 1px 8px;
-  border: 1px solid var(--border);
-  background: var(--surface);
+  font: 500 11px var(--font-ui);
+  border-radius: 999px;
+  padding: 2px 10px;
+  border: 1px solid var(--border-strong);
+  background: transparent;
   color: var(--fg);
   cursor: pointer;
 }
 .cm-chunkButtons button[name="accept"] {
-  background: var(--success);
+  background: var(--accent);
   border-color: transparent;
-  color: white;
+  color: var(--accent-fg);
 }
 .cm-selectionBackground,
 .cm-focused .cm-selectionBackground {
-  background: color-mix(in srgb, var(--accent) 25%, transparent) !important;
+  background: color-mix(in srgb, var(--focus) 28%, transparent) !important;
 }
 .cm-cursor {
-  border-left-color: var(--accent) !important;
+  border-left-color: var(--fg) !important;
 }
 
 [cmdk-group-heading] {

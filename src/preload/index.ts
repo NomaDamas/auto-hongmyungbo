@@ -41,6 +41,7 @@ const api: Api = {
     status: () => ipcRenderer.invoke("aside:status"),
     checkLogins: (platforms, profileId) => ipcRenderer.invoke("aside:checkLogins", platforms, profileId),
     openLogin: (platform, profileId) => ipcRenderer.invoke("aside:openLogin", platform, profileId),
+    openImporter: (profileId) => ipcRenderer.invoke("aside:openImporter", profileId),
   },
   openExternal: (url) => ipcRenderer.send("openExternal", url),
 };

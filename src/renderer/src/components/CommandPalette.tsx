@@ -26,9 +26,9 @@ export function CommandPalette() {
   const docs: DocId[] = ["master", ...settings.platforms];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 pt-[15vh]" onMouseDown={close}>
+    <div className="scrim items-start justify-center pt-[15vh]" onMouseDown={close}>
       <Command
-        className="w-[560px] overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)] shadow-2xl"
+        className="glass w-[560px] overflow-hidden"
         onMouseDown={(e) => e.stopPropagation()}
         onKeyDown={(e) => e.key === "Escape" && close()}
         loop

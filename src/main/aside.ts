@@ -133,3 +133,12 @@ export async function asideOpenLogin(platform: PlatformId, profileId?: string): 
   await repl(`await openTab(${JSON.stringify(LOGIN[platform].login)}); console.log("RESULT" + "true");`, profileId, 30000);
   await run("/usr/bin/open", ["-b", ASIDE_BUNDLE_ID], { timeoutMs: 5000 }).catch(() => undefined);
 }
+
+/**
+ * Open Aside's built-in importer (chrome://aside-import-data/). Aside itself migrates
+ * logins/cookies from Chrome, Safari, Firefox, Arc into its own profile; we only open the page.
+ */
+export async function asideOpenImporter(profileId?: string): Promise<void> {
+  await repl(`await openTab("chrome://aside-import-data/"); console.log("RESULT" + "true");`, profileId, 30000);
+  await run("/usr/bin/open", ["-b", ASIDE_BUNDLE_ID], { timeoutMs: 5000 }).catch(() => undefined);
+}

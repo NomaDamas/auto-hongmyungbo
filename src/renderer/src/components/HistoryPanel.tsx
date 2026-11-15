@@ -25,8 +25,8 @@ export function HistoryPanel() {
   };
 
   return (
-    <div className="fixed inset-0 z-40 flex justify-end bg-black/30" onMouseDown={close}>
-      <aside className="flex h-full w-[340px] flex-col border-l border-[var(--border)] bg-[var(--surface)] shadow-2xl" onMouseDown={(e) => e.stopPropagation()}>
+    <div className="scrim z-40 justify-end" onMouseDown={close}>
+      <aside className="glass m-2 flex w-[340px] flex-col" onMouseDown={(e) => e.stopPropagation()}>
         <header className="flex h-11 items-center border-b border-[var(--border)] px-4">
           <span className="text-[13px] font-semibold">{docLabel(doc)} 버전 기록</span>
           <button className="icon-btn ml-auto" onClick={close}>

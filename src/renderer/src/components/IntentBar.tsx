@@ -63,7 +63,7 @@ export function IntentBar() {
   };
 
   return (
-    <div className="shrink-0 border-t border-[var(--border)] bg-[var(--surface)]">
+    <div className="m-1 mt-0 shrink-0 overflow-hidden rounded-[15px] border border-[var(--border)] bg-[var(--surface-2)]">
       {briefOpen && (
         <div className="border-b border-[var(--border)] px-4 py-2">
           <div className="mb-1 flex items-center gap-2 text-[11px] text-[var(--muted)]">
@@ -86,7 +86,7 @@ export function IntentBar() {
             key={d}
             className={clsx(
               "flex h-6 items-center gap-1 rounded-full border px-2 text-[11.5px] transition-colors",
-              scope.includes(d) ? "border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--fg)]" : "border-[var(--border)] text-[var(--muted)] hover:text-[var(--fg)]",
+              scope.includes(d) ? "border-[var(--border-strong)] bg-[var(--surface-3)] text-[var(--fg)]" : "border-[var(--border)] text-[var(--muted)] hover:text-[var(--fg)]",
             )}
             onClick={(e) => toggle(d, !(e.metaKey || e.shiftKey))}
             title="클릭: 이 열만 · ⇧/⌘클릭: 추가/제외"
@@ -96,13 +96,13 @@ export function IntentBar() {
           </button>
         ))}
         <button
-          className={clsx("h-6 rounded-full border px-2 text-[11.5px]", all ? "border-[var(--accent)] text-[var(--accent)]" : "border-[var(--border)] text-[var(--muted)] hover:text-[var(--fg)]")}
+          className={clsx("h-6 rounded-full border px-2 text-[11.5px]", all ? "border-[var(--border-strong)] bg-[var(--surface-3)] text-[var(--fg)]" : "border-[var(--border)] text-[var(--muted)] hover:text-[var(--fg)]")}
           onClick={() => useStore.setState({ scope: all ? ["master"] : [...settings.platforms] })}
           title="모든 플랫폼에 같은 의도를 적용"
         >
           모든 플랫폼
         </button>
-        {selection && <span className="ml-1 rounded bg-[var(--accent-soft)] px-1.5 py-0.5 text-[11px] text-[var(--accent)]">선택 {selection.length}자만</span>}
+        {selection && <span className="ml-1 rounded-full bg-[color-mix(in_srgb,var(--focus)_18%,transparent)] px-2 py-0.5 text-[11px] text-[var(--focus)]">선택 {selection.length}자만</span>}
         <button className="btn btn-xs btn-ghost ml-auto" onClick={() => setBriefOpen(!briefOpen)} title="이 글의 고정 의도">
           브리프 {project.meta.brief ? "●" : ""} {briefOpen ? <ChevronDown size={11} /> : <ChevronUp size={11} />}
         </button>
@@ -135,7 +135,7 @@ export function IntentBar() {
             style={{ fieldSizing: "content" } as React.CSSProperties}
           />
           <button
-            className="absolute bottom-1.5 right-1.5 flex h-7 w-7 items-center justify-center rounded-md bg-[var(--accent)] text-white disabled:opacity-30"
+            className="absolute bottom-1.5 right-1.5 flex h-7 w-7 items-center justify-center rounded-full bg-[var(--accent)] text-[var(--accent-fg)] disabled:opacity-30"
             disabled={!text.trim()}
             onClick={() => submit()}
             title="보내기 (↵)"

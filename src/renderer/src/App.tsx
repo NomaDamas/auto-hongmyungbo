@@ -87,13 +87,13 @@ export function App() {
 
   return (
     <div className="flex h-screen flex-col">
-      <header className="drag flex h-12 shrink-0 items-center gap-2 border-b border-[var(--border)] pl-[84px] pr-3">
+      <header className="drag flex h-12 shrink-0 items-center gap-2 pl-[84px] pr-3">
         {project ? (
           <>
             <button className="no-drag icon-btn" onClick={() => useStore.getState().closeProject()} title="프로젝트 목록">
               <ChevronLeft size={15} />
             </button>
-            <span className="truncate text-[13px] font-semibold">{project.meta.title}</span>
+            <span className="truncate text-[13px] font-medium">{project.meta.title}</span>
             <button className="no-drag btn btn-sm btn-primary ml-3" onClick={() => void runPropagate()} title="원문 → 모든 플랫폼에 한 번에 (⌘↵)">
               <Radio size={13} /> 원문 전파
             </button>
@@ -123,9 +123,9 @@ export function App() {
       </header>
 
       <Group orientation="horizontal" className="min-h-0 flex-1">
-        <Panel id="main" minSize="35" defaultSize="62">
+        <Panel id="main" minSize="35" defaultSize="68">
           {project ? (
-            <div className="flex h-full flex-col">
+            <div className="flex h-full flex-col px-1">
               <ReviewBar />
               <Group orientation="horizontal" key={docs.join(",")} className="min-h-0 flex-1">
                 {docs.map((d, i) => (
@@ -142,10 +142,14 @@ export function App() {
             <Home />
           )}
         </Panel>
-        <Separator className={dockOpen ? "sep" : "hidden"} />
+        <Separator className={dockOpen ? "sep-ghost" : "hidden"} />
         {/* Collapsed, never unmounted: keeps web logins, chat state and terminal sessions alive. */}
-        <Panel id="dock" panelRef={dockRef} collapsible collapsedSize="0" minSize="22" defaultSize="38" onResize={(size) => syncDock(size.asPercentage > 0)}>
-          <Dock />
+        <Panel id="dock" panelRef={dockRef} collapsible collapsedSize="0" minSize="22" defaultSize="32" onResize={(size) => syncDock(size.asPercentage > 0)}>
+          <div className="h-full p-1 pl-0">
+            <div className="h-full overflow-hidden rounded-[12px] border border-[var(--border)]">
+              <Dock />
+            </div>
+          </div>
         </Panel>
       </Group>
 
@@ -161,7 +165,7 @@ export function App() {
 function WithSeparator({ index, children }: { index: number; children: React.ReactNode }) {
   return (
     <>
-      {index > 0 && <Separator className="sep" />}
+      {index > 0 && <Separator className="sep-ghost" />}
       {children}
     </>
   );

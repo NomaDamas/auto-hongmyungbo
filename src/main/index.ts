@@ -1,4 +1,4 @@
-import { app, BrowserWindow, clipboard, dialog, ipcMain, session, shell } from "electron";
+import { app, BrowserWindow, clipboard, dialog, ipcMain, nativeTheme, session, shell } from "electron";
 import { join } from "node:path";
 import type { DocId, PlatformId, ProjectMeta, Settings } from "@shared/types";
 import { getSettings, setSettings } from "./settings";
@@ -15,7 +15,7 @@ import {
   writeMeta,
 } from "./projects";
 import { killAllPtys, killPty, resizePty, spawnPty, writePty } from "./pty";
-import { asideCheckLogins, asideOpenLogin, asideStatus } from "./aside";
+import { asideCheckLogins, asideOpenImporter, asideOpenLogin, asideStatus } from "./aside";
 
 // HMB_USER_DATA isolates settings/logins (second profile or a clean test run).
 if (process.env.HMB_USER_DATA) app.setPath("userData", process.env.HMB_USER_DATA);
@@ -39,7 +39,7 @@ function createWindow(): void {
     minHeight: 700,
     titleBarStyle: "hiddenInset",
     trafficLightPosition: { x: 14, y: 14 },
-    backgroundColor: "#0b0b0f",
+    backgroundColor: nativeTheme.shouldUseDarkColors ? "#09090b" : "#fafafa",
     webPreferences: {
       preload: join(__dirname, "../preload/index.mjs"),
       sandbox: false,
@@ -108,6 +108,7 @@ function registerIpc(): void {
   ipcMain.handle("aside:status", () => asideStatus());
   ipcMain.handle("aside:checkLogins", (_e, platforms: PlatformId[], profileId?: string) => asideCheckLogins(platforms, profileId));
   ipcMain.handle("aside:openLogin", (_e, platform: PlatformId, profileId?: string) => asideOpenLogin(platform, profileId));
+  ipcMain.handle("aside:openImporter", (_e, profileId?: string) => asideOpenImporter(profileId));
 
   ipcMain.on("openExternal", (_e, url: string) => {
     if (/^https?:\/\//.test(url)) void shell.openExternal(url);
