@@ -1,62 +1,26 @@
-# Auto-HongMyungbo Skill
+---
+name: auto-hongmyungbo
+description: Edit an Auto-HongMyungbo post project (master.md + per-platform .md files) so the user can review your changes as diffs in the app.
+---
 
-## Purpose
-Use this skill to run the project end-to-end in a predictable way:
-`draft -> generate platform cards -> preview artifacts -> optional publish`.
+# Auto-HongMyungbo project skill
 
-## Safe Defaults
-- Non-destructive by default: publishing is **off** unless `--publish` is explicitly passed.
-- Reuse an already-running local server when available.
-- Output is always machine-readable JSON with `ok`, `steps`, `artifacts`, and `error`.
+Use when the current folder contains `project.json` and `master.md` (an Auto-HongMyungbo post project).
+The desktop app watches these files and shows every write as an inline diff the user accepts or rejects.
 
-## Single Entry Command
-Run from repository root:
+## Files
+| File | Meaning | Limit |
+|---|---|---|
+| `master.md` | Source draft. Edit only when asked. | — |
+| `linkedin.md` | LinkedIn post. Strong first two lines, short paragraphs, ≤3 hashtags. | 3000 |
+| `x.md` | Single X post. CJK characters count as 2. | 280 weighted |
+| `threads.md` | Casual, conversational. | 500 |
+| `reddit.md` | First line `# Title` (≤300), then plain value-first body. | 40000 |
+| `project.json` | App metadata. **Never edit.** | — |
 
-```bash
-./scripts/agent_skill_run.mjs --draft "your raw draft text"
-```
-
-Common options:
-- `--draft-file <path>`: load draft text from file
-- `--provider <openrouter|openai>`: default `openrouter`
-- `--model <model_id>`: optional custom model
-- `--platforms reddit,linkedin,twitter`: comma-separated list
-- `--language <auto|korean|english|japanese>`
-- `--publish`: explicitly enable publish step
-- `--no-start-server`: fail if local server is not already running
-
-## Expected JSON Output
-```json
-{
-  "ok": true,
-  "command": "generate-preview-publish",
-  "steps": [{ "name": "generate", "status": "ok" }],
-  "artifacts": {
-    "draftId": 1,
-    "cards": [{ "platform": "reddit", "charCount": 420 }],
-    "publish": null
-  },
-  "error": null
-}
-```
-
-Failure format stays consistent:
-- `ok: false`
-- `error.step`
-- `error.message`
-
-## Minimal Happy Path
-1. Provide a draft (`--draft` or `--draft-file`)
-2. Run the single entry command
-3. Read `artifacts.cards` for preview/inspection
-4. Re-run with `--publish` when ready
-
-## Agent Prompt Template
-Use this template with Codex/Ralph Loop:
-
-```text
-Use the Auto-HongMyungbo skill.
-Run ./scripts/agent_skill_run.mjs with provider=openrouter, platforms=reddit,linkedin.
-Input draft: "<paste draft>".
-Return only the final JSON output and summarize card char counts.
-```
+## Rules
+1. Edit files in place. Don't create new files. Don't repeat the full post in chat.
+2. Keep facts, numbers, names, links, and quotes from `master.md` unchanged.
+3. When asked to edit a selected passage, change only that passage.
+4. 윤문 (humanize): use `humanize-korean` (im-not-ai) for Korean and `humanizer` for English, if installed.
+5. Publish only when asked, through Aside (`aside "<task>"` or the `aside mcp` tools), and confirm before the final Post click.

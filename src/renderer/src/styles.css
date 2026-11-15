@@ -1,0 +1,172 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  --bg: #fbfbfa;
+  --surface: #ffffff;
+  --surface-2: #f5f5f3;
+  --surface-3: #ebebe8;
+  --border: #e5e5e2;
+  --fg: #1c1c1e;
+  --muted: #8a8a8e;
+  --accent: #5b5bd6;
+  --accent-soft: color-mix(in srgb, var(--accent) 10%, transparent);
+  --success: #2f9e5b;
+  --warning: #c98a00;
+  --error: #d93f3f;
+  --term-bg: #1a1a1f;
+  --font-prose: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", sans-serif;
+  --font-mono: "JetBrains Mono", "SF Mono", Menlo, monospace;
+  color-scheme: light;
+}
+
+.dark {
+  --bg: #0b0b0f;
+  --surface: #111116;
+  --surface-2: #16161c;
+  --surface-3: #22222a;
+  --border: #26262e;
+  --fg: #e8e8ea;
+  --muted: #7c7c86;
+  --accent: #8b8bf5;
+  --success: #4cc38a;
+  --warning: #e5b33d;
+  --error: #f06a6a;
+  --term-bg: #0b0b0f;
+  color-scheme: dark;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-prose);
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+}
+
+.cm-editor,
+input,
+textarea,
+.xterm {
+  user-select: text;
+}
+
+.drag {
+  -webkit-app-region: drag;
+}
+.no-drag {
+  -webkit-app-region: no-drag;
+}
+
+@layer components {
+  .btn {
+    @apply inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-md border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1 text-[12.5px] font-medium transition-colors hover:bg-[var(--surface-2)] disabled:cursor-not-allowed disabled:opacity-40;
+  }
+  .btn-sm {
+    @apply px-2.5 py-1 text-[12px];
+  }
+  .btn-xs {
+    @apply rounded px-2 py-0.5 text-[11.5px];
+  }
+  .btn-primary {
+    @apply border-transparent bg-[var(--accent)] text-white hover:bg-[var(--accent)] hover:brightness-110;
+  }
+  .btn-ghost {
+    @apply border-transparent bg-transparent text-[var(--muted)] hover:bg-[var(--surface-3)] hover:text-[var(--fg)];
+  }
+  .icon-btn {
+    @apply inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-[var(--muted)] transition-colors hover:bg-[var(--surface-3)] hover:text-[var(--fg)];
+  }
+  .input {
+    @apply rounded-md border border-[var(--border)] bg-[var(--surface-2)] px-2.5 py-1.5 text-[13px] outline-none focus:border-[var(--accent)];
+  }
+  .pill {
+    @apply inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full px-2 py-0.5 text-[10.5px] font-medium;
+  }
+  .pill-success {
+    @apply bg-[color-mix(in_srgb,var(--success)_15%,transparent)] text-[var(--success)];
+  }
+  .pill-warning {
+    @apply bg-[color-mix(in_srgb,var(--warning)_15%,transparent)] text-[var(--warning)];
+  }
+  .pill-accent {
+    @apply bg-[var(--accent-soft)] text-[var(--accent)];
+  }
+  .sep {
+    @apply w-px bg-[var(--border)] transition-colors data-[separator=active]:bg-[var(--accent)] data-[separator=hover]:bg-[var(--accent)];
+  }
+}
+
+/* @codemirror/merge unified view, themed to the app palette. */
+.cm-changedLine {
+  background: color-mix(in srgb, var(--success) 9%, transparent) !important;
+}
+.cm-changedText {
+  background: color-mix(in srgb, var(--success) 28%, transparent) !important;
+  text-decoration: none !important;
+}
+.cm-deletedChunk {
+  background: color-mix(in srgb, var(--error) 9%, transparent) !important;
+  padding: 2px 0;
+}
+.cm-deletedChunk del,
+.cm-deletedText {
+  background: color-mix(in srgb, var(--error) 25%, transparent) !important;
+  text-decoration: line-through;
+  text-decoration-color: color-mix(in srgb, var(--error) 60%, transparent);
+}
+/* Own row above the deleted chunk so the buttons never cover text in narrow columns. */
+.cm-editor .cm-chunkButtons {
+  position: static !important;
+  display: flex;
+  justify-content: flex-end;
+  gap: 4px;
+  padding: 2px 0 4px;
+}
+.cm-chunkButtons button {
+  font: 500 11px var(--font-prose);
+  border-radius: 4px;
+  padding: 1px 8px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--fg);
+  cursor: pointer;
+}
+.cm-chunkButtons button[name="accept"] {
+  background: var(--success);
+  border-color: transparent;
+  color: white;
+}
+.cm-selectionBackground,
+.cm-focused .cm-selectionBackground {
+  background: color-mix(in srgb, var(--accent) 25%, transparent) !important;
+}
+.cm-cursor {
+  border-left-color: var(--accent) !important;
+}
+
+[cmdk-group-heading] {
+  padding: 8px 12px 4px;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+webview {
+  display: flex;
+  width: 100%;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--surface-3);
+  border-radius: 4px;
+}

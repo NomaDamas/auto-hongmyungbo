@@ -1,198 +1,113 @@
-# 🤖 Auto-HongMyungbo (Open Source Local Edition) ⚽
+# 🤖 Auto-HongMyungbo ⚽
 
-> One draft in, platform-ready posts out.
-> Refine, compare, and publish across multiple SNS platforms from one local workspace.
+> Write once, then shape each platform's post side by side. The AI runs in an embedded ChatGPT, Claude, or Gemini web tab, or in a terminal harness. Every change it makes appears as a diff you can accept or reject. Publishing goes through Aside.
 
-![Auto-HongMyungbo Preview](docs/images/ddalcak_myungbo.png)
+![Auto-HongMyungbo](docs/images/ddalcak_myungbo.png)
 
-[![GitHub stars](https://img.shields.io/github/stars/NomaDamas/auto-hongmyungbo?style=flat-square)](https://github.com/NomaDamas/auto-hongmyungbo/stargazers)
-[![GitHub issues](https://img.shields.io/github/issues/NomaDamas/auto-hongmyungbo?style=flat-square)](https://github.com/NomaDamas/auto-hongmyungbo/issues)
-[![GitHub pull requests](https://img.shields.io/github/issues-pr/NomaDamas/auto-hongmyungbo?style=flat-square)](https://github.com/NomaDamas/auto-hongmyungbo/pulls)
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPLv3-blue.svg?style=flat-square)](LICENSE)
-[![Node.js](https://img.shields.io/badge/node-%3E%3D20-339933?style=flat-square&logo=node.js&logoColor=white)](https://nodejs.org/)
 
-## 📺 Demo
+## Why
 
-[Watch the demo video](https://github.com/user-attachments/assets/d2640150-7402-49c0-96d1-b198d7d02130)
+When you rework a post for LinkedIn, X, Threads, and Reddit inside one chat window, every version piles up in a single scrolling thread. You read it top to bottom and copy each version out by hand. Auto-HongMyungbo is the **UI/UX layer only**:
 
-## ⚡ Quick Install
+- **Writing**: done by the AI you already use (ChatGPT, Claude, or Gemini on the web, or Claude Code, Codex, or omp in a terminal), embedded in the app.
+- **Editing**: the source draft and each platform post sit in **side-by-side columns**. Edit them directly.
+- **AI changes**: shown inline as a **diff**. Accept or reject each chunk, or tweak it by hand.
+- **Publishing**: handled by the [Aside](https://aside.com) browser agent, using your logged-in accounts.
+
+There is no LLM API key and no backend.
+
+## Layout
+
+```
+┌──────────────── ⌘K · Generate all · Auto-send ─────────── Aside publish [in][X][@][r] ┐
+│ Source │ LinkedIn  │ X         │ Threads │ Reddit ║ [ChatGPT][Claude][Gemini] │ [Claude Code][Codex][omp] │
+│ draft  │ 1204/3000 │ 271/280   │ 480/500 │ title  ║                                                       │
+│        │ +added ── │ ⚠ source  │         │        ║   Embedded web (persistent login) / terminal (project cwd)  │
+│        │ −deleted  │   changed │         │        ║                                                       │
+│        │ [accept][reject]                        ║  [Grab selection] [Grab reply → diff]                 │
+│ Humanize · Shorter · Stronger hook · char gauge  ║                                                       │
+└──────────────────────────────────────────────────╨───────────────────────────────────────────────────────┘
+```
+
+| Feature | What it does |
+|---|---|
+| **Platform columns** | Source, LinkedIn, X, Threads, Reddit. Resizable. ⌘1–5 shows one column at a time, ⌘0 shows them all. |
+| **Diff review** | An AI reply or a harness file edit appears in that column as a unified diff. Accept or reject per chunk, or press ⌘⇧↵ to accept all and ⌘⇧⌫ to reject all. Unresolved changes can't be published. |
+| **Selection edits** | Select a passage and click Humanize, Shorter, or Stronger hook (or use ⌘K) to rewrite only that passage. |
+| **Embedded AI web** | ChatGPT, Claude, and Gemini share one persistent login session. Prompts are typed in and sent automatically. Replies are parsed and routed to each column as a diff. If parsing fails, use Grab reply or Grab selection. |
+| **Harness terminals** | Claude Code, Codex, and omp run in your login shell with the project folder as the working directory. When the harness edits `linkedin.md` and similar files, a file watcher turns the change into a diff. |
+| **Character limits** | X uses `twitter-text` weighted counting, where Korean characters count as 2. Reddit shows the title's length separately. Over the limit, a Fit to limit button appears. |
+| **Source changed** | If the source draft changes after a platform post was generated from it, the post shows a "Source changed" badge. Click it to request an update for just the changed parts. |
+| **Version history** | The previous version is saved automatically every time you accept a change. Restoring a version also goes through a diff. |
+| **Aside publishing** | Each platform button runs `aside "<publish task>"` in a terminal tab inside the dock. Aside always stops before the final Post button to confirm with you. |
+| **Humanize (Korean/English)** | Inside harnesses, the installed skills are used: [im-not-ai](https://github.com/epoko77-ai/im-not-ai) (Korean) and [humanizer](https://github.com/blader/humanizer) (English). Web chats can't load skills, so a condensed version of those rules is sent with the prompt. |
+
+## Install & run
 
 ```bash
 git clone https://github.com/NomaDamas/auto-hongmyungbo.git
 cd auto-hongmyungbo
-./scripts/setup_local_easy.sh
-./scripts/start_local.sh
+npm install        # node-pty native build included (postinstall)
+npm run dev
 ```
 
-Open: `http://localhost:3000`
+Requirements: macOS (Linux and Windows are untested), Node 20+, and Xcode CLT for the node-pty build.
 
-## 🔗 Quick Links
-
-- [What is this?](#-what-is-this)
-- [Why this over alternatives?](#-why-this-over-alternatives)
-- [Setup (first-time users)](#-setup-first-time-users)
-- [Basic commands](#-basic-commands)
-- [How to use](#-how-to-use)
-- [Docs and support](#-docs-and-support)
-- [Contributing](#-contributing)
-- [Growth playbook](#-growth-playbook-for-maintainers)
-
-## 🎯 What Is This?
-
-Auto-HongMyungbo is a local-first OSS tool for creators and indie builders who want to:
-
-- write one messy idea once
-- turn it into platform-specific drafts (Reddit, LinkedIn, X, Threads, etc.)
-- refine tone and structure quickly
-- publish in sequence with browser automation
-
-### Core flow
-
-1. Write a draft
-2. Generate platform posts
-3. Preview/Edit/Compare
-4. Accept to queue
-5. Publish one-by-one or batch
-
-## 🥊 Why This Over Alternatives?
-
-| Capability | Manual copy/paste workflow | Single-platform AI writer | Auto-HongMyungbo |
-| --- | --- | --- | --- |
-| One draft to many platforms | ❌ | ❌ | ✅ |
-| Platform-specific output in one UI | ❌ | ⚠️ Partial | ✅ |
-| Side-by-side review before posting | ❌ | ❌ | ✅ |
-| Queue-based multi-platform publish flow | ❌ | ❌ | ✅ |
-| Local-first (no external DB required) | ✅ | ⚠️ Varies | ✅ |
-| Open-source and customizable | ⚠️ Varies | ❌ | ✅ |
-
-If your pain is "I rewrite the same post 5 times," this project is built for that exact problem.
-
-## 🛠️ Setup (First-Time Users)
-
-### Requirements
-
-- macOS / Linux / Windows (WSL recommended)
-- Git
-- Node.js 20+
-- At least one LLM API key
-  - OpenAI or OpenRouter recommended
-  - Anthropic / Grok / Gemini optional
-
-API key guide: [`docs/API_KEYS.md`](docs/API_KEYS.md)
-
-### Environment file
-
-Create `frontend/.env` (or `frontend/.env.local`):
-
-```env
-# At least one is required
-OPENROUTER_API_KEY=your_key_here
-# or
-OPENAI_API_KEY=your_key_here
-
-# Optional providers
-ANTHROPIC_API_KEY=your_key_here
-GROK_API_KEY=your_key_here
-GEMINI_API_KEY=your_key_here
-
-# Optional: for Instagram media upload flow
-INSTAGRAM_MEDIA_PATH=docs/images/sample.jpg
-```
-
-## ⌨️ Basic Commands
+Optional:
 
 ```bash
-# one-time local setup
-./scripts/setup_local_easy.sh
+# Publishing
+curl -fsSL https://releases.aside.com/install.sh | bash && aside login
 
-# start app
-./scripts/start_local.sh
-
-# frontend only
-cd frontend
-npm run dev
-
-# production build check
-npm run build
+# Humanize skills (for harnesses)
+/plugin marketplace add epoko77-ai/im-not-ai && /plugin install humanize-korean@im-not-ai   # Claude Code
+npx skills add blader/humanizer --global --agent '*'
 ```
 
-## 📖 How To Use
+## Project folder contract
 
-1. **Draft**: paste your raw idea.
-2. **Options**: set provider/model/API key.
-3. **Refine (optional)**:
-   - Draft Idea Booster
-   - Aggro Pingpong
-   - Phrase Booster
-4. **Generate**: click `Generate N Platforms`.
-5. **Review**: Preview/Edit each platform card.
-6. **Queue**: Accept cards you want to publish.
-7. **Login**: run `Browser Login` per platform once.
-8. **Publish**:
-   - `Post Next Platform`
-   - `Post All (Beta)`
-   - `Publish now` on each queue card
+Each post is a single folder. Default location: `~/Documents/HongMyungbo/<date>-<title>/`.
 
-## 🧭 Docs and Support
-
-- API keys: [`docs/API_KEYS.md`](docs/API_KEYS.md)
-- Publish env checklist: [`docs/PUBLISH_ENV_CHECKLIST.md`](docs/PUBLISH_ENV_CHECKLIST.md)
-- Monorepo/GitHub notes: [`docs/MONOREPO_GITHUB.md`](docs/MONOREPO_GITHUB.md)
-- Report bugs / request features: [GitHub Issues](https://github.com/NomaDamas/auto-hongmyungbo/issues)
-- Ongoing changes: [Pull Requests](https://github.com/NomaDamas/auto-hongmyungbo/pulls)
-
-## 🤝 Contributing
-
-Contributions are welcome.
-
-- Start with a small issue or bug fix.
-- Open a branch from `main`.
-- Submit a PR with clear before/after behavior.
-- Keep changes focused and easy to review.
-
-If you are new, documentation and UX fixes are great first PRs.
-
-## 📈 Growth Playbook (For Maintainers)
-
-To drive network effects (more users -> more feedback -> better product -> more users):
-
-1. **Build around real pain**
-   - target "rewrite once, post everywhere" pain
-   - prioritize workflows users repeat weekly
-2. **Ship and measure in public**
-   - share every meaningful release with examples/GIF/video
-   - track where users drop off (setup, login, publish)
-3. **Distribute where users already gather**
-   - relevant Subreddits
-   - Hacker News / GeekNews
-   - Awesome lists in this domain
-4. **Tight feedback loop**
-   - convert repeated issue patterns into quick UX wins
-   - keep README/install flow brutally simple
-
-## 🧱 Project Structure
-
-```text
-auto-hongmyungbo/
-├── frontend/
-│   ├── src/app/api/      # Next.js API routes
-│   ├── src/components/   # UI components
-│   ├── src/lib/          # client helpers/types
-│   └── src/server/       # LLM + local store + automation
-├── scripts/              # setup/run scripts
-├── docs/                 # docs + images
-└── LICENSE
+```
+master.md  linkedin.md  x.md  threads.md  reddit.md   # the text (Reddit: first line "# Title")
+project.json                                           # metadata (staleness, publish status)
+AGENTS.md  CLAUDE.md                                   # rules for harnesses
+.history/<timestamp>/                                  # versions saved before each accepted change
 ```
 
-## 📄 License
+The folder is plain markdown, so you can also edit it in another editor or from a harness outside the app. The app picks up those changes and shows them as diffs.
 
-This project is licensed under the **GNU Affero General Public License v3.0 (AGPL-3.0)**.
+## Shortcuts
 
-If you use or modify this project and provide it as a network service, you must also make the corresponding source code available under AGPL-3.0.
+| Key | Action |
+|---|---|
+| ⌘K | Command palette (free-form instructions, actions, tab switching) |
+| ⌘↵ | Source → generate all platforms |
+| ⌘⇧↵ / ⌘⇧⌫ | Accept all / reject all changes in the current column |
+| ⌘↵ / ⌘⌫ (inside a diff) | Accept / reject the chunk under the cursor |
+| ⌘1–5 / ⌘0 | Show one column / show all columns |
+| ⌘J | Toggle the AI dock |
+| ⌘, | Settings (web tabs, harness commands, platforms, workspace folder) |
 
-See the full license text in [`LICENSE`](LICENSE).
+## Stack
 
----
-## 📬 Contact
-- For questions, errors, or support, feel free to reach out:
-- Email: developerminsing@gmail.com
+Electron · React 19 · Vite (electron-vite) · Tailwind 4 · CodeMirror 6 + `@codemirror/merge` · xterm.js + node-pty · react-resizable-panels · cmdk · zustand · chokidar · twitter-text · sonner
+
+## Structure
+
+```
+src/main/        Electron main: settings, project folders + file watcher, pty, webview session
+src/preload/     IPC bridge (window.api)
+src/shared/      types, platform rules, AGENTS.md template
+src/renderer/    UI: columns (DocColumn/DocEditor), dock (Dock/Terminal), palette, publish tray
+  lib/prompts.ts      Prompt builders (web vs. harness), humanize rules, section parsing
+  lib/web-bridge.ts   Composer, send, and reply DOM adapters for ChatGPT, Claude, and Gemini
+  lib/dispatch.ts     Sends to the active dock tab → collects the reply → creates the diff proposal
+```
+
+When a site redesign breaks the web adapters, edit the selector lists in `ADAPTERS` in `web-bridge.ts`. Until then, Grab reply / Grab selection still work.
+
+## License
+
+AGPL-3.0
