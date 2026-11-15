@@ -17,6 +17,7 @@ export function AsidePanel() {
   const logins = useStore((s) => s.asideLogins);
   const checking = useStore((s) => s.asideChecking);
   const settings = useStore((s) => s.settings)!;
+  const enabledPlatforms = useStore((s) => s.enabledPlatforms);
 
   useEffect(() => {
     if (open) void useStore.getState().refreshAside(true);
@@ -39,7 +40,7 @@ export function AsidePanel() {
 
   return (
     <div className="scrim items-center justify-center" onMouseDown={close}>
-      <div className="glass w-[520px]" onMouseDown={(e) => e.stopPropagation()}>
+      <div className="glass flex max-h-[88vh] w-[520px] flex-col" onMouseDown={(e) => e.stopPropagation()}>
         <header className="flex h-12 items-center gap-2 border-b border-[var(--border)] px-5">
           <ShieldCheck size={16} />
           <span className="font-semibold">Aside 연결</span>
@@ -48,7 +49,7 @@ export function AsidePanel() {
           </button>
         </header>
 
-        <div className="space-y-5 p-5 text-[13px]">
+        <div className="min-h-0 space-y-5 overflow-y-auto p-5 text-[13px]">
           {!aside ? (
             <div className="flex items-center gap-2 text-[var(--muted)]">
               <Loader2 size={14} className="animate-spin" /> 상태 확인 중…
@@ -108,7 +109,7 @@ export function AsidePanel() {
                   </button>
                 </div>
                 <ul className="divide-y divide-[var(--border)] rounded-lg border border-[var(--border)]">
-                  {settings.platforms.map((p) => {
+                  {enabledPlatforms().map((p) => {
                     const st = logins[p];
                     return (
                       <li key={p} className="flex items-center gap-3 px-3 py-2.5">

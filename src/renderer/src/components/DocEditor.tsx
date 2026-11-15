@@ -88,7 +88,7 @@ export function DocEditor({ doc, value, proposal, placeholder }: Props) {
       onChange={(text) => {
         if (!proposal) setDoc(doc, text);
       }}
-      onFocus={() => useStore.setState({ focusDoc: doc })}
+      onFocus={() => useStore.setState({ activeDoc: doc })}
     />
   );
 }

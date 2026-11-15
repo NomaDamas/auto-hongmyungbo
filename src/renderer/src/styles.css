@@ -201,3 +201,42 @@ webview {
   background: var(--surface-3);
   border-radius: 4px;
 }
+
+/* Dockview stays visually subordinate to the writing surface. */
+.hmb-dockview {
+  --dv-group-view-background-color: var(--surface);
+  --dv-tabs-and-actions-container-background-color: transparent;
+  --dv-activegroup-visiblepanel-tab-background-color: var(--surface-3);
+  --dv-activegroup-hiddenpanel-tab-background-color: transparent;
+  --dv-inactivegroup-visiblepanel-tab-background-color: var(--surface-3);
+  --dv-inactivegroup-hiddenpanel-tab-background-color: transparent;
+  --dv-activegroup-visiblepanel-tab-color: var(--fg);
+  --dv-activegroup-hiddenpanel-tab-color: var(--muted);
+  --dv-inactivegroup-visiblepanel-tab-color: var(--fg);
+  --dv-inactivegroup-hiddenpanel-tab-color: var(--muted);
+  --dv-tab-divider-color: transparent;
+  --dv-tabs-and-actions-container-height: 36px;
+  --dv-tabs-and-actions-container-font-size: 12px;
+  --dv-tab-margin: 4px 2px;
+  --dv-separator-border: var(--border);
+  --dv-sash-color: var(--border);
+  --dv-active-sash-color: var(--border-strong);
+  --dv-drag-over-background-color: color-mix(in srgb, var(--focus) 20%, transparent);
+  --dv-drag-over-border-color: color-mix(in srgb, var(--focus) 45%, transparent);
+  --dv-icon-hover-background-color: var(--surface-3);
+}
+.hmb-dockview .dv-tabs-and-actions-container {
+  background: transparent;
+  border-bottom: 1px solid var(--border);
+}
+.hmb-dockview .dv-tab {
+  overflow: hidden;
+  border-radius: 999px;
+}
+.hmb-dockview .dv-groupview {
+  background: var(--surface);
+}
+.hmb-dockview .dv-drop-target-selection,
+.hmb-dockview .dv-drop-target-anchor {
+  background: color-mix(in srgb, var(--focus) 20%, transparent);
+}

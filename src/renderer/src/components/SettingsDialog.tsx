@@ -20,6 +20,7 @@ export function SettingsDialog() {
       webTabs: draft.webTabs.filter((t) => t.label && t.url),
       harnesses: draft.harnesses.filter((h) => h.label && h.command),
       platforms: draft.platforms,
+      dockGroups: draft.dockGroups,
       theme: draft.theme,
     });
     close();
@@ -45,18 +46,29 @@ export function SettingsDialog() {
           </Section>
 
           <Section title="플랫폼">
-            <div className="flex flex-wrap gap-2">
-              {ALL_PLATFORMS.map((p) => (
-                <label key={p} className="flex items-center gap-1.5 rounded-md border border-[var(--border)] px-2.5 py-1.5">
-                  <input
-                    type="checkbox"
-                    checked={draft.platforms.includes(p)}
-                    onChange={(e) =>
-                      setDraft({ ...draft, platforms: e.target.checked ? ALL_PLATFORMS.filter((x) => x === p || draft.platforms.includes(x)) : draft.platforms.filter((x) => x !== p) })
-                    }
-                  />
-                  {PLATFORMS[p].label}
-                </label>
+            <div className="space-y-3">
+              {([
+                ["sns", "SNS"],
+                ["community", "커뮤니티"],
+                ["blog", "블로그"],
+              ] as const).map(([tab, label]) => (
+                <div key={tab}>
+                  <h4 className="mb-1.5 text-[11px] font-medium text-[var(--muted)]">{label}</h4>
+                  <div className="flex flex-wrap gap-2">
+                    {ALL_PLATFORMS.filter((p) => PLATFORMS[p].tab === tab).map((p) => (
+                      <label key={p} className="flex items-center gap-1.5 rounded-md border border-[var(--border)] px-2.5 py-1.5">
+                        <input
+                          type="checkbox"
+                          checked={draft.platforms.includes(p)}
+                          onChange={(e) =>
+                            setDraft({ ...draft, platforms: e.target.checked ? ALL_PLATFORMS.filter((x) => x === p || draft.platforms.includes(x)) : draft.platforms.filter((x) => x !== p) })
+                          }
+                        />
+                        {PLATFORMS[p].label}
+                      </label>
+                    ))}
+                  </div>
+                </div>
               ))}
             </div>
           </Section>
@@ -80,9 +92,25 @@ export function SettingsDialog() {
               fields={[
                 { key: "label", placeholder: "이름" },
                 { key: "command", placeholder: "명령어" },
+                { key: "addDirFlag", placeholder: "추가 디렉터리 플래그 (--add-dir)" },
               ]}
-              blank={() => ({ id: crypto.randomUUID().slice(0, 8), label: "", command: "" })}
+              blank={() => ({ id: crypto.randomUUID().slice(0, 8), label: "", command: "", addDirFlag: "--add-dir" })}
             />
+          </Section>
+
+          <Section title="AI 독 탭 그룹" hint="Web과 CLI 기본 그룹으로 되돌리고 현재 탭을 다시 배치합니다.">
+            <button
+              className="btn btn-sm"
+              onClick={() => setDraft({
+                ...draft,
+                dockGroups: [
+                  { id: "web", title: "Web", color: "blue", collapsed: false, tabIds: draft.webTabs.map((tab) => `web:${tab.id}`) },
+                  { id: "cli", title: "CLI", color: "green", collapsed: false, tabIds: draft.harnesses.map((harness) => `harness:${harness.id}`) },
+                ],
+              })}
+            >
+              탭 그룹 초기화
+            </button>
           </Section>
 
           <Section title="테마">

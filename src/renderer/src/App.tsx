@@ -1,81 +1,80 @@
 import { useEffect } from "react";
 import { Group, Panel, Separator, usePanelRef } from "react-resizable-panels";
-import { ChevronLeft, Command as CommandIcon, PanelRightClose, PanelRightOpen, Radio, Settings as SettingsIcon, ShieldCheck } from "lucide-react";
+import { FilePlus2, Loader2, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Radio } from "lucide-react";
 import { Toaster } from "sonner";
-import clsx from "clsx";
-import type { DocId } from "@shared/types";
+import { TABS, parseDoc } from "@shared/platforms";
 import { useStore } from "@/store";
 import { runPropagate } from "@/lib/dispatch";
 import { resolveAll } from "@/components/DocEditor";
-import { DocColumn } from "@/components/DocColumn";
 import { Dock } from "@/components/Dock";
-import { Home } from "@/components/Home";
-import { PublishTray } from "@/components/PublishTray";
 import { CommandPalette } from "@/components/CommandPalette";
 import { HistoryPanel } from "@/components/HistoryPanel";
 import { SettingsDialog } from "@/components/SettingsDialog";
 import { IntentBar } from "@/components/IntentBar";
-import { ReviewBar } from "@/components/ReviewBar";
 import { AsidePanel } from "@/components/AsidePanel";
+import { PreviewModal } from "@/components/PreviewModal";
+import { OnboardingWizard } from "@/components/OnboardingWizard";
+import { Sidebar } from "@/components/Sidebar";
+import { EditorArea, focusEditorTab } from "@/components/EditorArea";
+import { EmbedInbox } from "@/components/EmbedInbox";
 
 export function App() {
   const settings = useStore((s) => s.settings);
   const project = useStore((s) => s.project);
   const dockOpen = useStore((s) => s.dockOpen);
-  const soloDoc = useStore((s) => s.soloDoc);
-  const autoSubmit = useStore((s) => s.autoSubmit);
+  const sidebarOpen = useStore((s) => s.sidebarOpen);
 
   useEffect(() => {
     void useStore.getState().init();
   }, []);
 
-  // Store is the source of truth for dock visibility (⌘J, palette, dispatch); mirror it onto the panel.
+  // Collapse only the dock's layout panel; its webviews and terminals stay mounted.
   const dockRef = usePanelRef();
   useEffect(() => {
     const panel = dockRef.current;
     if (!panel) return;
     if (dockOpen && panel.isCollapsed()) panel.expand();
     else if (!dockOpen && !panel.isCollapsed()) panel.collapse();
-  }, [dockOpen]);
-  const syncDock = (open: boolean) => {
-    if (useStore.getState().dockOpen !== open) useStore.setState({ dockOpen: open });
-  };
+  }, [dockOpen, dockRef]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (!e.metaKey && !e.ctrlKey) return;
+      const key = e.key.toLowerCase();
       const s = useStore.getState();
-      const docs: DocId[] = ["master", ...(s.settings?.platforms ?? [])];
-      if (e.key === "k") {
+      if (key === "k") {
         e.preventDefault();
         useStore.setState({ paletteOpen: !s.paletteOpen });
-      } else if (e.key === ",") {
+      } else if (key === "b") {
         e.preventDefault();
-        useStore.setState({ settingsOpen: true });
-      } else if (e.key === "j") {
+        useStore.setState({ sidebarOpen: !s.sidebarOpen });
+      } else if (key === "j") {
         e.preventDefault();
         useStore.setState({ dockOpen: !s.dockOpen });
+      } else if (key === "p") {
+        e.preventDefault();
+        const platform = parseDoc(s.activeDoc).platform;
+        if (platform) useStore.setState({ previewDoc: platform });
+      } else if (key === ",") {
+        e.preventDefault();
+        useStore.setState({ settingsOpen: true });
       } else if (!s.project) {
         return;
-      } else if (e.key === "Enter" && e.shiftKey) {
+      } else if (key === "enter" && e.shiftKey) {
         e.preventDefault();
-        resolveAll(s.focusDoc, "accept");
-      } else if (e.key === "Backspace" && e.shiftKey) {
+        resolveAll(s.activeDoc, "accept");
+      } else if (key === "backspace" && e.shiftKey) {
         e.preventDefault();
-        resolveAll(s.focusDoc, "reject");
-      } else if (e.key === "Enter" && !s.proposals[s.focusDoc]) {
+        resolveAll(s.activeDoc, "reject");
+      } else if (key === "enter") {
         e.preventDefault();
         void runPropagate();
-      } else if (e.key === "l") {
+      } else if (key === "l") {
         e.preventDefault();
         document.querySelector<HTMLTextAreaElement>("[data-intent-input]")?.focus();
-      } else if (e.key === "0") {
+      } else if (/^[1-4]$/.test(key)) {
         e.preventDefault();
-        useStore.setState({ soloDoc: null });
-      } else if (/^[1-9]$/.test(e.key) && docs[Number(e.key) - 1]) {
-        e.preventDefault();
-        const d = docs[Number(e.key) - 1];
-        useStore.setState({ focusDoc: d, soloDoc: s.soloDoc === d ? null : d });
+        focusEditorTab(TABS[Number(key) - 1].id);
       }
     };
     window.addEventListener("keydown", onKey);
@@ -83,111 +82,91 @@ export function App() {
   }, []);
 
   if (!settings) return null;
-  const docs: DocId[] = soloDoc ? [soloDoc] : ["master", ...settings.platforms];
-
   return (
     <div className="flex h-screen flex-col">
       <header className="drag flex h-12 shrink-0 items-center gap-2 pl-[84px] pr-3">
-        {project ? (
-          <>
-            <button className="no-drag icon-btn" onClick={() => useStore.getState().closeProject()} title="프로젝트 목록">
-              <ChevronLeft size={15} />
-            </button>
-            <span className="truncate text-[13px] font-medium">{project.meta.title}</span>
-            <button className="no-drag btn btn-sm btn-primary ml-3" onClick={() => void runPropagate()} title="원문 → 모든 플랫폼에 한 번에 (⌘↵)">
-              <Radio size={13} /> 원문 전파
-            </button>
-            <label className="no-drag ml-1 flex items-center gap-1.5 text-[12px] text-[var(--muted)]" title="끄면 프롬프트를 입력창에만 넣고 직접 전송합니다">
-              <input type="checkbox" checked={autoSubmit} onChange={(e) => useStore.setState({ autoSubmit: e.target.checked })} />
-              자동 전송
-            </label>
-            <div className="no-drag ml-auto flex items-center gap-2">
-              <PublishTray />
-            </div>
-          </>
-        ) : (
-          <span className="text-[13px] font-semibold">Auto-HongMyungbo</span>
+        <button className="no-drag icon-btn" onClick={() => useStore.setState({ sidebarOpen: !sidebarOpen })} title="사이드바 (⌘B)">
+          {sidebarOpen ? <PanelLeftClose size={15} /> : <PanelLeftOpen size={15} />}
+        </button>
+        <span className="max-w-[320px] truncate text-[13px] font-medium">{project?.meta.title ?? "Auto-HongMyungbo"}</span>
+        {project && (
+          <button className="no-drag btn btn-sm btn-primary ml-2" onClick={() => void runPropagate()} title="원문 → 모든 플랫폼 (⌘↵)">
+            <Radio size={13} /> 원문 전파
+          </button>
         )}
-        <div className={`no-drag flex items-center gap-0.5 ${project ? "" : "ml-auto"}`}>
-          <AsideButton />
-          <button className="icon-btn" onClick={() => useStore.setState({ paletteOpen: true })} title="명령 (⌘K)">
-            <CommandIcon size={14} />
-          </button>
-          <button className="icon-btn" onClick={() => useStore.setState({ settingsOpen: true })} title="설정 (⌘,)">
-            <SettingsIcon size={14} />
-          </button>
-          <button className="icon-btn" onClick={() => useStore.setState({ dockOpen: !dockOpen })} title="AI 도크 (⌘J)">
-            {dockOpen ? <PanelRightClose size={14} /> : <PanelRightOpen size={14} />}
-          </button>
-        </div>
+        <DockToggle />
       </header>
 
-      <Group orientation="horizontal" className="min-h-0 flex-1">
-        <Panel id="main" minSize="35" defaultSize="68">
-          {project ? (
-            <div className="flex h-full flex-col px-1">
-              <ReviewBar />
-              <Group orientation="horizontal" key={docs.join(",")} className="min-h-0 flex-1">
-                {docs.map((d, i) => (
-                  <WithSeparator key={d} index={i}>
-                    <Panel id={d} minSize="12" defaultSize={d === "master" && docs.length > 1 ? "24" : undefined}>
-                      <DocColumn doc={d} />
-                    </Panel>
-                  </WithSeparator>
-                ))}
-              </Group>
-              <IntentBar />
+      <div className="flex min-h-0 flex-1">
+        {sidebarOpen && <Sidebar />}
+        <Group orientation="horizontal" className="min-h-0 min-w-0 flex-1">
+          <Panel id="editor" minSize="35" defaultSize="64">
+            {project ? (
+              <div className="flex h-full min-w-0 flex-col">
+                <EditorArea />
+                <EmbedInbox />
+                <IntentBar />
+              </div>
+            ) : (
+              <div className="flex h-full flex-col items-center justify-center gap-4 text-center">
+                <p className="text-[13px] text-[var(--muted)]">왼쪽에서 글을 고르거나 새 글을 만드세요</p>
+                <button className="btn btn-primary" onClick={() => void useStore.getState().createProject("새 글", "")}>
+                  <FilePlus2 size={14} /> 새 글
+                </button>
+              </div>
+            )}
+          </Panel>
+          <Separator className={dockOpen ? "sep-ghost" : "hidden"} />
+          <Panel
+            id="dock"
+            panelRef={dockRef}
+            collapsible
+            collapsedSize="0"
+            minSize="22"
+            defaultSize="36"
+            onResize={(size) => {
+              const open = size.asPercentage > 0;
+              if (useStore.getState().dockOpen !== open) useStore.setState({ dockOpen: open });
+            }}
+          >
+            <div className="h-full p-1 pl-0">
+              <div className="h-full overflow-hidden rounded-[12px] border border-[var(--border)]">
+                <Dock />
+              </div>
             </div>
-          ) : (
-            <Home />
-          )}
-        </Panel>
-        <Separator className={dockOpen ? "sep-ghost" : "hidden"} />
-        {/* Collapsed, never unmounted: keeps web logins, chat state and terminal sessions alive. */}
-        <Panel id="dock" panelRef={dockRef} collapsible collapsedSize="0" minSize="22" defaultSize="32" onResize={(size) => syncDock(size.asPercentage > 0)}>
-          <div className="h-full p-1 pl-0">
-            <div className="h-full overflow-hidden rounded-[12px] border border-[var(--border)]">
-              <Dock />
-            </div>
-          </div>
-        </Panel>
-      </Group>
+          </Panel>
+        </Group>
+      </div>
 
       <CommandPalette />
       <HistoryPanel />
       <SettingsDialog />
       <AsidePanel />
+      <PreviewModal />
+      <OnboardingWizard />
       <Toaster theme={settings.theme} position="bottom-center" richColors closeButton />
     </div>
   );
 }
 
-function WithSeparator({ index, children }: { index: number; children: React.ReactNode }) {
+function DockToggle() {
+  const settings = useStore((s) => s.settings)!;
+  const dockOpen = useStore((s) => s.dockOpen);
+  const dockTab = useStore((s) => s.dockTab);
+  const pending = useStore((s) => s.pendingReply);
+  const runTabs = useStore((s) => s.runTabs);
+  const [kind, id] = dockTab.split(":");
+  const label =
+    kind === "web"
+      ? settings.webTabs.find((tab) => tab.id === id)?.label
+      : kind === "harness"
+        ? settings.harnesses.find((harness) => harness.id === id)?.label
+        : runTabs.find((tab) => tab.id === dockTab)?.label;
   return (
-    <>
-      {index > 0 && <Separator className="sep-ghost" />}
-      {children}
-    </>
-  );
-}
-
-/** Aside connection status at a glance; opens the connection hub. */
-function AsideButton() {
-  const aside = useStore((s) => s.aside);
-  const logins = useStore((s) => s.asideLogins);
-  const platforms = useStore((s) => s.settings?.platforms ?? []);
-  const needLogin = platforms.filter((p) => logins[p] === "signed-out").length;
-  const ok = aside?.installed && aside.signedIn;
-  return (
-    <button
-      className={clsx("btn btn-xs mr-1 gap-1.5", !ok && "text-[var(--warning)]")}
-      onClick={() => useStore.setState({ asideOpen: true })}
-      title="Aside 연결 · 플랫폼 로그인 관리"
-    >
-      <ShieldCheck size={12} />
-      Aside
-      <span className={clsx("h-1.5 w-1.5 rounded-full", ok ? (needLogin ? "bg-[var(--warning)]" : "bg-[var(--success)]") : "bg-[var(--error)]")} />
-      {needLogin > 0 && <span className="text-[var(--warning)]">로그인 {needLogin}</span>}
+    <button className="no-drag btn btn-xs ml-auto max-w-44" onClick={() => useStore.setState({ dockOpen: !dockOpen })} title="AI 도크 (⌘J)">
+      {dockOpen ? <PanelRightClose size={12} /> : <PanelRightOpen size={12} />}
+      <span className="truncate">{label ?? "AI 도크"}</span>
+      {pending && <Loader2 size={11} className="animate-spin" />}
     </button>
   );
 }

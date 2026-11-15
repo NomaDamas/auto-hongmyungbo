@@ -1,18 +1,24 @@
 import { useEffect, useRef, useState } from "react";
 import type { WebviewTag } from "electron";
-import { ArrowLeft, ArrowRight, Download, ExternalLink, Globe, Loader2, Plus, RotateCw, TerminalSquare, Send, X as XIcon } from "lucide-react";
+import { ArrowLeft, ArrowRight, Download, ExternalLink, Globe, Loader2, RotateCw, Send, TerminalSquare } from "lucide-react";
 import { toast } from "sonner";
 import clsx from "clsx";
+import type { HarnessConfig, SourceProject } from "@shared/types";
 import { useStore } from "@/store";
-import { grabLatestReply, grabSelection, registerWebview, webControls } from "@/lib/web-bridge";
+import { grabLatestReply, grabSelection, pollNewWebReply, registerWebview, webControls } from "@/lib/web-bridge";
 import { applyReply } from "@/lib/dispatch";
+import { shellQuote } from "@/lib/term-bridge";
 import { Terminal } from "./Terminal";
+import { TabGroups, type DockTabDescriptor } from "./TabGroups";
 
-/**
- * Right-hand dock: embedded AI web chats (shared persistent login partition)
- * and harness terminals running in the project folder. Every tab stays mounted
- * so chat state and terminal sessions survive switching.
- */
+function harnessCommand(harness: HarnessConfig, source: SourceProject | undefined): string {
+  if (!source || !harness.addDirFlag) return harness.command;
+  const flag = harness.addDirFlag;
+  const argument = flag.endsWith("=") ? `${flag}${shellQuote(source.path)}` : `${flag} ${shellQuote(source.path)}`;
+  return `${harness.command} ${argument}`;
+}
+
+/** All tab bodies stay mounted; only visibility changes, preserving web logins and pty sessions. */
 export function Dock() {
   const settings = useStore((s) => s.settings)!;
   const project = useStore((s) => s.project);
@@ -23,72 +29,80 @@ export function Dock() {
 
   useEffect(() => {
     const [kind, id] = dockTab.split(":");
-    if (kind === "harness" && !startedHarness.has(id)) setStartedHarness((s) => new Set(s).add(id));
+    if (kind !== "harness") return;
+    setStartedHarness((started) => started.has(id) ? started : new Set(started).add(id));
   }, [dockTab]);
 
-  const select = (id: string) => useStore.setState({ dockTab: id });
+  const tabs: DockTabDescriptor[] = [
+    ...settings.webTabs.map((tab) => ({
+      id: `web:${tab.id}`,
+      label: tab.label,
+      kind: "web" as const,
+      icon: <Globe size={13} />,
+      busy: pending?.tabId === tab.id || pending?.tabId === `web:${tab.id}`,
+    })),
+    ...settings.harnesses.map((harness) => ({ id: `harness:${harness.id}`, label: harness.label, kind: "harness" as const, icon: <TerminalSquare size={13} /> })),
+    ...runTabs.map((tab) => ({ id: `run:${tab.id}`, label: tab.label, kind: "run" as const, icon: <Send size={13} /> })),
+  ];
 
   return (
     <div className="flex h-full min-w-0 flex-col bg-[var(--surface-2)]">
-      <nav className="flex h-11 shrink-0 items-center gap-0.5 overflow-x-auto border-b border-[var(--border)] px-2">
-        {settings.webTabs.map((t) => (
-          <Tab key={t.id} active={dockTab === `web:${t.id}`} onClick={() => select(`web:${t.id}`)} icon={<Globe size={13} />}>
-            {t.label}
-            {pending?.tabId === t.id && <Loader2 size={11} className="animate-spin text-[var(--accent)]" />}
-          </Tab>
-        ))}
-        {project && <span className="mx-1 h-4 w-px bg-[var(--border)]" />}
-        {project && settings.harnesses.map((h) => (
-          <Tab key={h.id} active={dockTab === `harness:${h.id}`} onClick={() => select(`harness:${h.id}`)} icon={<TerminalSquare size={13} />}>
-            {h.label}
-          </Tab>
-        ))}
-        {runTabs.map((r) => (
-          <Tab
-            key={r.id}
-            active={dockTab === `run:${r.id}`}
-            onClick={() => select(`run:${r.id}`)}
-            icon={<Send size={13} />}
-            onClose={() => {
-              const rest = runTabs.filter((x) => x.id !== r.id);
-              useStore.setState({ runTabs: rest, dockTab: dockTab === `run:${r.id}` ? `harness:${settings.harnesses[0]?.id}` : dockTab });
-            }}
-          >
-            {r.label}
-          </Tab>
-        ))}
-        <button className="icon-btn ml-auto shrink-0" title="탭 추가/편집 (설정)" onClick={() => useStore.setState({ settingsOpen: true })}>
-          <Plus size={14} />
-        </button>
-      </nav>
+      <TabGroups
+        tabs={tabs}
+        groups={settings.dockGroups}
+        activeId={dockTab}
+        onSelect={(id) => useStore.setState({ dockTab: id })}
+        onGroupsChange={(dockGroups) => void useStore.getState().updateSettings({ dockGroups })}
+        onClose={(id) => {
+          const runId = id.slice(4);
+          const rest = runTabs.filter((tab) => tab.id !== runId);
+          useStore.setState({
+            runTabs: rest,
+            dockTab: dockTab === id ? tabs.find((tab) => tab.kind !== "run")?.id ?? "" : dockTab,
+          });
+        }}
+        onOpenSettings={() => useStore.setState({ settingsOpen: true })}
+      />
 
       <div className="relative min-h-0 flex-1">
-        {settings.webTabs.map((t) => (
-          <div key={t.id} className={clsx("absolute inset-0 flex flex-col", dockTab !== `web:${t.id}` && "invisible")}>
-            <WebPane id={t.id} url={t.url} />
+        {settings.webTabs.map((tab) => (
+          <div key={tab.id} className={clsx("absolute inset-0 flex flex-col", dockTab !== `web:${tab.id}` && "invisible")}>
+            <WebPane id={tab.id} url={tab.url} label={tab.label} />
           </div>
         ))}
-        {project &&
-          settings.harnesses.map((h) =>
-          startedHarness.has(h.id) ? (
-            <div key={h.id} className={clsx("absolute inset-0", dockTab !== `harness:${h.id}` && "invisible")}>
-              <Terminal ptyId={`harness:${h.id}`} command={h.command} cwd={project.dir} visible={dockTab === `harness:${h.id}`} />
-            </div>
-          ) : null,
-        )}
-        {runTabs.map((r) => (
-          <div key={r.id} className={clsx("absolute inset-0", dockTab !== `run:${r.id}` && "invisible")}>
+        {settings.harnesses.map((harness) => (
+          <div key={harness.id} className={clsx("absolute inset-0", dockTab !== `harness:${harness.id}` && "invisible")}>
+            {!project ? (
+              <div className="flex h-full flex-col items-center justify-center gap-2 p-8 text-center text-[12px] text-[var(--muted)]">
+                <TerminalSquare size={22} />
+                <span>하네스를 실행하려면 먼저 홍보 프로젝트를 여세요.</span>
+                <span className="text-[11px]">프로젝트 폴더가 터미널의 작업 디렉터리가 됩니다.</span>
+              </div>
+            ) : startedHarness.has(harness.id) ? (
+              <Terminal
+                ptyId={`harness:${harness.id}`}
+                command={harnessCommand(harness, project.meta.source)}
+                cwd={project.dir}
+                visible={dockTab === `harness:${harness.id}`}
+              />
+            ) : (
+              <div className="flex h-full items-center justify-center text-[12px] text-[var(--muted)]">탭을 선택하면 {harness.label}을(를) 시작합니다.</div>
+            )}
+          </div>
+        ))}
+        {runTabs.map((tab) => (
+          <div key={tab.id} className={clsx("absolute inset-0", dockTab !== `run:${tab.id}` && "invisible")}>
             <Terminal
-              ptyId={`run:${r.id}`}
-              command={r.command}
-              cwd={project!.dir}
-              visible={dockTab === `run:${r.id}`}
+              ptyId={`run:${tab.id}`}
+              command={tab.command}
+              cwd={project?.dir ?? settings.workspaceRoot}
+              visible={dockTab === `run:${tab.id}`}
               onExit={(code) => {
-                if (!r.platform) return;
+                if (!tab.platform) return;
                 if (code === 0) {
-                  useStore.getState().setPublish(r.platform, { status: "sent", at: new Date().toISOString() });
-                  toast.success(`${r.label}: Aside 작업 완료`, { description: "게시가 확인되면 트레이에서 '게시됨'으로 표시하세요." });
-                } else toast.error(`${r.label}: Aside 종료 코드 ${code}`);
+                  useStore.getState().setPublish(tab.platform, { status: "sent", at: new Date().toISOString() });
+                  toast.success(`${tab.label}: Aside 작업 완료`);
+                } else toast.error(`${tab.label}: Aside 종료 코드 ${code}`);
               }}
             />
           </div>
@@ -98,93 +112,81 @@ export function Dock() {
   );
 }
 
-function Tab(props: { active: boolean; onClick: () => void; icon: React.ReactNode; children: React.ReactNode; onClose?: () => void }) {
-  return (
-    <button
-      onClick={props.onClick}
-      className={clsx(
-        "group flex h-7 shrink-0 items-center gap-1.5 rounded-full px-3 text-[12px] transition-colors",
-        props.active ? "bg-[var(--surface-3)] text-[var(--fg)]" : "text-[var(--muted)] hover:bg-[var(--surface-2)] hover:text-[var(--fg)]",
-      )}
-    >
-      {props.icon}
-      {props.children}
-      {props.onClose && (
-        <XIcon
-          size={11}
-          className="opacity-0 group-hover:opacity-100"
-          onClick={(e) => {
-            e.stopPropagation();
-            props.onClose!();
-          }}
-        />
-      )}
-    </button>
-  );
-}
-
-function WebPane({ id, url }: { id: string; url: string }) {
+function WebPane({ id, url, label }: { id: string; url: string; label: string }) {
   const ref = useRef<WebviewTag | null>(null);
   const [loading, setLoading] = useState(true);
   const [current, setCurrent] = useState(url);
-  const focusDoc = useStore((s) => s.focusDoc);
+  const activeDoc = useStore((s) => s.activeDoc);
+  const autoEmbed = useStore((s) => s.autoEmbed);
 
   useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    registerWebview(id, el);
+    const element = ref.current;
+    if (!element) return;
+    registerWebview(id, element);
     const onStart = () => setLoading(true);
     const onStop = () => {
       setLoading(false);
-      setCurrent(el.getURL());
+      setCurrent(element.getURL());
     };
-    el.addEventListener("did-start-loading", onStart);
-    el.addEventListener("did-stop-loading", onStop);
+    element.addEventListener("did-start-loading", onStart);
+    element.addEventListener("did-stop-loading", onStop);
     return () => {
-      el.removeEventListener("did-start-loading", onStart);
-      el.removeEventListener("did-stop-loading", onStop);
+      element.removeEventListener("did-start-loading", onStart);
+      element.removeEventListener("did-stop-loading", onStop);
       registerWebview(id, null);
     };
   }, [id]);
+
+  useEffect(() => {
+    if (!autoEmbed) return;
+    let running = false;
+    const poll = async () => {
+      // Not hasFocus(): typing inside the webview moves focus into the guest, so the host reports unfocused.
+      if (running || document.hidden) return;
+      const state = useStore.getState();
+      const pending = state.pendingReply;
+      if (!state.project || (pending && (pending.tabId === id || pending.tabId === `web:${id}`))) return;
+      running = true;
+      try {
+        const text = await pollNewWebReply(id);
+        if (!text || !useStore.getState().project) return;
+        useStore.setState((currentState) => ({
+          embedInbox: [...currentState.embedInbox, { id: crypto.randomUUID(), tabId: id, label, text }],
+        }));
+      } catch {
+        // A navigating/unloaded webview simply misses this poll.
+      } finally {
+        running = false;
+      }
+    };
+    void poll();
+    const timer = window.setInterval(() => void poll(), 1500);
+    return () => window.clearInterval(timer);
+  }, [autoEmbed, id, label]);
 
   const pull = async (mode: "reply" | "selection") => {
     try {
       const text = mode === "reply" ? await grabLatestReply(id) : await grabSelection(id);
       if (!text) return toast.error(mode === "reply" ? "가져올 응답이 없습니다." : "웹에서 텍스트를 먼저 선택하세요.");
-      // Pending multi-doc request → route by sections; otherwise drop into the focused column.
       const { pendingReply, selections } = useStore.getState();
-      const target = pendingReply?.tabId === id ? pendingReply : { docs: [focusDoc], selection: selections[focusDoc] ?? "" };
+      const target = pendingReply?.tabId === id || pendingReply?.tabId === `web:${id}` ? pendingReply : { docs: [activeDoc], selection: selections[activeDoc] ?? "" };
       useStore.setState({ pendingReply: null });
       applyReply(text, target);
-    } catch (e) {
-      toast.error((e as Error).message);
+    } catch (error) {
+      toast.error((error as Error).message);
     }
   };
-
-  const wv = () => webControls(id);
 
   return (
     <>
       <div className="flex h-9 shrink-0 items-center gap-1 border-b border-[var(--border)] px-2 text-[12px]">
-        <button className="icon-btn" onClick={() => wv()?.goBack()} title="뒤로">
-          <ArrowLeft size={13} />
-        </button>
-        <button className="icon-btn" onClick={() => wv()?.goForward()} title="앞으로">
-          <ArrowRight size={13} />
-        </button>
-        <button className="icon-btn" onClick={() => wv()?.reload()} title="새로고침">
-          {loading ? <Loader2 size={13} className="animate-spin" /> : <RotateCw size={13} />}
-        </button>
+        <button className="icon-btn" onClick={() => webControls(id)?.goBack()} title="뒤로"><ArrowLeft size={13} /></button>
+        <button className="icon-btn" onClick={() => webControls(id)?.goForward()} title="앞으로"><ArrowRight size={13} /></button>
+        <button className="icon-btn" onClick={() => webControls(id)?.reload()} title="새로고침">{loading ? <Loader2 size={13} className="animate-spin" /> : <RotateCw size={13} />}</button>
         <span className="mx-1 min-w-0 flex-1 truncate text-[var(--muted)]">{current}</span>
-        <button className="btn btn-xs btn-ghost" onClick={() => void pull("selection")} title="웹에서 선택한 텍스트를 현재 열로">
-          선택 가져오기
-        </button>
-        <button className="btn btn-xs btn-primary" onClick={() => void pull("reply")} title="마지막 AI 응답을 현재 열에 diff로">
-          <Download size={12} /> 응답 가져오기
-        </button>
-        <button className="icon-btn" onClick={() => window.api.openExternal(current)} title="브라우저에서 열기">
-          <ExternalLink size={13} />
-        </button>
+        <button className="btn btn-xs btn-ghost" onClick={() => void pull("selection")} title="웹에서 선택한 텍스트를 현재 문서로">선택 가져오기</button>
+        <button className="btn btn-xs btn-primary" onClick={() => void pull("reply")} title="마지막 AI 응답을 현재 문서에 diff로"><Download size={12} /> 응답 가져오기</button>
+        <button className="icon-btn" onClick={() => window.api.openExternal(current)} title="브라우저에서 열기"><ExternalLink size={13} /></button>
       </div>
       <webview ref={ref as never} src={url} partition="persist:ai-web" allowpopups={"true" as never} className="min-h-0 flex-1" />
     </>

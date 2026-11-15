@@ -18,8 +18,9 @@ const ADAPTERS: Adapter[] = [
     match: /chatgpt\.com|chat\.openai\.com/,
     composer: ["#prompt-textarea", "div.ProseMirror[contenteditable=true]", 'textarea[name="prompt"]'],
     send: ["button[data-testid=send-button]", "#composer-submit-button", 'button[aria-label="Send message"]', 'button[aria-label*="Send prompt"]'],
-    reply: ['[data-message-author-role="assistant"] .markdown', '[data-message-author-role="assistant"]'],
-    busy: ['button[data-testid="stop-button"]'],
+    // Logged-in markup first; logged-out chatgpt.com marks replies with data-assistant-markdown-root and streams under aria-busy.
+    reply: ['[data-message-author-role="assistant"] .markdown', '[data-message-author-role="assistant"]', "[data-assistant-markdown-root]"],
+    busy: ['button[data-testid="stop-button"]', '[data-assistant-markdown-root] [aria-busy="true"]'],
   },
   {
     match: /claude\.ai/,
@@ -49,7 +50,11 @@ const views = new Map<string, WebviewTag>();
 
 export function registerWebview(id: string, el: WebviewTag | null): void {
   if (el) views.set(id, el);
-  else views.delete(id);
+  else {
+    views.delete(id);
+    lastSeenReplies.delete(id);
+    stableReplyCandidates.delete(id);
+  }
 }
 
 /** Site adapter, with generic composer/send selectors appended as a last resort. Reply/busy stay site-specific to avoid grabbing the whole page. */
@@ -82,6 +87,9 @@ const FIND = `const find = (sels) => { for (const s of sels) { const all = [...d
 
 /** Last prompt probe per tab, so "응답 가져오기" can locate the turn after our prompt on unknown DOMs. */
 const probes = new Map<string, string>();
+const lastSeenReplies = new Map<string, string>();
+const stableReplyCandidates = new Map<string, string>();
+const ownWrites = new Set<string>();
 
 /** A distinctive single line of the prompt (chat UIs render it verbatim in the user turn). */
 function probeOf(prompt: string): string {
@@ -100,13 +108,13 @@ async function lastReply(v: WebviewTag, a: Adapter, probe?: string): Promise<{ t
     `${FIND}
      // Reply DOM → markdown-ish text: keeps bullets, numbered lists, headings and paragraphs
      // (innerText flattens <li> and drops '#'), and skips buttons/menus/sr-only labels.
-     const SKIP = "button, [role=button], [role=menu], svg, .sr-only, [aria-hidden=true], style, script";
+     const SKIP = "button, [role=button], [role=menu], svg, .sr-only, [aria-hidden=true], style, script, header, [data-assistant-writing-block-title]";
      const md = (el) => {
        if (el.nodeType === 3) return el.textContent;
        if (el.nodeType !== 1 || el.matches(SKIP)) return "";
        const tag = el.tagName;
        const inner = () => [...el.childNodes].map(md).join("");
-       if (/^H[1-6]$/.test(tag)) return "\\n\\n" + "#".repeat(Number(tag[1])) + " " + inner().trim() + "\\n\\n";
+       if (/^H[1-6]$/.test(tag)) { const h = inner().trim(); return h ? "\\n\\n" + "#".repeat(Number(tag[1])) + " " + h + "\\n\\n" : ""; }
        if (tag === "BR") return "\\n";
        if (tag === "LI") {
          const ol = el.parentElement?.tagName === "OL";
@@ -117,7 +125,8 @@ async function lastReply(v: WebviewTag, a: Adapter, probe?: string): Promise<{ t
        if (tag === "P" || tag === "DIV" || tag === "BLOCKQUOTE" || tag === "PRE" || tag === "SECTION" || tag === "ARTICLE") return "\\n\\n" + inner() + "\\n\\n";
        return inner();
      };
-     const prose = (el) => md(el).replace(/[ \\t]+\\n/g, "\\n").replace(/\\n\\s*\\n(\\s*\\n)+/g, "\\n\\n").trim();
+     // Convert the root's children, not the root: a reply root may itself be an <li> (logged-out ChatGPT turn).
+     const prose = (el) => [...el.childNodes].map(md).join("").replace(/[ \\t]+\\n/g, "\\n").replace(/\\n\\s*\\n(\\s*\\n)+/g, "\\n\\n").trim();
      const busy = !!find(args.busy);
      const r = find(args.reply);
      if (r) return { text: prose(r[r.length - 1]), count: r.length, busy };
@@ -138,7 +147,7 @@ async function lastReply(v: WebviewTag, a: Adapter, probe?: string): Promise<{ t
 }
 
 /** Put `text` into the chat composer and (optionally) submit. Returns a snapshot used to detect the next reply. */
-export async function sendToWeb(id: string, text: string, submit: boolean): Promise<{ count: number; text: string }> {
+async function sendToWebInternal(id: string, text: string, submit: boolean): Promise<{ count: number; text: string }> {
   const v = view(id);
   const a = adapterFor(v);
   const probe = probeOf(text);
@@ -190,6 +199,51 @@ export async function sendToWeb(id: string, text: string, submit: boolean): Prom
   return { count: before.count, text: before.text };
 }
 
+export async function sendToWeb(id: string, text: string, submit: boolean): Promise<{ count: number; text: string }> {
+  ownWrites.add(id);
+  try {
+    const before = await sendToWebInternal(id, text, submit);
+    lastSeenReplies.set(id, before.text);
+    return before;
+  } finally {
+    ownWrites.delete(id);
+  }
+}
+
+/** Poll one mounted tab. The first snapshot is a baseline; only later, stable replies are returned. */
+export async function pollNewWebReply(id: string): Promise<string | null> {
+  if (ownWrites.has(id)) return null;
+  const v = view(id);
+  const snapshot = await lastReply(v, adapterFor(v), probes.get(id));
+  const previous = lastSeenReplies.get(id);
+  if (previous === undefined) {
+    lastSeenReplies.set(id, snapshot.text);
+    return null;
+  }
+  if (snapshot.busy || !snapshot.text || snapshot.text === previous) {
+    stableReplyCandidates.delete(id);
+    return null;
+  }
+  if (stableReplyCandidates.get(id) !== snapshot.text) {
+    stableReplyCandidates.set(id, snapshot.text);
+    return null;
+  }
+  stableReplyCandidates.delete(id);
+  lastSeenReplies.set(id, snapshot.text);
+  return snapshot.text;
+}
+
+/** A cancelled/manual dispatch must not reappear later as a user-authored reply. */
+export async function markLatestReplySeen(id: string): Promise<void> {
+  try {
+    const v = view(id);
+    const snapshot = await lastReply(v, adapterFor(v), probes.get(id));
+    lastSeenReplies.set(id, snapshot.text);
+  } catch {
+    // The view may be unmounted; its next poll will establish a fresh baseline.
+  }
+}
+
 /**
  * Resolve with the new assistant reply once it stops changing.
  * Aborts via the signal (user cancels or sends a new prompt).
@@ -212,14 +266,19 @@ export async function waitForReply(id: string, before: { count: number; text: st
       stableSince = Date.now();
       continue;
     }
-    if (Date.now() - stableSince > 1800) return now.text;
+    if (Date.now() - stableSince > 1800) {
+      lastSeenReplies.set(id, now.text);
+      return now.text;
+    }
   }
   throw new DOMException("cancelled", "AbortError");
 }
 
 export async function grabLatestReply(id: string): Promise<string> {
   const v = view(id);
-  return (await lastReply(v, adapterFor(v), probes.get(id))).text;
+  const text = (await lastReply(v, adapterFor(v), probes.get(id))).text;
+  lastSeenReplies.set(id, text);
+  return text;
 }
 
 export async function grabSelection(id: string): Promise<string> {

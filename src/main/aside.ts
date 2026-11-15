@@ -3,7 +3,7 @@ import { access, constants } from "node:fs/promises";
 import { homedir, userInfo } from "node:os";
 import { join } from "node:path";
 import type { AsideLoginState, AsideStatus, PlatformId } from "@shared/types";
-import { ALL_PLATFORMS } from "@shared/platforms";
+import { ALL_PLATFORMS, PLATFORMS } from "@shared/platforms";
 
 /**
  * Bridge to the Aside browser through its official CLI only.
@@ -11,24 +11,17 @@ import { ALL_PLATFORMS } from "@shared/platforms";
  * Security model: Aside owns every platform login (its own browser profile, Apple
  * Passwords autofill, 2FA). This app never reads ~/.aside/cli/auth.json, cookies, or
  * passwords. It runs `aside` with execFile (no shell), passes only fixed URLs from the
- * table below into REPL scripts, and forwards a whitelist of non-secret status fields.
+ * PLATFORMS registry into REPL scripts, and forwards a whitelist of non-secret status fields.
  */
 
-const LOGIN: Record<PlatformId, { probe: string; login: string }> = {
-  linkedin: { probe: "https://www.linkedin.com/feed/", login: "https://www.linkedin.com/login" },
-  x: { probe: "https://x.com/home", login: "https://x.com/i/flow/login" },
-  threads: { probe: "https://www.threads.com/activity", login: "https://www.threads.com/login" },
-  reddit: { probe: "https://www.reddit.com/settings/", login: "https://www.reddit.com/login/" },
-};
-
-/** Final URLs that mean "not signed in" after following redirects. */
-const LOGGED_OUT = /\/(login|signin|signup|authwall|uas\/login|i\/flow\/login|accounts\/login|checkpoint)\b|[?&]__coig_login=/i;
+/** Final URLs that mean "not signed in" after following redirects (incl. nid.naver.com, tistory auth, HN login, medium signin). */
+const LOGGED_OUT = /\/(login|signin|signup|authwall|uas\/login|i\/flow\/login|accounts\/login|checkpoint|nidlogin\.login|auth\/login|m\/signin)\b|[?&]__coig_login=|^https:\/\/nid\.naver\.com\//i;
 
 const ASIDE_BUNDLE_ID = "at.studio.AsideBrowser";
 
 let binCache: string | null = null;
 
-async function asideBin(): Promise<string | null> {
+export async function asideBin(): Promise<string | null> {
   if (binCache) return binCache;
   const candidates = [join(homedir(), ".local/bin/aside"), "/opt/homebrew/bin/aside", "/usr/local/bin/aside"];
   for (const c of candidates) {
@@ -101,7 +94,7 @@ export async function asideStatus(): Promise<AsideStatus> {
 
 /** Navigate each platform's signed-in-only page in Aside and classify the final URL. Read-only. */
 export async function asideCheckLogins(platforms: PlatformId[], profileId?: string): Promise<Partial<Record<PlatformId, AsideLoginState>>> {
-  const targets = platforms.filter((p) => ALL_PLATFORMS.includes(p)).map((p) => [p, LOGIN[p].probe]);
+  const targets = platforms.filter((p) => ALL_PLATFORMS.includes(p)).map((p) => [p, PLATFORMS[p].probeUrl]);
   const script = `
     const targets = ${JSON.stringify(targets)};
     const out = {};
@@ -130,7 +123,7 @@ export async function asideCheckLogins(platforms: PlatformId[], profileId?: stri
 /** Open the platform's login page in the Aside browser (tab stays open) and bring Aside to the front. */
 export async function asideOpenLogin(platform: PlatformId, profileId?: string): Promise<void> {
   if (!ALL_PLATFORMS.includes(platform)) throw new Error(`unknown platform: ${platform}`);
-  await repl(`await openTab(${JSON.stringify(LOGIN[platform].login)}); console.log("RESULT" + "true");`, profileId, 30000);
+  await repl(`await openTab(${JSON.stringify(PLATFORMS[platform].loginUrl)}); console.log("RESULT" + "true");`, profileId, 30000);
   await run("/usr/bin/open", ["-b", ASIDE_BUNDLE_ID], { timeoutMs: 5000 }).catch(() => undefined);
 }
 

@@ -1,4 +1,4 @@
-import { contextBridge, ipcRenderer, type IpcRendererEvent } from "electron";
+import { contextBridge, ipcRenderer, webUtils, type IpcRendererEvent } from "electron";
 import type { Api } from "@shared/types";
 
 function subscribe<T>(channel: string, cb: (payload: T) => void): () => void {
@@ -15,7 +15,11 @@ const api: Api = {
   },
   projects: {
     list: () => ipcRenderer.invoke("projects:list"),
-    create: (title) => ipcRenderer.invoke("projects:create", title),
+    folders: () => ipcRenderer.invoke("projects:folders"),
+    createFolder: (path) => ipcRenderer.invoke("projects:createFolder", path),
+    renameFolder: (from, to) => ipcRenderer.invoke("projects:renameFolder", from, to),
+    create: (title, folder) => ipcRenderer.invoke("projects:create", title, folder),
+    move: (slug, folder) => ipcRenderer.invoke("projects:move", slug, folder),
     open: (slug) => ipcRenderer.invoke("projects:open", slug),
     writeDoc: (slug, doc, content) => ipcRenderer.invoke("projects:writeDoc", slug, doc, content),
     writeMeta: (slug, meta) => ipcRenderer.invoke("projects:writeMeta", slug, meta),
@@ -24,6 +28,11 @@ const api: Api = {
     readSnapshot: (slug, id, doc) => ipcRenderer.invoke("projects:readSnapshot", slug, id, doc),
     reveal: (slug) => ipcRenderer.invoke("projects:reveal", slug),
     onFileChanged: (cb) => subscribe("projects:fileChanged", cb),
+    addMedia: (slug, paths) => ipcRenderer.invoke("projects:addMedia", slug, paths),
+    pickMedia: (slug) => ipcRenderer.invoke("projects:pickMedia", slug),
+    pathForFile: (file) => webUtils.getPathForFile(file),
+    mediaUrl: (slug, file) => `hmb-media://media/${encodeURIComponent(slug)}/${encodeURIComponent(file)}`,
+    pickSource: () => ipcRenderer.invoke("projects:pickSource"),
   },
   pty: {
     spawn: (id, command, cwd, cols, rows) => ipcRenderer.invoke("pty:spawn", id, command, cwd, cols, rows),
@@ -42,6 +51,19 @@ const api: Api = {
     checkLogins: (platforms, profileId) => ipcRenderer.invoke("aside:checkLogins", platforms, profileId),
     openLogin: (platform, profileId) => ipcRenderer.invoke("aside:openLogin", platform, profileId),
     openImporter: (profileId) => ipcRenderer.invoke("aside:openImporter", profileId),
+  },
+  setup: {
+    status: () => ipcRenderer.invoke("setup:status"),
+    installAsideApp: () => ipcRenderer.invoke("setup:installAsideApp"),
+    onProgress: (cb) => subscribe("setup:progress", cb),
+  },
+  publish: {
+    now: (slug, platform) => ipcRenderer.invoke("publish:now", slug, platform),
+    schedule: (slug, platform, at, mode) => ipcRenderer.invoke("publish:schedule", slug, platform, at, mode),
+    cancel: (slug, platform) => ipcRenderer.invoke("publish:cancel", slug, platform),
+    comment: (slug, platform, targetUrl) => ipcRenderer.invoke("publish:comment", slug, platform, targetUrl),
+    refreshInsights: (slug, platforms) => ipcRenderer.invoke("publish:refreshInsights", slug, platforms),
+    onUpdate: (cb) => subscribe("publish:update", cb),
   },
   openExternal: (url) => ipcRenderer.send("openExternal", url),
 };

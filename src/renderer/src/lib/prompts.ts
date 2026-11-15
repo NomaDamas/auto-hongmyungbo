@@ -1,5 +1,5 @@
-import type { DocId, PlatformId } from "@shared/types";
-import { PLATFORMS, docFile, docLabel } from "@shared/platforms";
+import type { DocId, PlatformId, SourceProject } from "@shared/types";
+import { PLATFORMS, commentDoc, docFile, docLabel, docLimit, isDocId, parseDoc } from "@shared/platforms";
 
 /** Where a prompt is going: a chat web UI (paste text, reply comes back) or a harness in the project folder (edits files). */
 export type Target = "web" | "harness";
@@ -50,9 +50,41 @@ function humanizeRules(korean: boolean): string {
 }
 
 function spec(doc: DocId): string {
-  if (doc === "master") return "Source draft (no platform limit)";
-  const d = PLATFORMS[doc];
-  return `${d.label} (max ${d.limit} chars${doc === "x" ? ", CJK counts as 2" : ""}): ${d.guide}`;
+  const { platform, variant } = parseDoc(doc);
+  if (!platform) return "Source draft (no platform limit)";
+  const d = PLATFORMS[platform];
+  if (variant === "comment") {
+    const examples = platform === "linkedin"
+      ? " Include the relevant link with useful context when one is available."
+      : platform === "x"
+        ? " Make it a concise link reply when a link is available."
+        : platform === "reddit"
+          ? " Add a useful TL;DR or one concrete extra detail, never a promo."
+          : "";
+    return `${d.label} comment (max ${docLimit(doc)} chars${platform === "x" ? ", CJK counts as 2" : ""}): a short, natural, human first comment that adds value rather than praising or promoting.${examples}`;
+  }
+  return `${d.label} (max ${d.limit} chars${platform === "x" ? ", CJK counts as 2" : ""}): ${d.guide}`;
+}
+
+function sourceBlock(source: SourceProject | undefined, target: Target): string[] {
+  if (!source) return [];
+  if (target === "harness") {
+    return [
+      `The source project is at ${source.path} (readable via --add-dir); read it for facts.`,
+      `Project: ${source.name}`,
+      ...(source.links.length ? [`Links: ${source.links.join(", ")}`] : []),
+      ...(source.summary?.trim() ? [`Summary: ${source.summary.trim()}`] : []),
+      "Never invent features.",
+      "",
+    ];
+  }
+  return [
+    `Project: ${source.name}`,
+    ...(source.links.length ? [`Links: ${source.links.join(", ")}`] : []),
+    ...(source.summary?.trim() ? [`Summary: ${source.summary.trim()}`] : []),
+    "Use these source-project facts only; never invent features.",
+    "",
+  ];
 }
 
 /** Section markers survive markdown rendering in every chat UI and are parsed by parseSections. */
@@ -71,13 +103,18 @@ function sectionsOutput(docs: DocId[]): string[] {
   ];
 }
 
-/**
- * 일괄 전파: derive every platform post from the master draft. Existing posts are updated
- * (keeping the author's edits where the source didn't change); empty ones are written fresh.
- */
-export function propagate(master: string, current: Partial<Record<PlatformId, string>>, platforms: PlatformId[], brief: string, target: Target): string {
+/** Derive or update each enabled platform post from the master draft. */
+export function propagate(
+  master: string,
+  current: Partial<Record<PlatformId, string>>,
+  platforms: PlatformId[],
+  brief: string,
+  target: Target,
+  source?: SourceProject,
+): string {
   if (target === "harness") {
     return [
+      ...sourceBlock(source, target),
       `Propagate master.md to ${platforms.map(docFile).join(", ")} following AGENTS.md.`,
       "Empty files: write from scratch. Non-empty files: update to reflect master.md, keep my manual wording where the source didn't change.",
       ...(brief.trim() ? [`Standing brief: ${brief.trim()}`] : []),
@@ -85,6 +122,7 @@ export function propagate(master: string, current: Partial<Record<PlatformId, st
     ].join("\n");
   }
   return [
+    ...sourceBlock(source, target),
     ...briefBlock(brief),
     "Turn my source draft into platform posts. Same language as the draft unless told otherwise.",
     "Where a current post exists, update it to reflect the draft and keep my wording where the draft didn't change. Where it's empty, write it fresh.",
@@ -103,6 +141,84 @@ export function propagate(master: string, current: Partial<Record<PlatformId, st
   ].join("\n");
 }
 
+/** Draft one first-comment per platform in a single AI request. */
+export function commentDrafts(
+  master: string,
+  current: Partial<Record<DocId, string>>,
+  platforms: PlatformId[],
+  brief: string,
+  target: Target,
+  source?: SourceProject,
+): string {
+  const docs = platforms.map(commentDoc);
+  if (target === "harness") {
+    return [
+      ...sourceBlock(source, target),
+      `Read master.md and write first-comment drafts to ${docs.map(docFile).join(", ")}.`,
+      "Write exactly one short, natural, value-adding comment per file. Respect each platform's tone and comment limit:",
+      ...docs.map((doc) => `- ${spec(doc)}`),
+      "LinkedIn: include the relevant link with context when available. X: concise link reply. Reddit: TL;DR or a concrete extra detail. No generic praise or marketing.",
+      "Edit only those comment files; do not publish anything. Reply with one line per file when done.",
+      ...(brief.trim() ? [`Standing brief: ${brief.trim()}`] : []),
+    ].join("\n");
+  }
+  return [
+    ...sourceBlock(source, target),
+    ...briefBlock(brief),
+    "Write a short, natural first comment for my own post on each platform below. Each comment should add context or useful detail, not generic praise or marketing.",
+    "Use the source draft's language. LinkedIn: link + context when available. X: a concise link reply. Reddit: TL;DR or one concrete extra detail.",
+    "",
+    ...docs.map((doc) => `- ${spec(doc)}`),
+    "",
+    ...sectionsOutput(docs),
+    "",
+    "Source draft:",
+    '"""',
+    master,
+    '"""',
+    "",
+    "Current comment drafts (empty means write fresh):",
+    ...docs.flatMap((doc) => [marker(doc), current[doc]?.trim() || "(empty)"]),
+  ].join("\n");
+}
+
+/** Draft a reply to a pasted comment for one platform. */
+export function commentReply(
+  platform: PlatformId,
+  pasted: string,
+  postText: string,
+  brief: string,
+  target: Target,
+  source?: SourceProject,
+): string {
+  const doc = commentDoc(platform);
+  if (target === "harness") {
+    return [
+      ...sourceBlock(source, target),
+      `Write a reply to the pasted comment below and save it to ${docFile(doc)}.`,
+      `Match ${PLATFORMS[platform].label}'s tone, stay within ${docLimit(doc)} characters, answer directly, and do not publish it.`,
+      ...(brief.trim() ? [`Standing brief: ${brief.trim()}`] : []),
+      `My post for context:\n"""\n${postText || "(empty)"}\n"""`,
+      `Comment to answer:\n"""\n${pasted.trim()}\n"""`,
+    ].join("\n");
+  }
+  return [
+    ...sourceBlock(source, target),
+    ...briefBlock(brief),
+    `Context: ${spec(doc)}`,
+    "Write ONLY a direct, natural reply to the pasted comment. No quotes or commentary.",
+    "",
+    "My post for context:",
+    '"""',
+    postText || "(empty)",
+    '"""',
+    "Comment to answer:",
+    '"""',
+    pasted.trim(),
+    '"""',
+  ].join("\n");
+}
+
 export interface IntentRequest {
   docs: DocId[];
   texts: Partial<Record<DocId, string>>;
@@ -112,6 +228,7 @@ export interface IntentRequest {
   /** Selected excerpt; only honored when exactly one doc is targeted. */
   selection: string;
   brief: string;
+  source?: SourceProject;
 }
 
 /** One intent → one or many docs. Multi-doc web prompts come back as marked sections. */
@@ -128,6 +245,7 @@ export function intent(req: IntentRequest, target: Target): string {
     const what = selection ? `this passage in ${files}:\n"""\n${selection}\n"""` : files;
     const skill = humanize ? (korean ? "Use the humanize-korean skill (im-not-ai) if available." : "Use the humanizer skill if available.") : "";
     return [
+      ...sourceBlock(req.source, target),
       `Rewrite ${what}`,
       ...[skill, instruction].filter(Boolean),
       ...(brief.trim() ? [`Standing brief: ${brief.trim()}`] : []),
@@ -138,7 +256,12 @@ export function intent(req: IntentRequest, target: Target): string {
       .join("\n");
   }
 
-  const head = [...briefBlock(brief), ...(humanize ? [humanizeRules(korean)] : []), ...(instruction ? [`Instruction: ${instruction}`] : [])];
+  const head = [
+    ...sourceBlock(req.source, target),
+    ...briefBlock(brief),
+    ...(humanize ? [humanizeRules(korean)] : []),
+    ...(instruction ? [`Instruction: ${instruction}`] : []),
+  ];
 
   if (docs.length === 1) {
     const doc = docs[0];
@@ -165,13 +288,10 @@ export function intent(req: IntentRequest, target: Target): string {
   ].join("\n");
 }
 
-/**
- * Split a chat reply into per-doc sections using `=== doc ===` markers.
- * Returns null when no markers are present (the reply is a single document).
- */
+/** Split a chat reply into per-doc sections using `=== doc ===` markers. */
 export function parseSections(reply: string): Partial<Record<DocId, string>> | null {
-  const re = /^\s*[#*>`]*\s*={3,}\s*(master|linkedin|x|threads|reddit)\s*={3,}\s*[*`]*\s*$/gim;
-  const hits = [...reply.matchAll(re)];
+  const re = /^\s*[#*>`]*\s*={3,}\s*([a-z_]+(?:\.comment)?)\s*={3,}\s*[*`]*\s*$/gim;
+  const hits = [...reply.matchAll(re)].filter((match) => isDocId(match[1].toLowerCase()));
   if (hits.length === 0) return null;
   const out: Partial<Record<DocId, string>> = {};
   hits.forEach((m, i) => {

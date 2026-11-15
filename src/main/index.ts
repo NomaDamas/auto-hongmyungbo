@@ -1,13 +1,22 @@
-import { app, BrowserWindow, clipboard, dialog, ipcMain, nativeTheme, session, shell } from "electron";
+import { app, BrowserWindow, clipboard, dialog, ipcMain, nativeTheme, net, protocol, session, shell } from "electron";
 import { join } from "node:path";
+import { pathToFileURL } from "node:url";
 import type { DocId, PlatformId, ProjectMeta, Settings } from "@shared/types";
 import { getSettings, setSettings } from "./settings";
 import {
+  addMedia,
+  createFolder,
   createProject,
+  listFolders,
   listProjects,
   listSnapshots,
+  moveProject,
   openProject,
+  pickMedia,
+  pickSource,
   readSnapshot,
+  renameFolder,
+  resolveMediaFile,
   revealProject,
   setChangeSink,
   snapshot,
@@ -16,9 +25,15 @@ import {
 } from "./projects";
 import { killAllPtys, killPty, resizePty, spawnPty, writePty } from "./pty";
 import { asideCheckLogins, asideOpenImporter, asideOpenLogin, asideStatus } from "./aside";
+import { installAsideApp, setupStatus } from "./setup";
+import { cancelPublish, initPublishing, publishComment, publishNow, refreshInsights, schedulePublish, shutdownPublishing } from "./publish";
 
 // HMB_USER_DATA isolates settings/logins (second profile or a clean test run).
 if (process.env.HMB_USER_DATA) app.setPath("userData", process.env.HMB_USER_DATA);
+
+protocol.registerSchemesAsPrivileged([
+  { scheme: "hmb-media", privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true } },
+]);
 
 /** Shared login partition for every embedded AI web tab, persisted across restarts. */
 const WEB_PARTITION = "persist:ai-web";
@@ -84,7 +99,11 @@ function registerIpc(): void {
   });
 
   ipcMain.handle("projects:list", () => listProjects());
-  ipcMain.handle("projects:create", (_e, title: string) => createProject(title));
+  ipcMain.handle("projects:folders", () => listFolders());
+  ipcMain.handle("projects:createFolder", (_e, path: string) => createFolder(path));
+  ipcMain.handle("projects:renameFolder", (_e, from: string, to: string) => renameFolder(from, to));
+  ipcMain.handle("projects:create", (_e, title: string, folder: string) => createProject(title, folder));
+  ipcMain.handle("projects:move", (_e, slug: string, folder: string) => moveProject(slug, folder));
   ipcMain.handle("projects:open", (_e, slug: string) => openProject(slug));
   ipcMain.handle("projects:writeDoc", (_e, slug: string, doc: DocId, content: string) => writeDoc(slug, doc, content));
   ipcMain.handle("projects:writeMeta", (_e, slug: string, meta: ProjectMeta) => writeMeta(slug, meta));
@@ -94,6 +113,9 @@ function registerIpc(): void {
   ipcMain.handle("projects:listSnapshots", (_e, slug: string, doc: DocId) => listSnapshots(slug, doc));
   ipcMain.handle("projects:readSnapshot", (_e, slug: string, id: string, doc: DocId) => readSnapshot(slug, id, doc));
   ipcMain.handle("projects:reveal", (_e, slug: string) => revealProject(slug));
+  ipcMain.handle("projects:addMedia", (_e, slug: string, paths: string[]) => addMedia(slug, paths));
+  ipcMain.handle("projects:pickMedia", (_e, slug: string) => pickMedia(slug));
+  ipcMain.handle("projects:pickSource", () => pickSource());
 
   ipcMain.handle("pty:spawn", (e, id: string, command: string, cwd: string, cols: number, rows: number) =>
     spawnPty(e.sender, id, command, cwd, cols, rows),
@@ -110,13 +132,35 @@ function registerIpc(): void {
   ipcMain.handle("aside:openLogin", (_e, platform: PlatformId, profileId?: string) => asideOpenLogin(platform, profileId));
   ipcMain.handle("aside:openImporter", (_e, profileId?: string) => asideOpenImporter(profileId));
 
+  ipcMain.handle("setup:status", () => setupStatus());
+  ipcMain.handle("setup:installAsideApp", () => installAsideApp());
+  ipcMain.handle("publish:now", (_e, slug: string, platform: PlatformId) => publishNow(slug, platform));
+  ipcMain.handle("publish:schedule", (_e, slug: string, platform: PlatformId, at: string, mode: "aside-native" | "app") =>
+    schedulePublish(slug, platform, at, mode),
+  );
+  ipcMain.handle("publish:cancel", (_e, slug: string, platform: PlatformId) => cancelPublish(slug, platform));
+  ipcMain.handle("publish:comment", (_e, slug: string, platform: PlatformId, targetUrl?: string) => publishComment(slug, platform, targetUrl));
+  ipcMain.handle("publish:refreshInsights", (_e, slug: string, platforms: PlatformId[]) => refreshInsights(slug, platforms));
+
   ipcMain.on("openExternal", (_e, url: string) => {
     if (/^https?:\/\//.test(url)) void shell.openExternal(url);
   });
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
+  protocol.handle("hmb-media", async (request) => {
+    try {
+      const url = new URL(request.url);
+      const parts = url.pathname.slice(1).split("/");
+      if (url.hostname !== "media" || parts.length !== 2) return new Response("Not found", { status: 404 });
+      const file = await resolveMediaFile(decodeURIComponent(parts[0]), decodeURIComponent(parts[1]));
+      return net.fetch(pathToFileURL(file).toString());
+    } catch {
+      return new Response("Not found", { status: 404 });
+    }
+  });
   session.fromPartition(WEB_PARTITION).setUserAgent(chromeUserAgent());
+  await initPublishing();
   registerIpc();
   createWindow();
   app.on("activate", () => {
@@ -124,7 +168,10 @@ app.whenReady().then(() => {
   });
 });
 
-app.on("before-quit", killAllPtys);
+app.on("before-quit", () => {
+  killAllPtys();
+  void shutdownPublishing();
+});
 app.on("window-all-closed", () => {
   if (process.platform !== "darwin") app.quit();
 });
