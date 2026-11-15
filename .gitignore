@@ -1,19 +1,7 @@
-# Python
-__pycache__/
-*.pyc
-backend/.venv/
-backend/.env
-backend/app.db
-
-# Node
-frontend/node_modules/
-frontend/.next/
-frontend/.env.local
-frontend/.env
-frontend/local_store.json
-frontend/.browser-profiles/
+node_modules/
+out/
+dist/
 .env
-
-# OS
 .DS_Store
-frontend/tsconfig.tsbuildinfo
+*.tsbuildinfo
+resources/vendor/

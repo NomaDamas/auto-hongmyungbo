@@ -1,198 +1,102 @@
-# 🤖 Auto-HongMyungbo (Open Source Local Edition) ⚽
+# 🤖 Auto-HongMyungbo ⚽
 
-> One draft in, platform-ready posts out.
-> Refine, compare, and publish across multiple SNS platforms from one local workspace.
+> Write one source draft, refine each platform's post by stating your intent, and publish now or on a schedule through Aside.
+> The AI you already use does the writing — ChatGPT, Claude, Gemini (web) or Claude Code, Codex, omp (CLI). This app only **connects** them (a multiplexer).
 
-![Auto-HongMyungbo Preview](docs/images/ddalcak_myungbo.png)
+![Auto-HongMyungbo](docs/images/ddalcak_myungbo.png)
 
-[![GitHub stars](https://img.shields.io/github/stars/NomaDamas/auto-hongmyungbo?style=flat-square)](https://github.com/NomaDamas/auto-hongmyungbo/stargazers)
-[![GitHub issues](https://img.shields.io/github/issues/NomaDamas/auto-hongmyungbo?style=flat-square)](https://github.com/NomaDamas/auto-hongmyungbo/issues)
-[![GitHub pull requests](https://img.shields.io/github/issues-pr/NomaDamas/auto-hongmyungbo?style=flat-square)](https://github.com/NomaDamas/auto-hongmyungbo/pulls)
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPLv3-blue.svg?style=flat-square)](LICENSE)
-[![Node.js](https://img.shields.io/badge/node-%3E%3D20-339933?style=flat-square&logo=node.js&logoColor=white)](https://nodejs.org/)
 
-## 📺 Demo
+## Layout
 
-[Watch the demo video](https://github.com/user-attachments/assets/d2640150-7402-49c0-96d1-b198d7d02130)
+```
+┌ Sidebar ───────┐┌──────────── Editor (tabs, drag to split) ────────────┐┌ AI dock ─────────────┐
+│ Promotion      ││ [Source] [SNS] [Community] [Blog]                    ││ ● Web  ChatGPT Claude │
+│ ▾ Launch       ││ ┌───────────────────┬─────────────────────────┐      ││ ● CLI  Claude Code …  │
+│   · Launch ●   ││ │ Source            │ LinkedIn·X·Threads·…    │      ││  (Chrome-style tab    │
+│   · v2 ⏰11/16 ││ │ 📁 Linked project │ Preview  Publish ▾  ⋯   │      ││   groups)             │
+│ ▸ Hiring       ││ │                   │ [media strip]           │      ││                       │
+│ Uncategorized  ││ └───────────────────┴─────────────────────────┘      ││                       │
+│ ⚙ Aside ●      ││ [ → Say what you want for LinkedIn…   ↑ ] [Propagate]  ││                       │
+└────────────────┘└──────────────────────────────────────────────────────┘└───────────────────────┘
+```
 
-## ⚡ Quick Install
+| Feature | What it does |
+|---|---|
+| **Promotion folders (sidebar)** | Folders up to 2 levels deep. Each is a real folder (`~/Documents/HongMyungbo/<folder>/<post>/`). Drag a post to move it. Each post shows a status dot (draft / changes pending / scheduled / posted). |
+| **Tabs + split** | Four tabs: Source / SNS / Community / Blog. Drag a tab to the left or right edge to snap into a 50/50 split. Inside a tab, pick the platform (e.g. LinkedIn · X · Threads · Instagram · Facebook). |
+| **Intent** | **The doc you're viewing is the target.** Write one line and press ↵; it goes to the active AI, and the result comes back into that doc as a diff. "Propagate" pushes the source to every platform. |
+| **⋯ Advanced** | Presets (humanize / shorten / stronger hook / tone / translate / fit length), brief, auto-send, version history, copy, grab reply / grab selection. |
+| **Preview** | A modal that mocks each platform's real post (LinkedIn "…see more", X 280-char limit, Instagram carousel, Reddit title, blog layout, and so on). ⌘P. |
+| **Media** | Drop or pick images and videos per doc. Checked against each platform's limits (number of images and videos, whether they can be mixed, whether media is required). Aside uploads them. |
+| **Publish / schedule** | Publish now, or schedule by date and time. Platforms with a built-in scheduler get scheduled by Aside in that scheduler; the rest are published by Aside at that time while the app is running. Both go through Aside MCP (`aside mcp` → `exec`). |
+| **Comments** | Each platform tab has a **Post \| Comment** toggle. The comment is a separate doc (`<platform>.comment.md`) and works with the same diff, intent, and history. Mode "first comment on my post" posts automatically right after the post publishes. Mode "reply to another post" replies at the target URL. ⋯ → draft comments for all platforms in one go, draft a reply to a comment, comment on all platforms. |
+| **Auto-embed** | When you write directly in ChatGPT/Claude/Gemini, the new reply shows up as an approval card below the editor. Approve it to bring it in as a diff; with section markers it's split across platforms. If the source is empty, it suggests importing the reply as the source. File changes from harnesses also arrive as diffs. |
+| **Link a project** | Pick a code or project folder. Harnesses start with `--add-dir` so they can read the code. Links (git remote, homepage, README) and a summary go into the prompt. |
+| **AI dock** | Embedded web (ChatGPT/Claude/Gemini, persistent login) plus harness terminals. Chrome-style tab groups: rename, change color, collapse, drag to move. |
+| **Aside connection** | Aside account, browser profile, and login status per platform. Log in through the Aside browser itself (password autofill, 2FA), or import from another browser. |
+| **Setup wizard** | First run: install Aside.app (bundled dmg, signature verified) → install Aside CLI → `aside login` → check platform logins → detect harnesses. |
+
+### Platforms
+
+| Tab | Platform |
+|---|---|
+| SNS | LinkedIn, X, Threads, Instagram, Facebook, Bluesky, Mastodon |
+| Community | Reddit, Hacker News, Product Hunt, DEV, Naver Cafe, OKKY |
+| Blog | Naver Blog, Tistory, Brunch, velog, Medium, Substack, Hashnode, WordPress |
+
+Per-platform character limits, media rules, writing guides, and Aside publish hints live in `src/shared/platforms.ts`.
+
+## Install & run
 
 ```bash
 git clone https://github.com/NomaDamas/auto-hongmyungbo.git
 cd auto-hongmyungbo
-./scripts/setup_local_easy.sh
-./scripts/start_local.sh
+npm install        # includes the node-pty native build
+npm run dev
 ```
 
-Open: `http://localhost:3000`
-
-## 🔗 Quick Links
-
-- [What is this?](#-what-is-this)
-- [Why this over alternatives?](#-why-this-over-alternatives)
-- [Setup (first-time users)](#-setup-first-time-users)
-- [Basic commands](#-basic-commands)
-- [How to use](#-how-to-use)
-- [Docs and support](#-docs-and-support)
-- [Contributing](#-contributing)
-- [Growth playbook](#-growth-playbook-for-maintainers)
-
-## 🎯 What Is This?
-
-Auto-HongMyungbo is a local-first OSS tool for creators and indie builders who want to:
-
-- write one messy idea once
-- turn it into platform-specific drafts (Reddit, LinkedIn, X, Threads, etc.)
-- refine tone and structure quickly
-- publish in sequence with browser automation
-
-### Core flow
-
-1. Write a draft
-2. Generate platform posts
-3. Preview/Edit/Compare
-4. Accept to queue
-5. Publish one-by-one or batch
-
-## 🥊 Why This Over Alternatives?
-
-| Capability | Manual copy/paste workflow | Single-platform AI writer | Auto-HongMyungbo |
-| --- | --- | --- | --- |
-| One draft to many platforms | ❌ | ❌ | ✅ |
-| Platform-specific output in one UI | ❌ | ⚠️ Partial | ✅ |
-| Side-by-side review before posting | ❌ | ❌ | ✅ |
-| Queue-based multi-platform publish flow | ❌ | ❌ | ✅ |
-| Local-first (no external DB required) | ✅ | ⚠️ Varies | ✅ |
-| Open-source and customizable | ⚠️ Varies | ❌ | ✅ |
-
-If your pain is "I rewrite the same post 5 times," this project is built for that exact problem.
-
-## 🛠️ Setup (First-Time Users)
-
-### Requirements
-
-- macOS / Linux / Windows (WSL recommended)
-- Git
-- Node.js 20+
-- At least one LLM API key
-  - OpenAI or OpenRouter recommended
-  - Anthropic / Grok / Gemini optional
-
-API key guide: [`docs/API_KEYS.md`](docs/API_KEYS.md)
-
-### Environment file
-
-Create `frontend/.env` (or `frontend/.env.local`):
-
-```env
-# At least one is required
-OPENROUTER_API_KEY=your_key_here
-# or
-OPENAI_API_KEY=your_key_here
-
-# Optional providers
-ANTHROPIC_API_KEY=your_key_here
-GROK_API_KEY=your_key_here
-GEMINI_API_KEY=your_key_here
-
-# Optional: for Instagram media upload flow
-INSTAGRAM_MEDIA_PATH=docs/images/sample.jpg
-```
-
-## ⌨️ Basic Commands
+Package a dmg (includes the Aside.app dmg; non-commercial):
 
 ```bash
-# one-time local setup
-./scripts/setup_local_easy.sh
-
-# start app
-./scripts/start_local.sh
-
-# frontend only
-cd frontend
-npm run dev
-
-# production build check
-npm run build
+npm run dist       # fetch:aside → build → electron-builder --mac
 ```
 
-## 📖 How To Use
+The first-run wizard installs the bundled Aside.app into `/Applications`, then runs the official CLI install script and `aside login`.
 
-1. **Draft**: paste your raw idea.
-2. **Options**: set provider/model/API key.
-3. **Refine (optional)**:
-   - Draft Idea Booster
-   - Aggro Pingpong
-   - Phrase Booster
-4. **Generate**: click `Generate N Platforms`.
-5. **Review**: Preview/Edit each platform card.
-6. **Queue**: Accept cards you want to publish.
-7. **Login**: run `Browser Login` per platform once.
-8. **Publish**:
-   - `Post Next Platform`
-   - `Post All (Beta)`
-   - `Publish now` on each queue card
+## Security model (Aside)
 
-## 🧭 Docs and Support
+- Aside owns all login credentials (cookies, passwords, 2FA). This app never reads `~/.aside/cli/auth.json` or any cookies.
+- Aside is called only through the official CLI and MCP, via `execFile`/stdio without a shell. Only fixed URLs and file paths go into REPL scripts.
+- Login status is judged only by whether a logged-in-only page in Aside redirects.
 
-- API keys: [`docs/API_KEYS.md`](docs/API_KEYS.md)
-- Publish env checklist: [`docs/PUBLISH_ENV_CHECKLIST.md`](docs/PUBLISH_ENV_CHECKLIST.md)
-- Monorepo/GitHub notes: [`docs/MONOREPO_GITHUB.md`](docs/MONOREPO_GITHUB.md)
-- Report bugs / request features: [GitHub Issues](https://github.com/NomaDamas/auto-hongmyungbo/issues)
-- Ongoing changes: [Pull Requests](https://github.com/NomaDamas/auto-hongmyungbo/pulls)
+## Project folder contract
 
-## 🤝 Contributing
-
-Contributions are welcome.
-
-- Start with a small issue or bug fix.
-- Open a branch from `main`.
-- Submit a PR with clear before/after behavior.
-- Keep changes focused and easy to review.
-
-If you are new, documentation and UX fixes are great first PRs.
-
-## 📈 Growth Playbook (For Maintainers)
-
-To drive network effects (more users -> more feedback -> better product -> more users):
-
-1. **Build around real pain**
-   - target "rewrite once, post everywhere" pain
-   - prioritize workflows users repeat weekly
-2. **Ship and measure in public**
-   - share every meaningful release with examples/GIF/video
-   - track where users drop off (setup, login, publish)
-3. **Distribute where users already gather**
-   - relevant Subreddits
-   - Hacker News / GeekNews
-   - Awesome lists in this domain
-4. **Tight feedback loop**
-   - convert repeated issue patterns into quick UX wins
-   - keep README/install flow brutally simple
-
-## 🧱 Project Structure
-
-```text
-auto-hongmyungbo/
-├── frontend/
-│   ├── src/app/api/      # Next.js API routes
-│   ├── src/components/   # UI components
-│   ├── src/lib/          # client helpers/types
-│   └── src/server/       # LLM + local store + automation
-├── scripts/              # setup/run scripts
-├── docs/                 # docs + images
-└── LICENSE
+```
+<folder>/<post>/
+  master.md  linkedin.md  x.md  naver_blog.md …   # text (title platforms: first line "# Title")
+  media/                                          # attached images/videos
+  project.json                                    # metadata (platforms, media, publish/schedule, linked project, brief)
+  AGENTS.md  CLAUDE.md                            # rules for harnesses (including the linked project section)
+  .history/<timestamp>/                           # versions before each accepted change
 ```
 
-## 📄 License
+## Shortcuts
 
-This project is licensed under the **GNU Affero General Public License v3.0 (AGPL-3.0)**.
+| Key | Action |
+|---|---|
+| ⌘K | Command palette |
+| ⌘L | Focus intent input |
+| ⌘↵ | Propagate source |
+| ⌘P | Preview the current doc |
+| ⌘⇧↵ / ⌘⇧⌫ | Accept / reject all for the current doc |
+| ⌘B / ⌘J | Toggle sidebar / AI dock |
+| ⌘1–4 | Switch tab panel |
 
-If you use or modify this project and provide it as a network service, you must also make the corresponding source code available under AGPL-3.0.
+## Stack
 
-See the full license text in [`LICENSE`](LICENSE).
+Electron · React 19 · electron-vite · Tailwind 4 · dockview · CodeMirror 6 + merge · xterm.js + node-pty · react-resizable-panels · cmdk · zustand · react-day-picker · date-fns · @modelcontextprotocol/sdk · chokidar · twitter-text · sonner · Geist
 
----
-## 📬 Contact
-- For questions, errors, or support, feel free to reach out:
-- Email: developerminsing@gmail.com
+## License
+
+AGPL-3.0

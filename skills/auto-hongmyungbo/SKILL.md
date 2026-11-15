@@ -1,62 +1,29 @@
-# Auto-HongMyungbo Skill
+---
+name: auto-hongmyungbo
+description: Edit an Auto-HongMyungbo post project (master.md + per-platform .md files) so the user can review your changes as diffs in the app.
+---
 
-## Purpose
-Use this skill to run the project end-to-end in a predictable way:
-`draft -> generate platform cards -> preview artifacts -> optional publish`.
+# Auto-HongMyungbo project skill
 
-## Safe Defaults
-- Non-destructive by default: publishing is **off** unless `--publish` is explicitly passed.
-- Reuse an already-running local server when available.
-- Output is always machine-readable JSON with `ok`, `steps`, `artifacts`, and `error`.
+Use this skill when the current folder contains `project.json` and `master.md` (an Auto-HongMyungbo post).
+The desktop app watches these files and shows every write as an inline diff that the user accepts or rejects.
 
-## Single Entry Command
-Run from repository root:
+## Files
+- `master.md`: the source draft. Edit only when asked.
+- `<platform>.md`: one file per enabled platform. `AGENTS.md` lists each platform's file, character limit, writing guide and media rules.
+- `<platform>.comment.md`: the comment/reply for that platform (first comment on our own post, or a reply on another post). Keep it short and natural, and respect the platform's comment tone.
+  Platforms: linkedin, x, threads, instagram, facebook, bluesky, mastodon, reddit, hackernews, producthunt, devto, naver_cafe, okky, naver_blog, tistory, brunch, velog, medium, substack, hashnode, wordpress.
+- Title platforms (every non-SNS platform): the first line is `# Title`.
+- `media/`: attached images and videos. Reference them in the text only when asked.
+- `project.json`: app metadata. **Never edit it.**
 
-```bash
-./scripts/agent_skill_run.mjs --draft "your raw draft text"
-```
+## Source project
+If `AGENTS.md` has a "Source project" section, the code it describes is readable at that path (granted through `--add-dir`).
+Read the code and README for facts. Never invent features, numbers or links.
 
-Common options:
-- `--draft-file <path>`: load draft text from file
-- `--provider <openrouter|openai>`: default `openrouter`
-- `--model <model_id>`: optional custom model
-- `--platforms reddit,linkedin,twitter`: comma-separated list
-- `--language <auto|korean|english|japanese>`
-- `--publish`: explicitly enable publish step
-- `--no-start-server`: fail if local server is not already running
-
-## Expected JSON Output
-```json
-{
-  "ok": true,
-  "command": "generate-preview-publish",
-  "steps": [{ "name": "generate", "status": "ok" }],
-  "artifacts": {
-    "draftId": 1,
-    "cards": [{ "platform": "reddit", "charCount": 420 }],
-    "publish": null
-  },
-  "error": null
-}
-```
-
-Failure format stays consistent:
-- `ok: false`
-- `error.step`
-- `error.message`
-
-## Minimal Happy Path
-1. Provide a draft (`--draft` or `--draft-file`)
-2. Run the single entry command
-3. Read `artifacts.cards` for preview/inspection
-4. Re-run with `--publish` when ready
-
-## Agent Prompt Template
-Use this template with Codex/Ralph Loop:
-
-```text
-Use the Auto-HongMyungbo skill.
-Run ./scripts/agent_skill_run.mjs with provider=openrouter, platforms=reddit,linkedin.
-Input draft: "<paste draft>".
-Return only the final JSON output and summarize card char counts.
-```
+## Rules
+1. Edit files in place. Don't create new files, and don't repeat the full post in chat.
+2. Keep the facts, numbers, names, links and quotes from `master.md` exactly as they are.
+3. Respect each platform's character limit. X counts CJK characters as 2.
+4. Korean prose: use the `humanize-korean` skill (im-not-ai) if it's installed. English prose: use `humanizer` if it's installed.
+5. Publishing and scheduling are done by the app through Aside. Don't publish yourself.
