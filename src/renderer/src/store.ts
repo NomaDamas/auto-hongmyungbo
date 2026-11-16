@@ -124,14 +124,14 @@ interface State {
 
 const saveTimers = new Map<string, number>();
 const pendingWrites = new Map<string, { slug: string; doc: DocId; text: string }>();
-const inFlightWrites = new Set<Promise<void>>();
+const inFlightWrites = new Map<Promise<void>, { slug: string; doc: DocId; text: string }>();
 let initStarted = false;
 const LAST_PROJECT_KEY = "hmb_last_project";
 
 function trackedWriteDoc(slug: string, doc: DocId, text: string): Promise<void> {
   const write = window.api.projects.writeDoc(slug, doc, text);
-  inFlightWrites.add(write);
-  void write.then(() => inFlightWrites.delete(write), () => inFlightWrites.delete(write));
+  inFlightWrites.set(write, { slug, doc, text });
+  void write.then(() => inFlightWrites.delete(write), () => undefined);
   return write;
 }
 
@@ -159,9 +159,15 @@ async function flushPendingWrites(): Promise<void> {
   const writes = [...pendingWrites.values()];
   pendingWrites.clear();
   const queued = writes.map(({ slug, doc, text }) => trackedWriteDoc(slug, doc, text));
-  const results = await Promise.allSettled([...queued, ...inFlightWrites]);
+  const active = [...inFlightWrites.entries()];
+  const results = await Promise.allSettled([...queued, ...active.map(([write]) => write)]);
   if (results.some((result) => result.status === "rejected")) {
     for (const pending of writes) pendingWrites.set(`${pending.slug}:${pending.doc}`, pending);
+    for (const [index, result] of results.entries()) {
+      if (result.status !== "rejected" || index < queued.length) continue;
+      const pending = active[index - queued.length]?.[1];
+      if (pending) pendingWrites.set(`${pending.slug}:${pending.doc}`, pending);
+    }
     throw new Error("draft write failed");
   }
 }
