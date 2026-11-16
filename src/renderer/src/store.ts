@@ -109,7 +109,7 @@ interface State {
   propose(doc: DocId, proposed: string, source: string): void;
   resolveProposal(doc: DocId, finalText: string): Promise<void>;
   rejectProposal(doc: DocId): void;
-  markFresh(doc: PlatformId): void;
+  markFresh(doc: PlatformId): Promise<void>;
   setPublish(doc: PlatformId, state: PublishState): void;
   setComment(platform: PlatformId, patch: Partial<CommentState>): void;
   setInsights(insights: Partial<Record<PlatformId, PostInsights>>): void;
@@ -192,11 +192,11 @@ function cancelPendingWrite(slug: string, doc: DocId): void {
 }
 
 export const useStore = create<State>((set, get) => {
-  const writeMeta = (meta: ProjectMeta) => {
+  const writeMeta = async (meta: ProjectMeta): Promise<void> => {
     const p = get().project;
     if (!p) return;
     set({ project: { ...p, meta }, publishStates: meta.publish });
-    void window.api.projects.writeMeta(p.slug, meta);
+    await window.api.projects.writeMeta(p.slug, meta);
   };
 
   const openData = (project: ProjectData) => {
@@ -405,11 +405,11 @@ export const useStore = create<State>((set, get) => {
       set({ proposals: rest, project: { ...project, docs: { ...project.docs, [doc]: finalText } } });
       cancelPendingWrite(project.slug, doc);
       const { platform, variant } = parseDoc(doc);
-      if (platform && variant === "post") get().markFresh(platform);
+      if (platform && variant === "post") await get().markFresh(platform);
       const finalWrite = trackedWriteDoc(project.slug, doc, finalText);
       await window.api.projects.snapshot(project.slug, doc, prop.baseline, `before ${prop.source}`);
       await finalWrite;
-      await window.api.projects.commit(project.slug, `approve: ${doc} from ${prop.source}`);
+      await window.api.projects.commit(project.slug, `approve: ${doc} from ${prop.source}`, doc);
     },
 
     rejectProposal(doc) {
@@ -424,10 +424,11 @@ export const useStore = create<State>((set, get) => {
       void trackedWriteDoc(project.slug, doc, prop.baseline);
     },
 
-    markFresh(doc) {
+    async markFresh(doc) {
       const p = get().project;
       if (!p) return;
-      writeMeta({ ...p.meta, derivedFrom: { ...p.meta.derivedFrom, [doc]: hashText(p.docs.master ?? "") } });
+      const meta = { ...p.meta, derivedFrom: { ...p.meta.derivedFrom, [doc]: hashText(p.docs.master ?? "") } };
+      await writeMeta(meta);
     },
 
     setPublish(doc, state) {

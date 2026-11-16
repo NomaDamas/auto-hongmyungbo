@@ -128,9 +128,9 @@ function registerIpc(): void {
   ipcMain.handle("projects:move", (_e, slug: string, folder: string) => moveProject(slug, folder));
   ipcMain.handle("projects:open", (_e, slug: string) => openProject(slug));
   ipcMain.handle("projects:writeDoc", (_e, slug: string, doc: DocId, content: string) => writeDoc(slug, doc, content));
-  ipcMain.handle("projects:commit", (_e, slug: string, message: string) => commitProject(slug, message));
+  ipcMain.handle("projects:commit", (_e, slug: string, message: string, doc?: DocId) => commitProject(slug, message, doc));
   ipcMain.handle("projects:gitLog", (_e, slug: string) => gitLog(slug));
-  ipcMain.handle("projects:rollback", (_e, slug: string, hash: string) => rollbackProject(slug, hash));
+  ipcMain.handle("projects:rollback", (_e, slug: string, hash: string, doc: DocId) => rollbackProject(slug, hash, doc));
   ipcMain.handle("projects:writeMeta", (_e, slug: string, meta: ProjectMeta) => writeMeta(slug, meta));
   ipcMain.handle("projects:snapshot", (_e, slug: string, doc: DocId, content: string, label: string) =>
     snapshot(slug, doc, content, label),

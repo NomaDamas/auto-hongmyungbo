@@ -279,10 +279,15 @@ export async function writeDoc(slug: string, doc: DocId, content: string): Promi
   await next;
 }
 
-export async function commitProject(slug: string, message: string): Promise<void> {
+export async function commitProject(slug: string, message: string, doc?: DocId): Promise<void> {
   const dir = await projectDir(slug);
   await git(dir, ["init", "-q"]);
-  await git(dir, ["add", "--", "."]);
+  if (doc) {
+    validateDoc(doc);
+    await git(dir, ["add", "--", docFile(doc), "project.json"]);
+  } else {
+    await git(dir, ["add", "--", "."]);
+  }
   const status = await git(dir, ["status", "--porcelain"]);
   if (!status.trim()) return;
   await git(dir, ["-c", "user.name=Auto-HongMyungbo", "-c", "user.email=local@auto-hongmyungbo", "commit", "-m", message.slice(0, 120)]);
@@ -299,10 +304,13 @@ export async function gitLog(slug: string): Promise<{ hash: string; message: str
   } catch { return []; }
 }
 
-export async function rollbackProject(slug: string, hash: string): Promise<void> {
+export async function rollbackProject(slug: string, hash: string, doc: DocId): Promise<void> {
   if (!/^[0-9a-f]{7,64}$/i.test(hash)) throw new Error("invalid git revision");
+  validateDoc(doc);
   const dir = await projectDir(slug);
-  await git(dir, ["restore", "--source", hash, "--", "."]);
+  const relativePath = docFile(doc);
+  const { stdout } = await execFileAsync("git", ["show", `${hash}:${relativePath}`], { cwd: dir, maxBuffer: 2 * 1024 * 1024 });
+  await writeDoc(slug, doc, stdout);
 }
 
 export async function writeMeta(slug: string, meta: ProjectMeta): Promise<void> {

@@ -28,6 +28,7 @@ export function UnifiedChat() {
 
   const send = async (preset?: string) => {
     if (!provider) return toast.error("Provider를 먼저 설정하세요.");
+    if (provider.kind !== "web" && provider.kind !== "cli") return toast.error("이 Provider 유형은 아직 실행 어댑터가 없습니다.");
     if (!project.docs[activeDoc]?.trim() && !preset) return toast.error("현재 문서에 내용을 먼저 입력하세요.");
     const previousDock = useStore.getState().dockTab;
     if (provider.kind === "web") {
@@ -35,9 +36,11 @@ export function UnifiedChat() {
       useStore.setState({ dockTab: `web:${webId}` });
     }
     if (provider.kind === "cli") useStore.setState({ dockTab: `harness:${provider.id}` });
+    const settingsHint = [provider.model && `model=${provider.model}`, provider.effort && `effort=${provider.effort}`].filter(Boolean).join(", ");
+    const requestInstruction = settingsHint ? `${instruction}\n\nProvider settings: ${settingsHint}` : instruction;
     setBusy(true);
     try {
-      await runIntent(instruction, preset as never, targets);
+      await runIntent(requestInstruction, preset as never, targets);
       setInstruction("");
     } finally {
       setBusy(false);
