@@ -43,7 +43,17 @@ const WEB_PARTITION = "persist:ai-web";
  * Present the same Chrome UA without the Electron token.
  */
 function chromeUserAgent(): string {
-  return session.defaultSession.getUserAgent().replace(/\s?Electron\/\S+/, "").replace(/\s?auto-hongmyungbo\/\S+/, "");
+  return session.defaultSession.getUserAgent().replace(/\s?Electron\/\S+/i, "").replace(/\s?auto-hongmyungbo\/\S+/i, "");
+}
+
+function isGoogleAuthUrl(url: string): boolean {
+  try {
+    const host = new URL(url).hostname;
+    return /(^|\.)accounts\.google\.com$|(^|\.)oauth2?\.googleapis\.com$|(^|\.)google\.com$/.test(host) &&
+      /\/signin|\/oauth|\/auth|\/v[0-9]+\/auth|accounts\.google\.com/i.test(url);
+  } catch {
+    return false;
+  }
 }
 
 function createWindow(): void {
@@ -74,14 +84,20 @@ function createWindow(): void {
   // never attempt to spoof it or copy credentials/cookies back into the app.
   win.webContents.on("did-attach-webview", (_e, wc) => {
     wc.setWindowOpenHandler(({ url, disposition }) => {
-      if (/accounts\.google\.com|oauth2?\.googleapis\.com|google\.com\/signin/i.test(url) || disposition === "foreground-tab" || disposition === "background-tab") {
+      if (isGoogleAuthUrl(url) || disposition === "foreground-tab" || disposition === "background-tab") {
         void shell.openExternal(url);
         return { action: "deny" };
       }
       return { action: "allow", overrideBrowserWindowOptions: { width: 520, height: 720, webPreferences: { partition: WEB_PARTITION } } };
     });
     wc.on("will-navigate", (event, url) => {
-      if (/accounts\.google\.com|oauth2?\.googleapis\.com|google\.com\/signin/i.test(url)) {
+      if (isGoogleAuthUrl(url)) {
+        event.preventDefault();
+        void shell.openExternal(url);
+      }
+    });
+    wc.on("will-redirect", (event, url) => {
+      if (isGoogleAuthUrl(url)) {
         event.preventDefault();
         void shell.openExternal(url);
       }
