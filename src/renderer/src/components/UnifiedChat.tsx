@@ -4,7 +4,7 @@ import { toast } from "sonner";
 import type { DocId } from "@shared/types";
 import type { Preset } from "@/lib/prompts";
 import { useStore } from "@/store";
-import { cancelPending, runIntent } from "@/lib/dispatch";
+import { cancelPending, runAsideIntent, runIntent } from "@/lib/dispatch";
 import { shellQuote } from "@/lib/term-bridge";
 
 const SKILLS = [
@@ -63,7 +63,9 @@ export function UnifiedChat() {
         let timeoutHandle: number | undefined;
         try {
           await Promise.race([
-            runIntent(fullInstruction, preset, targets),
+            executionKind === "web"
+              ? runAsideIntent(provider.url!, provider.browserProfileId || settings.asideProfileId || undefined, fullInstruction, preset, targets)
+              : runIntent(fullInstruction, preset, targets),
             new Promise<never>((_, reject) => { timeoutHandle = window.setTimeout(() => {
               if (executionKind === "web") cancelPending();
               reject(new Error(`${provider.label} timed out`));

@@ -203,3 +203,21 @@ export function runIntent(instruction: string, preset?: Preset, docs?: DocId[]):
     { docs: targets, selection },
   );
 }
+
+/** Execute a web provider through its Aside-managed browser profile, then apply a reviewable diff. */
+export async function runAsideIntent(url: string, profileId: string | undefined, instruction: string, preset?: Preset, docs?: DocId[]): Promise<void> {
+  const { project, selections, activeDoc } = useStore.getState();
+  if (!project) return;
+  const requested = (docs ?? [activeDoc]).filter((doc) => {
+    if (preset === "x-viral") return parseDoc(doc).platform === "x";
+    if (preset === "linkedin") return parseDoc(doc).platform === "linkedin";
+    if (preset === "threads") return parseDoc(doc).platform === "threads";
+    return true;
+  });
+  if (!requested.length) throw new Error("이 skill에 맞는 대상 pane이 없습니다.");
+  const texts = Object.fromEntries(requested.map((doc) => [doc, textOf(doc)]));
+  const selection = requested.length === 1 ? (selections[requested[0]] ?? "") : "";
+  const prompt = intent({ docs: requested, texts, instruction, preset, selection, brief: project.meta.brief ?? "", source: project.meta.source }, "web");
+  const reply = await window.api.aside.runWebPrompt(url, prompt, profileId);
+  applyReply(reply, { docs: requested, selection });
+}

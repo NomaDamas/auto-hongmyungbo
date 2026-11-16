@@ -298,6 +298,7 @@ export interface Api {
     checkLogins(platforms: PlatformId[], profileId?: string): Promise<Partial<Record<PlatformId, AsideLoginState>>>;
     openLogin(platform: PlatformId, profileId?: string): Promise<void>;
     openImporter(profileId?: string): Promise<void>;
+    runWebPrompt(url: string, prompt: string, profileId?: string): Promise<string>;
   };
   setup: {
     status(): Promise<SetupStatus>;
