@@ -50,13 +50,18 @@ async function dispatch(prompt: (t: Target) => string, pending: Omit<PendingRepl
   if (!t) {
     toast.error("오른쪽 도크에서 AI 웹 탭이나 하네스 터미널을 선택하세요.");
     useStore.setState({ dockOpen: true });
-    return;
+    throw new Error("AI 실행 탭을 선택할 수 없습니다.");
   }
   const text = prompt(t.target);
   useStore.setState({ dockOpen: true });
 
   if (t.target === "harness") {
-    sendToTerminal(t.id, text, autoSubmit);
+    try {
+      sendToTerminal(t.id, text, autoSubmit);
+    } catch (error) {
+      toast.error((error as Error).message);
+      throw error;
+    }
     toast.message("하네스로 전송", { description: "파일이 바뀌면 각 패널에 diff로 표시됩니다." });
     return;
   }
@@ -80,6 +85,7 @@ async function dispatch(prompt: (t: Target) => string, pending: Omit<PendingRepl
     if ((e as Error).name === "AbortError") return;
     useStore.setState({ pendingReply: null });
     toast.error((e as Error).message);
+    throw e;
   }
 }
 

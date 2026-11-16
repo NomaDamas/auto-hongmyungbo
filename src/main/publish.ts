@@ -190,8 +190,10 @@ Reply with ONLY one JSON object on the last line, using null for numbers the pag
 async function agentTask(project: ProjectData, platform: PlatformId, scheduledAt?: string): Promise<string> {
   const definition = PLATFORMS[platform];
   const docPath = join(project.dir, docFile(platform));
-  const text = await readFile(docPath, "utf8");
-  const media = await Promise.all((project.meta.media?.[platform] ?? []).map((item) => resolveMediaFile(project.slug, item.file)));
+  const threadPosts = project.meta.threads?.[platform]?.posts;
+  const text = threadPosts?.length ? threadPosts.map((post) => post.text).join("\n\n--- THREAD POST ---\n\n") : await readFile(docPath, "utf8");
+  const threadMedia = threadPosts?.flatMap((post) => post.media ?? []) ?? [];
+  const media = await Promise.all([...(project.meta.media?.[platform] ?? []), ...threadMedia].map((item) => resolveMediaFile(project.slug, item.file)));
   const thread = platform === "x" || platform === "threads" ? text.split("\n\n--- THREAD POST ---\n\n").filter((part) => part.trim()) : [];
   const action = scheduledAt
     ? `Use ${definition.label}'s native schedule feature; do not post immediately. Schedule it for ${formatLocalTime(scheduledAt)}. After scheduling, reply with the scheduled post URL on the last line if one is available.`
@@ -224,13 +226,37 @@ function formatLocalTime(at: string): string {
 
 async function performNow(slug: string, platform: PlatformId): Promise<void> {
   const project = await readProject(slug);
+  const thread = project.meta.threads?.[platform];
+  if (thread?.posts.length) {
+    thread.posts = thread.posts.map((post) => ({ ...post, status: "sent", error: undefined }));
+    project.meta.threads = { ...project.meta.threads, [platform]: thread };
+    await writeMeta(slug, project.meta);
+  }
   await updateState(slug, platform, { status: "sent", at: new Date().toISOString() });
   let url: string | undefined;
   try {
     const result = await execAside(await agentTask(project, platform));
     url = lastUrl(result);
+    if (thread?.posts.length) {
+      const latest = await readProject(slug);
+      const current = latest.meta.threads?.[platform];
+      if (current) {
+        current.posts = current.posts.map((post) => ({ ...post, status: "posted", url }));
+        latest.meta.threads = { ...latest.meta.threads, [platform]: current };
+        await writeMeta(slug, latest.meta);
+      }
+    }
     await updateState(slug, platform, { status: "posted", at: new Date().toISOString(), url });
   } catch (error) {
+    if (thread?.posts.length) {
+      const latest = await readProject(slug);
+      const current = latest.meta.threads?.[platform];
+      if (current) {
+        current.posts = current.posts.map((post) => post.status === "posted" ? post : ({ ...post, status: "failed", error: errorMessage(error) }));
+        latest.meta.threads = { ...latest.meta.threads, [platform]: current };
+        await writeMeta(slug, latest.meta);
+      }
+    }
     await updateState(slug, platform, { status: "failed", at: new Date().toISOString(), error: errorMessage(error) });
     return;
   }

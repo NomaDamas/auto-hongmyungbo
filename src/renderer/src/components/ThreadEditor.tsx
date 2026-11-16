@@ -1,4 +1,5 @@
-import { Plus, X } from "lucide-react";
+import { ImagePlus, Plus, X } from "lucide-react";
+import { toast } from "sonner";
 import type { PlatformId, ThreadDraft, ThreadPost } from "@shared/types";
 import { PLATFORMS } from "@shared/platforms";
 import { useStore } from "@/store";
@@ -24,6 +25,13 @@ export function ThreadEditor({ platform, value }: { platform: PlatformId; value:
     void window.api.projects.writeMeta(state.project!.slug, meta);
     state.setDoc(platform, next.map((post) => post.text).join(SEPARATOR));
   };
+  const addMedia = async (index: number) => {
+    try {
+      const added = await window.api.projects.pickMedia(project.slug);
+      if (!added.length) return;
+      save(posts.map((post, postIndex) => postIndex === index ? { ...post, media: [...post.media, ...added] } : post));
+    } catch (error) { toast.error((error as Error).message); }
+  };
   return (
     <div className="h-full overflow-y-auto p-3">
       <div className="mx-auto flex max-w-2xl flex-col gap-2">
@@ -40,7 +48,10 @@ export function ThreadEditor({ platform, value }: { platform: PlatformId; value:
               {posts.length > 1 && <button className="icon-btn ml-auto h-6 w-6" title="게시물 삭제" onClick={() => save(posts.filter((_, item) => item !== index))}><X size={12} /></button>}
             </div>
             <textarea className="min-h-24 w-full resize-y bg-transparent text-[14px] leading-relaxed outline-none" value={post.text} placeholder="Thread 게시물 내용을 입력하세요…" onChange={(event) => save(posts.map((item, itemIndex) => itemIndex === index ? { ...item, text: event.target.value, status: "draft" } : item))} />
-            <div className="mt-2 text-[10.5px] text-[var(--muted)]">미디어 {post.media.length}개 · 게시물별 미디어 연결은 Media API에서 관리합니다.</div>
+            <div className="mt-2 flex items-center gap-2 text-[10.5px] text-[var(--muted)]">
+              <button className="btn btn-xs" onClick={() => void addMedia(index)}><ImagePlus size={12} /> 미디어 추가</button>
+              <span>미디어 {post.media.length}개 · 게시물별로 보존됩니다.</span>
+            </div>
           </article>
         ))}
         <button className="btn btn-sm self-start" onClick={() => save([...posts, { id: `${platform}-${Date.now()}`, text: "", media: [], status: "draft" }])}><Plus size={13} /> 게시물 추가</button>

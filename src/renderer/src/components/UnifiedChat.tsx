@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import type { DocId } from "@shared/types";
 import { useStore } from "@/store";
 import { runIntent } from "@/lib/dispatch";
+import { shellQuote } from "@/lib/term-bridge";
 
 const SKILLS = [
   ["humanize", "윤문"],
@@ -29,21 +30,24 @@ export function UnifiedChat() {
 
   const send = async (preset?: string) => {
     if (!provider) return toast.error("Provider를 먼저 설정하세요.");
-    if (provider.kind !== "web" && provider.kind !== "cli") return toast.error("이 Provider 유형은 아직 실행 어댑터가 없습니다.");
+    const executionKind = provider.kind === "custom" ? (provider.command ? "cli" : provider.url ? "web" : "unsupported") : provider.kind === "browser" ? (provider.url ? "web" : "unsupported") : provider.kind;
+    if (executionKind !== "web" && executionKind !== "cli") return toast.error("Provider에 실행 명령 또는 URL을 설정하세요.");
     if (!project.docs[activeDoc]?.trim() && !preset) return toast.error("현재 문서에 내용을 먼저 입력하세요.");
     const previousDock = useStore.getState().dockTab;
-    if (provider.kind === "web") {
+    if (executionKind === "web") {
       const webId = provider.id === "claude-web" ? "claude" : provider.id;
-      if (!settings.webTabs.some((tab) => tab.id === webId)) {
-        if (!provider.url) return toast.error("Web Provider URL을 설정하세요.");
-        await useStore.getState().updateSettings({ webTabs: [...settings.webTabs, { id: webId, label: provider.label, url: provider.url }] });
-      }
+      if (!provider.url) return toast.error("Web Provider URL을 설정하세요.");
+      const webTabs = settings.webTabs.some((tab) => tab.id === webId)
+        ? settings.webTabs.map((tab) => tab.id === webId ? { ...tab, label: provider.label, url: provider.url! } : tab)
+        : [...settings.webTabs, { id: webId, label: provider.label, url: provider.url }];
+      await useStore.getState().updateSettings({ webTabs });
       useStore.setState({ dockTab: `web:${webId}` });
     }
-    if (provider.kind === "cli") {
+    if (executionKind === "cli") {
       if (!provider.command) return toast.error("CLI Provider 명령을 설정하세요.");
       const runId = `provider:${provider.id}`;
-      useStore.setState((state) => ({ runTabs: [...state.runTabs.filter((tab) => tab.id !== runId), { id: runId, label: provider.label, command: `${provider.command} ${provider.model ? `--model ${provider.model}` : ""} ${provider.effort ? `--effort ${provider.effort}` : ""}`.trim() }], dockTab: `run:${runId}` }));
+      const args = [provider.model && `--model ${shellQuote(provider.model)}`, provider.effort && `--effort ${shellQuote(provider.effort)}`].filter(Boolean).join(" ");
+      useStore.setState((state) => ({ runTabs: [...state.runTabs.filter((tab) => tab.id !== runId), { id: runId, label: provider.label, command: `${provider.command} ${args}`.trim() }], dockTab: `run:${runId}` }));
     }
     const settingsHint = [provider.model && `model=${provider.model}`, provider.effort && `effort=${provider.effort}`].filter(Boolean).join(", ");
     const requestInstruction = settingsHint ? `${instruction}\n\nProvider settings: ${settingsHint}` : instruction;
@@ -52,7 +56,14 @@ export function UnifiedChat() {
       const fullInstruction = provider.skills.length ? `${requestInstruction}\n\nSkills: ${provider.skills.join(", ")}` : requestInstruction;
       let lastError: unknown;
       for (let attempt = 0; attempt <= provider.retries; attempt += 1) {
-        try { await runIntent(fullInstruction, preset as never, targets); lastError = undefined; break; } catch (error) { lastError = error; }
+        try {
+          await Promise.race([
+            runIntent(fullInstruction, preset as never, targets),
+            new Promise<never>((_, reject) => window.setTimeout(() => reject(new Error(`${provider.label} timed out`)), provider.timeoutMs)),
+          ]);
+          lastError = undefined;
+          break;
+        } catch (error) { lastError = error; }
       }
       if (lastError) throw lastError;
       setInstruction("");
