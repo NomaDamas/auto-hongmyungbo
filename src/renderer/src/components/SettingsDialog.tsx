@@ -116,8 +116,8 @@ export function SettingsDialog() {
                     <option value="high">high</option>
                     <option value="xhigh">xhigh</option>
                   </select>
-                  <input className="input" type="number" min={1000} max={3600000} step={1000} title="timeout (ms)" value={provider.timeoutMs} onChange={(e) => setDraft({ ...draft, providers: draft.providers.map((p) => p.id === provider.id ? { ...p, timeoutMs: Number(e.target.value) || 600000 } : p) })} />
-                  <input className="input" type="number" min={0} max={5} title="재시도 횟수" value={provider.retries} onChange={(e) => setDraft({ ...draft, providers: draft.providers.map((p) => p.id === provider.id ? { ...p, retries: Number(e.target.value) || 0 } : p) })} />
+                  <input className="input" disabled={provider.kind === "cli"} type="number" min={1000} max={3600000} step={1000} title="timeout (ms) · CLI는 터미널 세션이 직접 관리" value={provider.timeoutMs} onChange={(e) => setDraft({ ...draft, providers: draft.providers.map((p) => p.id === provider.id ? { ...p, timeoutMs: Number(e.target.value) || 600000 } : p) })} />
+                  <input className="input" disabled={provider.kind === "cli"} type="number" min={0} max={5} title="재시도 횟수 · CLI는 중복 입력 방지를 위해 지원하지 않음" value={provider.retries} onChange={(e) => setDraft({ ...draft, providers: draft.providers.map((p) => p.id === provider.id ? { ...p, retries: Number(e.target.value) || 0 } : p) })} />
                   <input className="input" placeholder="skills (쉼표 구분)" value={provider.skills.join(", ")} onChange={(e) => setDraft({ ...draft, providers: draft.providers.map((p) => p.id === provider.id ? { ...p, skills: e.target.value.split(",").map((skill) => skill.trim()).filter(Boolean) } : p) })} />
                   <input className="input" placeholder="브라우저 프로필 (선택)" value={provider.browserProfileId ?? ""} onChange={(e) => setDraft({ ...draft, providers: draft.providers.map((p) => p.id === provider.id ? { ...p, browserProfileId: e.target.value || undefined } : p) })} />
                 </div>

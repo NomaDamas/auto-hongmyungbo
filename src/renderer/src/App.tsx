@@ -18,6 +18,7 @@ import { Sidebar } from "@/components/Sidebar";
 import { EditorArea, focusEditorTab } from "@/components/EditorArea";
 import { EmbedInbox } from "@/components/EmbedInbox";
 import { InsightsBoard } from "@/components/InsightsBoard";
+import { UnifiedChat } from "@/components/UnifiedChat";
 
 export function App() {
   const settings = useStore((s) => s.settings);
@@ -143,8 +144,11 @@ export function App() {
               if (useStore.getState().dockOpen !== open) useStore.setState({ dockOpen: open });
             }}
           >
-            <div className="h-full p-1 pl-0">
-              <div className="h-full overflow-hidden rounded-[12px] border border-[var(--border)]">
+            <div className="flex h-full min-h-0 flex-col gap-1 p-1 pl-0">
+              <div className="min-h-[260px] flex-[1.15] overflow-hidden rounded-[12px] border border-[var(--border)]">
+                <UnifiedChat />
+              </div>
+              <div className="min-h-[180px] flex-1 overflow-hidden rounded-[12px] border border-[var(--border)]">
                 <Dock />
               </div>
             </div>

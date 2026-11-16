@@ -1,6 +1,8 @@
 import { dialog, shell, type WebContents } from "electron";
 import { watch, type FSWatcher } from "chokidar";
 import { access, copyFile, mkdir, readFile, readdir, rename, stat, writeFile } from "node:fs/promises";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
 import { basename, dirname, extname, isAbsolute, join, relative, resolve, sep, win32 } from "node:path";
 import type {
   DocId,
@@ -22,6 +24,12 @@ const HISTORY = ".history";
 const MEDIA = "media";
 const IMAGE_EXTENSIONS: Record<string, true> = { ".jpg": true, ".jpeg": true, ".png": true, ".gif": true, ".webp": true, ".heic": true };
 const VIDEO_EXTENSIONS: Record<string, true> = { ".mp4": true, ".mov": true, ".webm": true, ".m4v": true };
+const execFileAsync = promisify(execFile);
+
+async function git(cwd: string, args: string[]): Promise<string> {
+  const result = await execFileAsync("git", args, { cwd, maxBuffer: 2 * 1024 * 1024 });
+  return result.stdout;
+}
 
 function relativeParts(value: string, allowEmpty = false): string[] {
   if (typeof value !== "string" || (!allowEmpty && !value) || value.includes("\0") || value.includes("\\")) {
@@ -269,6 +277,40 @@ export async function writeDoc(slug: string, doc: DocId, content: string): Promi
   });
   docWrites.set(path, next.catch(() => undefined));
   await next;
+}
+
+export async function commitProject(slug: string, message: string, doc?: DocId): Promise<void> {
+  const dir = await projectDir(slug);
+  await git(dir, ["init", "-q"]);
+  if (doc) {
+    validateDoc(doc);
+    await git(dir, ["add", "--", docFile(doc), "project.json"]);
+  } else {
+    await git(dir, ["add", "--", "."]);
+  }
+  const status = await git(dir, ["status", "--porcelain"]);
+  if (!status.trim()) return;
+  await git(dir, ["-c", "user.name=Auto-HongMyungbo", "-c", "user.email=local@auto-hongmyungbo", "commit", "-m", message.slice(0, 120)]);
+}
+
+export async function gitLog(slug: string, doc?: DocId): Promise<{ hash: string; message: string; at: string }[]> {
+  const dir = await projectDir(slug);
+  try {
+    const output = await git(dir, ["log", "-20", "--format=%H%x09%aI%x09%s", ...(doc ? ["--", docFile(doc)] : [])]);
+    return output.trim().split("\n").filter(Boolean).map((line) => {
+      const [hash, at, ...message] = line.split("\t");
+      return { hash, at, message: message.join("\t") };
+    });
+  } catch { return []; }
+}
+
+export async function rollbackProject(slug: string, hash: string, doc: DocId): Promise<string> {
+  if (!/^[0-9a-f]{7,64}$/i.test(hash)) throw new Error("invalid git revision");
+  validateDoc(doc);
+  const dir = await projectDir(slug);
+  const relativePath = docFile(doc);
+  const { stdout } = await execFileAsync("git", ["show", `${hash}:${relativePath}`], { cwd: dir, maxBuffer: 2 * 1024 * 1024 });
+  return stdout;
 }
 
 export async function writeMeta(slug: string, meta: ProjectMeta): Promise<void> {
