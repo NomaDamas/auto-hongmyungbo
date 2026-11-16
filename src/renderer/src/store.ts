@@ -407,6 +407,12 @@ export const useStore = create<State>((set, get) => {
       const { platform, variant } = parseDoc(doc);
       if (platform && variant === "post") await get().markFresh(platform);
       const finalWrite = trackedWriteDoc(project.slug, doc, finalText);
+      const { platform: changedPlatform } = parseDoc(doc);
+      if (changedPlatform === "x" || changedPlatform === "threads") {
+        const threads = { ...project.meta.threads };
+        delete threads[changedPlatform];
+        await window.api.projects.writeMeta(project.slug, { ...project.meta, threads });
+      }
       await window.api.projects.snapshot(project.slug, doc, prop.baseline, `before ${prop.source}`);
       await finalWrite;
       await window.api.projects.commit(project.slug, `approve: ${doc} from ${prop.source}`, doc);
