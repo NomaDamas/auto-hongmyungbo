@@ -14,7 +14,8 @@ export function ThreadEditor({ platform, value }: { platform: PlatformId; value:
   const project = useStore((s) => s.project)!;
   const stored = project.meta.threads?.[platform];
   const threadPlatform = platform as "x" | "threads";
-  const initial: ThreadDraft = stored?.platform === threadPlatform ? stored : { platform: threadPlatform, posts: splitThread(value).map((text, index): ThreadPost => ({ id: `${platform}-${index + 1}`, text, media: [], status: "draft" })) };
+  const storedText = stored?.posts.map((post) => post.text).join(SEPARATOR);
+  const initial: ThreadDraft = stored?.platform === threadPlatform && storedText === value ? stored : { platform: threadPlatform, posts: splitThread(value).map((text, index): ThreadPost => ({ id: `${platform}-${index + 1}`, text, media: [], status: "draft" })) };
   const posts = initial.posts;
   const save = (next: ThreadPost[]) => {
     const state = useStore.getState();

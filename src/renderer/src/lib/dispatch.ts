@@ -13,6 +13,7 @@ function activeTarget(): { target: Target; id: string } | null {
   const [kind, id] = dockTab.split(":");
   if (kind === "web") return { target: "web", id };
   if (kind === "harness") return { target: "harness", id: dockTab };
+  if (kind === "run") return { target: "harness", id: dockTab };
   return null;
 }
 

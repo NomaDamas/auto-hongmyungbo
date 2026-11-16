@@ -34,18 +34,27 @@ export function UnifiedChat() {
     const previousDock = useStore.getState().dockTab;
     if (provider.kind === "web") {
       const webId = provider.id === "claude-web" ? "claude" : provider.id;
-      if (!settings.webTabs.some((tab) => tab.id === webId)) return toast.error("이 Web Provider를 AI 탭에 먼저 등록하세요.");
+      if (!settings.webTabs.some((tab) => tab.id === webId)) {
+        if (!provider.url) return toast.error("Web Provider URL을 설정하세요.");
+        await useStore.getState().updateSettings({ webTabs: [...settings.webTabs, { id: webId, label: provider.label, url: provider.url }] });
+      }
       useStore.setState({ dockTab: `web:${webId}` });
     }
     if (provider.kind === "cli") {
-      if (!settings.harnesses.some((harness) => harness.id === provider.id)) return toast.error("이 CLI Provider를 하네스 설정에 먼저 등록하세요.");
-      useStore.setState({ dockTab: `harness:${provider.id}` });
+      if (!provider.command) return toast.error("CLI Provider 명령을 설정하세요.");
+      const runId = `provider:${provider.id}`;
+      useStore.setState((state) => ({ runTabs: [...state.runTabs.filter((tab) => tab.id !== runId), { id: runId, label: provider.label, command: `${provider.command} ${provider.model ? `--model ${provider.model}` : ""} ${provider.effort ? `--effort ${provider.effort}` : ""}`.trim() }], dockTab: `run:${runId}` }));
     }
     const settingsHint = [provider.model && `model=${provider.model}`, provider.effort && `effort=${provider.effort}`].filter(Boolean).join(", ");
     const requestInstruction = settingsHint ? `${instruction}\n\nProvider settings: ${settingsHint}` : instruction;
     setBusy(true);
     try {
-      await runIntent(requestInstruction, preset as never, targets);
+      const fullInstruction = provider.skills.length ? `${requestInstruction}\n\nSkills: ${provider.skills.join(", ")}` : requestInstruction;
+      let lastError: unknown;
+      for (let attempt = 0; attempt <= provider.retries; attempt += 1) {
+        try { await runIntent(fullInstruction, preset as never, targets); lastError = undefined; break; } catch (error) { lastError = error; }
+      }
+      if (lastError) throw lastError;
       setInstruction("");
     } finally {
       setBusy(false);

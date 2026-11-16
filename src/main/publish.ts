@@ -202,7 +202,7 @@ Read the exact post text from ${JSON.stringify(docPath)} and use it verbatim. It
 <post-text>
 ${text}
 </post-text>
-${thread.length > 1 ? `For a thread, publish each post in order and reply to the previous post. The post boundaries are marked by the exact line "--- THREAD POST ---". Do not merge them into one post.` : ""}
+${thread.length > 1 ? `For a thread, publish each post in order and reply to the previous post. The post boundaries are marked by the exact line "--- THREAD POST ---". Do not merge them into one post. Stop after each post and report its URL before continuing. If a post fails, report the completed index and do not replay completed posts on retry.` : ""}
 ${media.length ? `Upload these media files:\n${media.map((path) => `- ${path}`).join("\n")}` : "Do not attach media."}
 ${action}`;
 }
