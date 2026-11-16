@@ -180,7 +180,16 @@ export async function publishAllComments(): Promise<void> {
 export function runIntent(instruction: string, preset?: Preset, docs?: DocId[]): Promise<void> {
   const { project, selections, activeDoc } = useStore.getState();
   if (!project) return Promise.resolve();
-  const requested = docs ?? [activeDoc];
+  const requested = (docs ?? [activeDoc]).filter((doc) => {
+    if (preset === "x-viral") return parseDoc(doc).platform === "x";
+    if (preset === "linkedin") return parseDoc(doc).platform === "linkedin";
+    if (preset === "threads") return parseDoc(doc).platform === "threads";
+    return true;
+  });
+  if (requested.length === 0) {
+    toast.error("이 플랫폼 skill에 맞는 대상 pane을 선택하세요.");
+    return Promise.resolve();
+  }
   const targets = requested.filter((doc) => textOf(doc).trim() || (!!instruction.trim() && parseDoc(doc).variant === "comment"));
   if (targets.length === 0) {
     toast.error(`${requested.map(docLabel).join(", ")}이(가) 비어 있습니다.`);
