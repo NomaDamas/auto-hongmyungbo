@@ -131,7 +131,7 @@ const LAST_PROJECT_KEY = "hmb_last_project";
 function trackedWriteDoc(slug: string, doc: DocId, text: string): Promise<void> {
   const write = window.api.projects.writeDoc(slug, doc, text);
   inFlightWrites.set(write, { slug, doc, text });
-  void write.then(() => inFlightWrites.delete(write), () => undefined);
+  void write.then(() => inFlightWrites.delete(write), () => inFlightWrites.delete(write));
   return write;
 }
 
