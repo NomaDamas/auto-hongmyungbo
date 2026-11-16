@@ -10,7 +10,7 @@ const pendingWrites = new Map<string, string[]>();
  * PATH, nvm, and auth from ~/.zshrc behave exactly like a normal terminal.
  */
 export function spawnPty(wc: WebContents, id: string, command: string, cwd: string, cols: number, rows: number): void {
-  killPty(id);
+  killPty(id, false);
   const shell = process.env.SHELL || userInfo().shell || "/bin/zsh";
   const args = command.trim() ? ["-l", "-i", "-c", command] : ["-l", "-i"];
   const p = nodePty.spawn(shell, args, {
@@ -45,10 +45,10 @@ export function resizePty(id: string, cols: number, rows: number): void {
   if (cols > 0 && rows > 0) ptys.get(id)?.resize(cols, rows);
 }
 
-export function killPty(id: string): void {
+export function killPty(id: string, clearQueued = true): void {
   ptys.get(id)?.kill();
   ptys.delete(id);
-  pendingWrites.delete(id);
+  if (clearQueued) pendingWrites.delete(id);
 }
 
 export function killAllPtys(): void {
