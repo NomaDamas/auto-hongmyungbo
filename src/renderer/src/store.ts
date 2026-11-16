@@ -124,6 +124,7 @@ interface State {
 
 const saveTimers = new Map<string, number>();
 const pendingWrites = new Map<string, { slug: string; doc: DocId; text: string }>();
+const inFlightWrites = new Map<string, Promise<void>>();
 let initStarted = false;
 const LAST_PROJECT_KEY = "hmb_last_project";
 
@@ -138,7 +139,13 @@ function scheduleSave(slug: string, doc: DocId, text: string): void {
       const pending = pendingWrites.get(key);
       if (!pending) return;
       pendingWrites.delete(key);
-      void window.api.projects.writeDoc(pending.slug, pending.doc, pending.text);
+      const write = window.api.projects.writeDoc(pending.slug, pending.doc, pending.text);
+      inFlightWrites.set(key, write);
+      void write.then(() => {
+        if (inFlightWrites.get(key) === write) inFlightWrites.delete(key);
+      }, () => {
+        if (inFlightWrites.get(key) === write) inFlightWrites.delete(key);
+      });
     }, 300),
   );
 }
@@ -150,7 +157,8 @@ async function flushPendingWrites(): Promise<void> {
   }
   const writes = [...pendingWrites.values()];
   pendingWrites.clear();
-  await Promise.all(writes.map(({ slug, doc, text }) => window.api.projects.writeDoc(slug, doc, text)));
+  const queued = writes.map(({ slug, doc, text }) => window.api.projects.writeDoc(slug, doc, text));
+  await Promise.all([...queued, ...inFlightWrites.values()]);
 }
 
 export const useStore = create<State>((set, get) => {
