@@ -143,10 +143,30 @@ export interface HarnessConfig {
   addDirFlag?: string;
 }
 
+export type ProviderKind = "cli" | "web" | "browser" | "custom";
+export type ProviderEffort = "low" | "medium" | "high" | "xhigh";
+
+/** Non-secret provider settings. Credentials and cookies stay with the provider/Aside. */
+export interface ProviderConfig {
+  id: string;
+  label: string;
+  kind: ProviderKind;
+  command?: string;
+  url?: string;
+  model?: string;
+  effort?: ProviderEffort;
+  timeoutMs: number;
+  retries: number;
+  skills: string[];
+  browserProfileId?: string;
+  enabled: boolean;
+}
+
 export interface Settings {
   workspaceRoot: string;
   webTabs: WebTabConfig[];
   harnesses: HarnessConfig[];
+  providers: ProviderConfig[];
   platforms: PlatformId[];
   theme: "dark" | "light";
   /** Aside browser profile used for publishing and login checks; empty = Aside default. */

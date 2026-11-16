@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { FolderOpen, Plus, Trash2, X as XIcon } from "lucide-react";
-import type { HarnessConfig, Settings, WebTabConfig } from "@shared/types";
+import type { HarnessConfig, ProviderConfig, Settings, WebTabConfig } from "@shared/types";
 import { ALL_PLATFORMS, PLATFORMS } from "@shared/platforms";
 import { useStore } from "@/store";
 
@@ -19,6 +19,7 @@ export function SettingsDialog() {
     await useStore.getState().updateSettings({
       webTabs: draft.webTabs.filter((t) => t.label && t.url),
       harnesses: draft.harnesses.filter((h) => h.label && h.command),
+      providers: draft.providers.filter((p) => p.label),
       platforms: draft.platforms,
       dockGroups: draft.dockGroups,
       theme: draft.theme,
@@ -96,6 +97,35 @@ export function SettingsDialog() {
               ]}
               blank={() => ({ id: crypto.randomUUID().slice(0, 8), label: "", command: "", addDirFlag: "--add-dir" })}
             />
+          </Section>
+
+          <Section title="Provider" hint="요청마다 사용할 AI, 모델, 추론 강도를 선택합니다. 인증정보는 저장하지 않습니다.">
+            <div className="space-y-2">
+              {draft.providers.map((provider) => (
+                <div key={provider.id} className="grid grid-cols-[auto_1fr_1fr_auto] items-center gap-2 rounded-md border border-[var(--border)] p-2">
+                  <input type="checkbox" checked={provider.enabled} aria-label={`${provider.label} 사용`} onChange={(e) => setDraft({ ...draft, providers: draft.providers.map((p) => p.id === provider.id ? { ...p, enabled: e.target.checked } : p) })} />
+                  <input className="input" value={provider.label} onChange={(e) => setDraft({ ...draft, providers: draft.providers.map((p) => p.id === provider.id ? { ...p, label: e.target.value } : p) })} />
+                  <select className="input" value={provider.kind} onChange={(e) => setDraft({ ...draft, providers: draft.providers.map((p) => p.id === provider.id ? { ...p, kind: e.target.value as ProviderConfig["kind"] } : p) })}>
+                    <option value="cli">CLI</option><option value="web">Web</option><option value="browser">Browser</option><option value="custom">Custom</option>
+                  </select>
+                  <input className="input" placeholder="명령 또는 URL" value={provider.command ?? provider.url ?? ""} onChange={(e) => setDraft({ ...draft, providers: draft.providers.map((p) => p.id === provider.id ? (p.kind === "cli" ? { ...p, command: e.target.value, url: undefined } : { ...p, url: e.target.value, command: undefined }) : p) })} />
+                  <input className="input" placeholder="모델 (선택)" value={provider.model ?? ""} onChange={(e) => setDraft({ ...draft, providers: draft.providers.map((p) => p.id === provider.id ? { ...p, model: e.target.value || undefined } : p) })} />
+                  <select className="input" value={provider.effort ?? "medium"} onChange={(e) => setDraft({ ...draft, providers: draft.providers.map((p) => p.id === provider.id ? { ...p, effort: e.target.value as ProviderConfig["effort"] } : p) })}>
+                    <option value="low">low</option>
+                    <option value="medium">medium</option>
+                    <option value="high">high</option>
+                    <option value="xhigh">xhigh</option>
+                  </select>
+                  <input className="input" type="number" min={1000} max={3600000} step={1000} title="timeout (ms)" value={provider.timeoutMs} onChange={(e) => setDraft({ ...draft, providers: draft.providers.map((p) => p.id === provider.id ? { ...p, timeoutMs: Number(e.target.value) || 600000 } : p) })} />
+                  <input className="input" type="number" min={0} max={5} title="재시도 횟수" value={provider.retries} onChange={(e) => setDraft({ ...draft, providers: draft.providers.map((p) => p.id === provider.id ? { ...p, retries: Number(e.target.value) || 0 } : p) })} />
+                  <input className="input" placeholder="skills (쉼표 구분)" value={provider.skills.join(", ")} onChange={(e) => setDraft({ ...draft, providers: draft.providers.map((p) => p.id === provider.id ? { ...p, skills: e.target.value.split(",").map((skill) => skill.trim()).filter(Boolean) } : p) })} />
+                  <input className="input" placeholder="브라우저 프로필 (선택)" value={provider.browserProfileId ?? ""} onChange={(e) => setDraft({ ...draft, providers: draft.providers.map((p) => p.id === provider.id ? { ...p, browserProfileId: e.target.value || undefined } : p) })} />
+                </div>
+              ))}
+              <button className="btn btn-xs btn-ghost" onClick={() => setDraft({ ...draft, providers: [...draft.providers, { id: `custom-${crypto.randomUUID().slice(0, 8)}`, label: "Custom provider", kind: "custom", timeoutMs: 600000, retries: 0, skills: [], enabled: true }] })}>
+                <Plus size={12} /> Provider 추가
+              </button>
+            </div>
           </Section>
 
           <Section title="AI 독 탭 그룹" hint="Web과 CLI 기본 그룹으로 되돌리고 현재 탭을 다시 배치합니다.">

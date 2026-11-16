@@ -225,7 +225,7 @@ export async function readProject(slug: string): Promise<ProjectData> {
   const dir = await projectDir(slug);
   const settings = await getSettings();
   const meta = await readMeta(dir);
-  const docs: Partial<Record<DocId, string>> = { master: await readText(join(dir, docFile("master"))) };
+  const docs: Partial<Record<DocId, string>> = { master: await readFile(join(dir, docFile("master")), "utf8") };
   await Promise.all(
     enabledPlatforms(meta, settings.platforms).flatMap((platform) => [
       readText(join(dir, docFile(platform))).then((text) => void (docs[platform] = text)),
@@ -257,12 +257,18 @@ export async function moveProject(slug: string, folder: string): Promise<string>
 
 /** Content we just wrote, so the watcher can ignore our own echoes. */
 const ownWrites = new Map<string, string>();
+const docWrites = new Map<string, Promise<void>>();
 
 export async function writeDoc(slug: string, doc: DocId, content: string): Promise<void> {
   validateDoc(doc);
   const path = join(await projectDir(slug), docFile(doc));
-  ownWrites.set(path, content);
-  await writeFile(path, content);
+  const previous = docWrites.get(path) ?? Promise.resolve();
+  const next = previous.then(async () => {
+    ownWrites.set(path, content);
+    await writeFile(path, content);
+  });
+  docWrites.set(path, next.catch(() => undefined));
+  await next;
 }
 
 export async function writeMeta(slug: string, meta: ProjectMeta): Promise<void> {

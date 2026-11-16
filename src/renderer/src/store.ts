@@ -123,18 +123,72 @@ interface State {
 }
 
 const saveTimers = new Map<string, number>();
+const pendingWrites = new Map<string, { slug: string; doc: DocId; text: string }>();
+const failedWrites = new Map<string, { slug: string; doc: DocId; text: string }>();
+const inFlightWrites = new Map<Promise<void>, { slug: string; doc: DocId; text: string }>();
 let initStarted = false;
+const LAST_PROJECT_KEY = "hmb_last_project";
+
+function trackedWriteDoc(slug: string, doc: DocId, text: string): Promise<void> {
+  const write = window.api.projects.writeDoc(slug, doc, text);
+  const payload = { slug, doc, text };
+  const key = `${slug}:${doc}`;
+  inFlightWrites.set(write, payload);
+  void write.then(() => {
+    inFlightWrites.delete(write);
+    failedWrites.delete(key);
+  }, () => {
+    inFlightWrites.delete(write);
+    failedWrites.set(key, payload);
+  });
+  return write;
+}
 
 function scheduleSave(slug: string, doc: DocId, text: string): void {
   const key = `${slug}:${doc}`;
+  pendingWrites.set(key, { slug, doc, text });
   clearTimeout(saveTimers.get(key));
   saveTimers.set(
     key,
     window.setTimeout(() => {
       saveTimers.delete(key);
-      void window.api.projects.writeDoc(slug, doc, text);
+      const pending = pendingWrites.get(key);
+      if (!pending) return;
+      pendingWrites.delete(key);
+      trackedWriteDoc(pending.slug, pending.doc, pending.text);
     }, 300),
   );
+}
+
+async function flushPendingWrites(): Promise<void> {
+  for (const [key, timer] of saveTimers) {
+    clearTimeout(timer);
+    saveTimers.delete(key);
+  }
+  const writes = [...new Map([...failedWrites, ...pendingWrites].map(([key, value]) => [key, value])).values()];
+  const queuedKeys = new Set(writes.map((pending) => `${pending.slug}:${pending.doc}`));
+  pendingWrites.clear();
+  failedWrites.clear();
+  const active = [...inFlightWrites.entries()];
+  const queued = writes.map(({ slug, doc, text }) => trackedWriteDoc(slug, doc, text));
+  const results = await Promise.allSettled([...queued, ...active.map(([write]) => write)]);
+  if (results.some((result) => result.status === "rejected")) {
+    for (const pending of writes) pendingWrites.set(`${pending.slug}:${pending.doc}`, pending);
+    for (const [index, result] of results.entries()) {
+      if (result.status !== "rejected" || index < queued.length) continue;
+      const pending = active[index - queued.length]?.[1];
+      if (pending && !queuedKeys.has(`${pending.slug}:${pending.doc}`)) pendingWrites.set(`${pending.slug}:${pending.doc}`, pending);
+    }
+    for (const [key, pending] of failedWrites) pendingWrites.set(key, pending);
+    throw new Error("draft write failed");
+  }
+}
+
+function cancelPendingWrite(slug: string, doc: DocId): void {
+  const key = `${slug}:${doc}`;
+  clearTimeout(saveTimers.get(key));
+  saveTimers.delete(key);
+  pendingWrites.delete(key);
 }
 
 export const useStore = create<State>((set, get) => {
@@ -198,7 +252,28 @@ export const useStore = create<State>((set, get) => {
       set({ settings, setupOpen: !settings.onboarded, dockTab: settings.webTabs[0] ? `web:${settings.webTabs[0].id}` : "" });
       document.documentElement.classList.toggle("dark", settings.theme === "dark");
       await Promise.all([get().refreshProjects(), get().refreshFolders()]);
+      const lastProject = localStorage.getItem(LAST_PROJECT_KEY);
+      if (lastProject && get().projects.some((item) => item.slug === lastProject)) {
+        await get().openProject(lastProject).catch(() => {
+          localStorage.removeItem(LAST_PROJECT_KEY);
+          toast.error("이전 프로젝트 파일을 읽지 못했습니다.", { description: "프로젝트 목록에서 복구할 항목을 선택하세요." });
+        });
+      } else if (lastProject) {
+        localStorage.removeItem(LAST_PROJECT_KEY);
+        toast.message("이전에 열었던 프로젝트를 찾지 못했습니다.", { description: "프로젝트 목록에서 다시 선택하세요." });
+      }
       void get().refreshAside();
+
+      let closingAfterFlush = false;
+      window.addEventListener("beforeunload", (event) => {
+        if (closingAfterFlush) return;
+        event.preventDefault();
+        closingAfterFlush = true;
+        void flushPendingWrites().then(() => window.close()).catch(() => {
+          closingAfterFlush = false;
+          toast.error("저장 중 앱을 닫지 못했습니다. 다시 시도하세요.");
+        });
+      });
 
       window.api.projects.onFileChanged(({ slug, doc, content }) => {
         const { project, proposals } = get();
@@ -268,6 +343,7 @@ export const useStore = create<State>((set, get) => {
     async createProject(title, folder) {
       const project = await window.api.projects.create(title, folder);
       openData(project);
+      localStorage.setItem(LAST_PROJECT_KEY, project.slug);
       await get().refreshProjects();
     },
 
@@ -283,6 +359,7 @@ export const useStore = create<State>((set, get) => {
 
     async openProject(slug) {
       openData(await window.api.projects.open(slug));
+      localStorage.setItem(LAST_PROJECT_KEY, slug);
     },
 
     closeProject() {
@@ -326,11 +403,12 @@ export const useStore = create<State>((set, get) => {
       const rest = { ...proposals };
       delete rest[doc];
       set({ proposals: rest, project: { ...project, docs: { ...project.docs, [doc]: finalText } } });
-      clearTimeout(saveTimers.get(`${project.slug}:${doc}`));
+      cancelPendingWrite(project.slug, doc);
       const { platform, variant } = parseDoc(doc);
       if (platform && variant === "post") get().markFresh(platform);
+      const finalWrite = trackedWriteDoc(project.slug, doc, finalText);
       await window.api.projects.snapshot(project.slug, doc, prop.baseline, `before ${prop.source}`);
-      await window.api.projects.writeDoc(project.slug, doc, finalText);
+      await finalWrite;
     },
 
     rejectProposal(doc) {
@@ -340,8 +418,9 @@ export const useStore = create<State>((set, get) => {
       const rest = { ...proposals };
       delete rest[doc];
       set({ proposals: rest });
+      cancelPendingWrite(project.slug, doc);
       // Harness writes already hit disk; restore the reviewed baseline.
-      void window.api.projects.writeDoc(project.slug, doc, prop.baseline);
+      void trackedWriteDoc(project.slug, doc, prop.baseline);
     },
 
     markFresh(doc) {
