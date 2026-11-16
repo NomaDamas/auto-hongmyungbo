@@ -166,6 +166,7 @@ async function flushPendingWrites(): Promise<void> {
     saveTimers.delete(key);
   }
   const writes = [...new Map([...failedWrites, ...pendingWrites].map(([key, value]) => [key, value])).values()];
+  const queuedKeys = new Set(writes.map((pending) => `${pending.slug}:${pending.doc}`));
   pendingWrites.clear();
   failedWrites.clear();
   const active = [...inFlightWrites.entries()];
@@ -176,7 +177,7 @@ async function flushPendingWrites(): Promise<void> {
     for (const [index, result] of results.entries()) {
       if (result.status !== "rejected" || index < queued.length) continue;
       const pending = active[index - queued.length]?.[1];
-      if (pending) pendingWrites.set(`${pending.slug}:${pending.doc}`, pending);
+      if (pending && !queuedKeys.has(`${pending.slug}:${pending.doc}`)) pendingWrites.set(`${pending.slug}:${pending.doc}`, pending);
     }
     for (const [key, pending] of failedWrites) pendingWrites.set(key, pending);
     throw new Error("draft write failed");
