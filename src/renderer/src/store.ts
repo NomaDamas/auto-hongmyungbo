@@ -409,6 +409,7 @@ export const useStore = create<State>((set, get) => {
       const finalWrite = trackedWriteDoc(project.slug, doc, finalText);
       await window.api.projects.snapshot(project.slug, doc, prop.baseline, `before ${prop.source}`);
       await finalWrite;
+      await window.api.projects.commit(project.slug, `approve: ${doc} from ${prop.source}`);
     },
 
     rejectProposal(doc) {
