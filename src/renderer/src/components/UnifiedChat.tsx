@@ -38,8 +38,8 @@ export function UnifiedChat() {
       const webId = provider.id === "claude-web" ? "claude" : provider.id;
       if (!provider.url) return toast.error("Web Provider URL을 설정하세요.");
       const webTabs = settings.webTabs.some((tab) => tab.id === webId)
-        ? settings.webTabs.map((tab) => tab.id === webId ? { ...tab, label: provider.label, url: provider.url! } : tab)
-        : [...settings.webTabs, { id: webId, label: provider.label, url: provider.url }];
+        ? settings.webTabs.map((tab) => tab.id === webId ? { ...tab, label: provider.label, url: provider.url!, browserProfileId: provider.browserProfileId } : tab)
+        : [...settings.webTabs, { id: webId, label: provider.label, url: provider.url, browserProfileId: provider.browserProfileId }];
       await useStore.getState().updateSettings({ webTabs });
       useStore.setState({ dockTab: `web:${webId}` });
     }

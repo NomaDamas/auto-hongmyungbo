@@ -67,7 +67,7 @@ export function Dock() {
       <div className="relative min-h-0 flex-1">
         {settings.webTabs.map((tab) => (
           <div key={tab.id} className={clsx("absolute inset-0 flex flex-col", dockTab !== `web:${tab.id}` && "invisible")}>
-            <WebPane id={tab.id} url={tab.url} label={tab.label} />
+          <WebPane id={tab.id} url={tab.url} label={tab.label} browserProfileId={tab.browserProfileId} />
           </div>
         ))}
         {settings.harnesses.map((harness) => (
@@ -112,7 +112,7 @@ export function Dock() {
   );
 }
 
-function WebPane({ id, url, label }: { id: string; url: string; label: string }) {
+function WebPane({ id, url, label, browserProfileId }: { id: string; url: string; label: string; browserProfileId?: string }) {
   const ref = useRef<WebviewTag | null>(null);
   const [loading, setLoading] = useState(true);
   const [current, setCurrent] = useState(url);
@@ -188,7 +188,7 @@ function WebPane({ id, url, label }: { id: string; url: string; label: string })
         <button className="btn btn-xs btn-primary" onClick={() => void pull("reply")} title="마지막 AI 응답을 현재 문서에 diff로"><Download size={12} /> 응답 가져오기</button>
         <button className="icon-btn" onClick={() => window.api.openExternal(current)} title="브라우저에서 열기"><ExternalLink size={13} /></button>
       </div>
-      <webview ref={ref as never} src={url} partition="persist:ai-web" allowpopups={"true" as never} className="min-h-0 flex-1" />
+      <webview ref={ref as never} src={url} partition={`persist:ai-web-${browserProfileId || "default"}`} allowpopups={"true" as never} className="min-h-0 flex-1" />
     </>
   );
 }

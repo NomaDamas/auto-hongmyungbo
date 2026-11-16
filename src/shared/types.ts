@@ -147,6 +147,7 @@ export interface WebTabConfig {
   id: string;
   label: string;
   url: string;
+  browserProfileId?: string;
 }
 
 export interface HarnessConfig {
