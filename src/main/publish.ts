@@ -241,7 +241,9 @@ async function performNow(slug: string, platform: PlatformId): Promise<void> {
     const posts = thread.posts.map((post) => ({ ...post }));
     let previousUrl: string | undefined;
     for (let index = 0; index < posts.length; index += 1) {
-      if (posts[index].status === "posted") continue;
+      const prior = posts.slice(0, index).reverse().find((post) => post.status === "posted" && post.url);
+      if (prior?.url) previousUrl = prior.url;
+      if (posts[index].status === "posted") { previousUrl = posts[index].url ?? previousUrl; continue; }
       posts[index] = { ...posts[index], status: "sent", error: undefined };
       const before = await readProject(slug);
       before.meta.threads = { ...before.meta.threads, [platform]: { ...thread, posts } };
@@ -263,7 +265,11 @@ async function performNow(slug: string, platform: PlatformId): Promise<void> {
       next.meta.threads = { ...next.meta.threads, [platform]: { ...thread, posts } };
       await writeMeta(slug, next.meta);
     }
-    await updateState(slug, platform, { status: "posted", at: new Date().toISOString(), url: posts.at(-1)?.url });
+    const threadUrl = posts.at(-1)?.url;
+    await updateState(slug, platform, { status: "posted", at: new Date().toISOString(), url: threadUrl });
+    const comment = project.meta.comments?.[platform];
+    const commentText = project.docs[commentDoc(platform)]?.trim();
+    if (threadUrl && commentText && (comment?.mode ?? "first") === "first") await performComment(slug, platform, threadUrl);
     return;
   }
   if (thread?.posts.length) {
@@ -449,6 +455,11 @@ export async function schedulePublish(
   const project = await readProject(slug);
   const state: PublishState = { status: "scheduled", scheduledAt: at, scheduleMode: mode, at: new Date().toISOString() };
   await updateState(slug, platform, state);
+  if ((platform === "x" || platform === "threads") && project.meta.threads?.[platform]?.posts.length) {
+    const posts = project.meta.threads[platform]!.posts.map((post) => ({ ...post, status: "sent" as const, error: undefined }));
+    project.meta.threads = { ...project.meta.threads, [platform]: { ...project.meta.threads[platform]!, posts } };
+    await writeMeta(slug, project.meta);
+  }
   if (mode === "app") {
     queue = queue.filter((job) => job.slug !== slug || job.platform !== platform);
     queue.push({ slug, platform, at });
