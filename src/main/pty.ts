@@ -3,6 +3,7 @@ import * as nodePty from "node-pty";
 import { userInfo } from "node:os";
 
 const ptys = new Map<string, nodePty.IPty>();
+const pendingWrites = new Map<string, string[]>();
 
 /**
  * Harnesses (claude, codex, omp, aside...) run through the user's login shell so
@@ -20,6 +21,11 @@ export function spawnPty(wc: WebContents, id: string, command: string, cwd: stri
     env: { ...process.env, TERM: "xterm-256color", COLORTERM: "truecolor" } as Record<string, string>,
   });
   ptys.set(id, p);
+  const queued = pendingWrites.get(id);
+  if (queued?.length) {
+    for (const data of queued) p.write(data);
+    pendingWrites.delete(id);
+  }
   p.onData((data) => {
     if (!wc.isDestroyed()) wc.send("pty:data", { id, data });
   });
@@ -30,7 +36,9 @@ export function spawnPty(wc: WebContents, id: string, command: string, cwd: stri
 }
 
 export function writePty(id: string, data: string): void {
-  ptys.get(id)?.write(data);
+  const pty = ptys.get(id);
+  if (pty) pty.write(data);
+  else pendingWrites.set(id, [...(pendingWrites.get(id) ?? []), data]);
 }
 
 export function resizePty(id: string, cols: number, rows: number): void {
@@ -40,6 +48,7 @@ export function resizePty(id: string, cols: number, rows: number): void {
 export function killPty(id: string): void {
   ptys.get(id)?.kill();
   ptys.delete(id);
+  pendingWrites.delete(id);
 }
 
 export function killAllPtys(): void {

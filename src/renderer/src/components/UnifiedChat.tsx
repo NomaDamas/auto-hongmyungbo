@@ -3,7 +3,7 @@ import { Bot, Loader2, Send, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import type { DocId } from "@shared/types";
 import { useStore } from "@/store";
-import { runIntent } from "@/lib/dispatch";
+import { cancelPending, runIntent } from "@/lib/dispatch";
 import { shellQuote } from "@/lib/term-bridge";
 
 const SKILLS = [
@@ -59,11 +59,22 @@ export function UnifiedChat() {
         try {
           await Promise.race([
             runIntent(fullInstruction, preset as never, targets),
-            new Promise<never>((_, reject) => window.setTimeout(() => reject(new Error(`${provider.label} timed out`)), provider.timeoutMs)),
+            new Promise<never>((_, reject) => window.setTimeout(() => {
+              cancelPending();
+              reject(new Error(`${provider.label} timed out`));
+            }, provider.timeoutMs)),
           ]);
           lastError = undefined;
           break;
-        } catch (error) { lastError = error; }
+        } catch (error) {
+          lastError = error;
+          // A timeout cancels the in-flight web request. Retrying would risk
+          // submitting the same prompt twice after a late browser response.
+          if (String((error as Error)?.message ?? "").includes("timed out")) break;
+          // CLI writes are fire-and-forget; replaying them cannot be made
+          // idempotent, so provider retries apply only to web adapters.
+          if (executionKind === "cli") break;
+        }
       }
       if (lastError) throw lastError;
       setInstruction("");
