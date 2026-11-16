@@ -19,7 +19,7 @@ export function SettingsDialog() {
     await useStore.getState().updateSettings({
       webTabs: draft.webTabs.filter((t) => t.label && t.url),
       harnesses: draft.harnesses.filter((h) => h.label && h.command),
-      providers: draft.providers.filter((p) => p.label && p.enabled),
+      providers: draft.providers.filter((p) => p.label),
       platforms: draft.platforms,
       dockGroups: draft.dockGroups,
       theme: draft.theme,

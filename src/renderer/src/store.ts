@@ -128,6 +128,13 @@ const inFlightWrites = new Set<Promise<void>>();
 let initStarted = false;
 const LAST_PROJECT_KEY = "hmb_last_project";
 
+function trackedWriteDoc(slug: string, doc: DocId, text: string): Promise<void> {
+  const write = window.api.projects.writeDoc(slug, doc, text);
+  inFlightWrites.add(write);
+  void write.then(() => inFlightWrites.delete(write), () => inFlightWrites.delete(write));
+  return write;
+}
+
 function scheduleSave(slug: string, doc: DocId, text: string): void {
   const key = `${slug}:${doc}`;
   pendingWrites.set(key, { slug, doc, text });
@@ -139,13 +146,7 @@ function scheduleSave(slug: string, doc: DocId, text: string): void {
       const pending = pendingWrites.get(key);
       if (!pending) return;
       pendingWrites.delete(key);
-      const write = window.api.projects.writeDoc(pending.slug, pending.doc, pending.text);
-      inFlightWrites.add(write);
-      void write.then(() => {
-        inFlightWrites.delete(write);
-      }, () => {
-        inFlightWrites.delete(write);
-      });
+      trackedWriteDoc(pending.slug, pending.doc, pending.text);
     }, 300),
   );
 }
@@ -157,7 +158,7 @@ async function flushPendingWrites(): Promise<void> {
   }
   const writes = [...pendingWrites.values()];
   pendingWrites.clear();
-  const queued = writes.map(({ slug, doc, text }) => window.api.projects.writeDoc(slug, doc, text));
+  const queued = writes.map(({ slug, doc, text }) => trackedWriteDoc(slug, doc, text));
   await Promise.all([...queued, ...inFlightWrites]);
 }
 
@@ -231,7 +232,10 @@ export const useStore = create<State>((set, get) => {
       await Promise.all([get().refreshProjects(), get().refreshFolders()]);
       const lastProject = localStorage.getItem(LAST_PROJECT_KEY);
       if (lastProject && get().projects.some((item) => item.slug === lastProject)) {
-        await get().openProject(lastProject).catch(() => localStorage.removeItem(LAST_PROJECT_KEY));
+        await get().openProject(lastProject).catch(() => {
+          localStorage.removeItem(LAST_PROJECT_KEY);
+          toast.error("이전 프로젝트 파일을 읽지 못했습니다.", { description: "프로젝트 목록에서 복구할 항목을 선택하세요." });
+        });
       } else if (lastProject) {
         localStorage.removeItem(LAST_PROJECT_KEY);
         toast.message("이전에 열었던 프로젝트를 찾지 못했습니다.", { description: "프로젝트 목록에서 다시 선택하세요." });
@@ -381,7 +385,7 @@ export const useStore = create<State>((set, get) => {
       const { platform, variant } = parseDoc(doc);
       if (platform && variant === "post") get().markFresh(platform);
       await window.api.projects.snapshot(project.slug, doc, prop.baseline, `before ${prop.source}`);
-      await window.api.projects.writeDoc(project.slug, doc, finalText);
+      await trackedWriteDoc(project.slug, doc, finalText);
     },
 
     rejectProposal(doc) {
@@ -393,7 +397,7 @@ export const useStore = create<State>((set, get) => {
       set({ proposals: rest });
       cancelPendingWrite(project.slug, doc);
       // Harness writes already hit disk; restore the reviewed baseline.
-      void window.api.projects.writeDoc(project.slug, doc, prop.baseline);
+      void trackedWriteDoc(project.slug, doc, prop.baseline);
     },
 
     markFresh(doc) {
