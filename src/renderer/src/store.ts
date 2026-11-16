@@ -124,14 +124,23 @@ interface State {
 
 const saveTimers = new Map<string, number>();
 const pendingWrites = new Map<string, { slug: string; doc: DocId; text: string }>();
+const failedWrites = new Map<string, { slug: string; doc: DocId; text: string }>();
 const inFlightWrites = new Map<Promise<void>, { slug: string; doc: DocId; text: string }>();
 let initStarted = false;
 const LAST_PROJECT_KEY = "hmb_last_project";
 
 function trackedWriteDoc(slug: string, doc: DocId, text: string): Promise<void> {
   const write = window.api.projects.writeDoc(slug, doc, text);
-  inFlightWrites.set(write, { slug, doc, text });
-  void write.then(() => inFlightWrites.delete(write), () => inFlightWrites.delete(write));
+  const payload = { slug, doc, text };
+  const key = `${slug}:${doc}`;
+  inFlightWrites.set(write, payload);
+  void write.then(() => {
+    inFlightWrites.delete(write);
+    failedWrites.delete(key);
+  }, () => {
+    inFlightWrites.delete(write);
+    failedWrites.set(key, payload);
+  });
   return write;
 }
 
@@ -156,10 +165,11 @@ async function flushPendingWrites(): Promise<void> {
     clearTimeout(timer);
     saveTimers.delete(key);
   }
-  const writes = [...pendingWrites.values()];
+  const writes = [...new Map([...failedWrites, ...pendingWrites].map(([key, value]) => [key, value])).values()];
   pendingWrites.clear();
-  const queued = writes.map(({ slug, doc, text }) => trackedWriteDoc(slug, doc, text));
+  failedWrites.clear();
   const active = [...inFlightWrites.entries()];
+  const queued = writes.map(({ slug, doc, text }) => trackedWriteDoc(slug, doc, text));
   const results = await Promise.allSettled([...queued, ...active.map(([write]) => write)]);
   if (results.some((result) => result.status === "rejected")) {
     for (const pending of writes) pendingWrites.set(`${pending.slug}:${pending.doc}`, pending);
@@ -168,6 +178,7 @@ async function flushPendingWrites(): Promise<void> {
       const pending = active[index - queued.length]?.[1];
       if (pending) pendingWrites.set(`${pending.slug}:${pending.doc}`, pending);
     }
+    for (const [key, pending] of failedWrites) pendingWrites.set(key, pending);
     throw new Error("draft write failed");
   }
 }
