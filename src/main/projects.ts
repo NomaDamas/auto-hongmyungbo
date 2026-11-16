@@ -225,7 +225,7 @@ export async function readProject(slug: string): Promise<ProjectData> {
   const dir = await projectDir(slug);
   const settings = await getSettings();
   const meta = await readMeta(dir);
-  const docs: Partial<Record<DocId, string>> = { master: await readText(join(dir, docFile("master"))) };
+  const docs: Partial<Record<DocId, string>> = { master: await readFile(join(dir, docFile("master")), "utf8") };
   await Promise.all(
     enabledPlatforms(meta, settings.platforms).flatMap((platform) => [
       readText(join(dir, docFile(platform))).then((text) => void (docs[platform] = text)),

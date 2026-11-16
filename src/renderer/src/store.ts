@@ -124,7 +124,7 @@ interface State {
 
 const saveTimers = new Map<string, number>();
 const pendingWrites = new Map<string, { slug: string; doc: DocId; text: string }>();
-const inFlightWrites = new Map<string, Promise<void>>();
+const inFlightWrites = new Set<Promise<void>>();
 let initStarted = false;
 const LAST_PROJECT_KEY = "hmb_last_project";
 
@@ -140,11 +140,11 @@ function scheduleSave(slug: string, doc: DocId, text: string): void {
       if (!pending) return;
       pendingWrites.delete(key);
       const write = window.api.projects.writeDoc(pending.slug, pending.doc, pending.text);
-      inFlightWrites.set(key, write);
+      inFlightWrites.add(write);
       void write.then(() => {
-        if (inFlightWrites.get(key) === write) inFlightWrites.delete(key);
+        inFlightWrites.delete(write);
       }, () => {
-        if (inFlightWrites.get(key) === write) inFlightWrites.delete(key);
+        inFlightWrites.delete(write);
       });
     }, 300),
   );
@@ -158,7 +158,14 @@ async function flushPendingWrites(): Promise<void> {
   const writes = [...pendingWrites.values()];
   pendingWrites.clear();
   const queued = writes.map(({ slug, doc, text }) => window.api.projects.writeDoc(slug, doc, text));
-  await Promise.all([...queued, ...inFlightWrites.values()]);
+  await Promise.all([...queued, ...inFlightWrites]);
+}
+
+function cancelPendingWrite(slug: string, doc: DocId): void {
+  const key = `${slug}:${doc}`;
+  clearTimeout(saveTimers.get(key));
+  saveTimers.delete(key);
+  pendingWrites.delete(key);
 }
 
 export const useStore = create<State>((set, get) => {
@@ -236,7 +243,10 @@ export const useStore = create<State>((set, get) => {
         if (closingAfterFlush) return;
         event.preventDefault();
         closingAfterFlush = true;
-        void flushPendingWrites().finally(() => window.close());
+        void flushPendingWrites().then(() => window.close()).catch(() => {
+          closingAfterFlush = false;
+          toast.error("저장 중 앱을 닫지 못했습니다. 다시 시도하세요.");
+        });
       });
 
       window.api.projects.onFileChanged(({ slug, doc, content }) => {
@@ -367,7 +377,7 @@ export const useStore = create<State>((set, get) => {
       const rest = { ...proposals };
       delete rest[doc];
       set({ proposals: rest, project: { ...project, docs: { ...project.docs, [doc]: finalText } } });
-      clearTimeout(saveTimers.get(`${project.slug}:${doc}`));
+      cancelPendingWrite(project.slug, doc);
       const { platform, variant } = parseDoc(doc);
       if (platform && variant === "post") get().markFresh(platform);
       await window.api.projects.snapshot(project.slug, doc, prop.baseline, `before ${prop.source}`);
@@ -381,6 +391,7 @@ export const useStore = create<State>((set, get) => {
       const rest = { ...proposals };
       delete rest[doc];
       set({ proposals: rest });
+      cancelPendingWrite(project.slug, doc);
       // Harness writes already hit disk; restore the reviewed baseline.
       void window.api.projects.writeDoc(project.slug, doc, prop.baseline);
     },
