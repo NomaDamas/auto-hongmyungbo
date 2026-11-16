@@ -480,8 +480,8 @@ export async function schedulePublish(
       await writeMeta(slug, project.meta);
       let last: string | undefined;
       for (let index = 0; index < posts.length; index += 1) {
-        const media = await Promise.all((posts[index].media ?? []).map((item) => resolveMediaFile(project.slug, item.file)));
         try {
+          const media = await Promise.all((posts[index].media ?? []).map((item) => resolveMediaFile(project.slug, item.file)));
           const result = await scheduleThreadPost(project, platform, index, posts[index].text, media, at, last);
           last = lastUrl(result) ?? last;
           posts[index] = { ...posts[index], status: "scheduled", url: last };
@@ -491,8 +491,8 @@ export async function schedulePublish(
           await writeMeta(slug, project.meta);
           throw error;
         }
-        project.meta.threads = { ...project.meta.threads, [platform]: { ...thread, posts } };
-        await writeMeta(slug, project.meta);
+          project.meta.threads = { ...project.meta.threads, [platform]: { ...thread, posts } };
+          await writeMeta(slug, project.meta);
       }
       await updateState(slug, platform, { ...state, at: new Date().toISOString(), url: last });
       return;
