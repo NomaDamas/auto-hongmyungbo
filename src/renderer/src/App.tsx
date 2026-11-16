@@ -132,7 +132,7 @@ export function App() {
             )}
           </Panel>
           <Separator className={dockOpen ? "sep-ghost" : "hidden"} />
-          <Panel
+        <Panel
             id="dock"
             panelRef={dockRef}
             collapsible
@@ -144,11 +144,12 @@ export function App() {
               if (useStore.getState().dockOpen !== open) useStore.setState({ dockOpen: open });
             }}
           >
-            <div className="flex h-full min-h-0 flex-col gap-1 p-1 pl-0">
-              <div className="min-h-[260px] flex-[1.15] overflow-hidden rounded-[12px] border border-[var(--border)]">
+            <div className="relative flex h-full min-h-0 flex-col p-1 pl-0">
+              <div className="min-h-0 flex-1 overflow-hidden rounded-[12px] border border-[var(--border)]">
                 <UnifiedChat />
               </div>
-              <div className="min-h-[180px] flex-1 overflow-hidden rounded-[12px] border border-[var(--border)]">
+              {/* Web and CLI panes are execution surfaces, not user-facing workspace panes. */}
+              <div aria-hidden="true" className="pointer-events-none absolute -left-[10000px] top-0 h-px w-px overflow-hidden opacity-0">
                 <Dock />
               </div>
             </div>
