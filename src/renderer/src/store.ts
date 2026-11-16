@@ -159,7 +159,11 @@ async function flushPendingWrites(): Promise<void> {
   const writes = [...pendingWrites.values()];
   pendingWrites.clear();
   const queued = writes.map(({ slug, doc, text }) => trackedWriteDoc(slug, doc, text));
-  await Promise.all([...queued, ...inFlightWrites]);
+  const results = await Promise.allSettled([...queued, ...inFlightWrites]);
+  if (results.some((result) => result.status === "rejected")) {
+    for (const pending of writes) pendingWrites.set(`${pending.slug}:${pending.doc}`, pending);
+    throw new Error("draft write failed");
+  }
 }
 
 function cancelPendingWrite(slug: string, doc: DocId): void {

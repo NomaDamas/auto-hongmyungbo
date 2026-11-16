@@ -104,7 +104,11 @@ export function SettingsDialog() {
               {draft.providers.map((provider) => (
                 <div key={provider.id} className="grid grid-cols-[auto_1fr_1fr_auto] items-center gap-2 rounded-md border border-[var(--border)] p-2">
                   <input type="checkbox" checked={provider.enabled} aria-label={`${provider.label} 사용`} onChange={(e) => setDraft({ ...draft, providers: draft.providers.map((p) => p.id === provider.id ? { ...p, enabled: e.target.checked } : p) })} />
-                  <span className="truncate text-[12px]">{provider.label}</span>
+                  <input className="input" value={provider.label} onChange={(e) => setDraft({ ...draft, providers: draft.providers.map((p) => p.id === provider.id ? { ...p, label: e.target.value } : p) })} />
+                  <select className="input" value={provider.kind} onChange={(e) => setDraft({ ...draft, providers: draft.providers.map((p) => p.id === provider.id ? { ...p, kind: e.target.value as ProviderConfig["kind"] } : p) })}>
+                    <option value="cli">CLI</option><option value="web">Web</option><option value="browser">Browser</option><option value="custom">Custom</option>
+                  </select>
+                  <input className="input" placeholder="명령 또는 URL" value={provider.command ?? provider.url ?? ""} onChange={(e) => setDraft({ ...draft, providers: draft.providers.map((p) => p.id === provider.id ? (p.kind === "cli" ? { ...p, command: e.target.value, url: undefined } : { ...p, url: e.target.value, command: undefined }) : p) })} />
                   <input className="input" placeholder="모델 (선택)" value={provider.model ?? ""} onChange={(e) => setDraft({ ...draft, providers: draft.providers.map((p) => p.id === provider.id ? { ...p, model: e.target.value || undefined } : p) })} />
                   <select className="input" value={provider.effort ?? "medium"} onChange={(e) => setDraft({ ...draft, providers: draft.providers.map((p) => p.id === provider.id ? { ...p, effort: e.target.value as ProviderConfig["effort"] } : p) })}>
                     <option value="low">low</option>
