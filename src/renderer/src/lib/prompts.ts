@@ -4,7 +4,7 @@ import { PLATFORMS, commentDoc, docFile, docLabel, docLimit, isDocId, parseDoc }
 /** Where a prompt is going: a chat web UI (paste text, reply comes back) or a harness in the project folder (edits files). */
 export type Target = "web" | "harness";
 
-export type Preset = "humanize" | "shorter" | "hook" | "casual" | "professional" | "translate-en" | "translate-ko" | "fit";
+export type Preset = "humanize" | "shorter" | "hook" | "casual" | "professional" | "translate-en" | "translate-ko" | "fit" | "x-viral" | "linkedin" | "threads";
 
 export const PRESETS: Record<Preset, { label: string; instruction: string }> = {
   humanize: { label: "윤문", instruction: "" },
@@ -15,6 +15,9 @@ export const PRESETS: Record<Preset, { label: string; instruction: string }> = {
   "translate-en": { label: "영어로", instruction: "Translate into natural, native-sounding English." },
   "translate-ko": { label: "한국어로", instruction: "Translate into natural Korean (not translationese)." },
   fit: { label: "글자수 맞추기", instruction: "Fit within the platform's character limit. Cut, don't cram." },
+  "x-viral": { label: "X 확산형", instruction: "Optimize for X discovery and conversation: lead with a concrete hook, one clear idea, readable line breaks, and a specific reason to respond. Never use fabricated claims, spam, engagement bait, or guaranteed-virality language." },
+  linkedin: { label: "LinkedIn", instruction: "Adapt for LinkedIn: open with a concrete professional insight, use short readable paragraphs, preserve the author's evidence, and end with a useful takeaway or focused question without clickbait." },
+  threads: { label: "Threads", instruction: "Adapt for Threads: keep a conversational opening, short paragraphs, natural pacing, and one clear thought per post. Preserve the author's voice and avoid engagement bait." },
 };
 
 const HANGUL = /[\uac00-\ud7a3]/g;
@@ -65,6 +68,15 @@ function spec(doc: DocId): string {
   }
   return `${d.label} (max ${d.limit} chars${platform === "x" ? ", CJK counts as 2" : ""}): ${d.guide}`;
 }
+
+function platformHint(doc: DocId): string {
+  const platform = parseDoc(doc).platform;
+  if (platform === "x") return PRESETS["x-viral"].instruction;
+  if (platform === "linkedin") return PRESETS.linkedin.instruction;
+  if (platform === "threads") return PRESETS.threads.instruction;
+  return "";
+}
+
 
 function sourceBlock(source: SourceProject | undefined, target: Target): string[] {
   if (!source) return [];
@@ -285,7 +297,7 @@ export function intent(req: IntentRequest, target: Target): string {
   return [
     ...head,
     "Apply the instruction to every text below. Keep each one's platform style and limit:",
-    ...docs.map((d) => `- ${spec(d)}`),
+    ...docs.map((d) => `- ${spec(d)}${platformHint(d) ? `\n  Platform guidance: ${platformHint(d)}` : ""}`),
     "",
     ...sectionsOutput(docs),
     "",
