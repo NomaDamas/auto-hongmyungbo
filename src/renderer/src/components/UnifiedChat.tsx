@@ -30,7 +30,10 @@ export function UnifiedChat() {
     if (!provider) return toast.error("Provider를 먼저 설정하세요.");
     if (!project.docs[activeDoc]?.trim() && !preset) return toast.error("현재 문서에 내용을 먼저 입력하세요.");
     const previousDock = useStore.getState().dockTab;
-    if (provider.kind === "web") useStore.setState({ dockTab: `web:${provider.id}` });
+    if (provider.kind === "web") {
+      const webId = provider.id === "claude-web" ? "claude" : provider.id;
+      useStore.setState({ dockTab: `web:${webId}` });
+    }
     if (provider.kind === "cli") useStore.setState({ dockTab: `harness:${provider.id}` });
     setBusy(true);
     try {

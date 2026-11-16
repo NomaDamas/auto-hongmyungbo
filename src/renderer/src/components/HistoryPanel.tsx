@@ -9,10 +9,12 @@ export function HistoryPanel() {
   const doc = useStore((s) => s.historyDoc);
   const project = useStore((s) => s.project);
   const [items, setItems] = useState<Snapshot[]>([]);
+  const [gitItems, setGitItems] = useState<{ hash: string; message: string; at: string }[]>([]);
 
   useEffect(() => {
     if (!doc || !project) return;
     void window.api.projects.listSnapshots(project.slug, doc).then(setItems);
+    void window.api.projects.gitLog(project.slug).then(setGitItems);
   }, [doc, project?.slug]);
 
   if (!doc || !project) return null;
@@ -39,6 +41,12 @@ export function HistoryPanel() {
             <button key={s.id} className="w-full rounded-md px-3 py-2 text-left hover:bg-[var(--surface-2)]" onClick={() => void restore(s)}>
               <div className="text-[13px]">{new Date(s.at).toLocaleString()}</div>
               <div className="text-[11px] text-[var(--muted)]">{s.label}</div>
+            </button>
+          ))}
+          {gitItems.map((item) => (
+            <button key={item.hash} className="mt-1 w-full rounded-md border border-[var(--border)] px-3 py-2 text-left hover:bg-[var(--surface-2)]" onClick={() => void window.api.projects.rollback(project.slug, item.hash).then(() => useStore.getState().openProject(project.slug))}>
+              <div className="text-[12px]">{item.message}</div>
+              <div className="text-[10px] text-[var(--muted)]">{new Date(item.at).toLocaleString()} · {item.hash.slice(0, 7)} · 복원</div>
             </button>
           ))}
         </div>
