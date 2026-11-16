@@ -406,8 +406,9 @@ export const useStore = create<State>((set, get) => {
       cancelPendingWrite(project.slug, doc);
       const { platform, variant } = parseDoc(doc);
       if (platform && variant === "post") get().markFresh(platform);
+      const finalWrite = trackedWriteDoc(project.slug, doc, finalText);
       await window.api.projects.snapshot(project.slug, doc, prop.baseline, `before ${prop.source}`);
-      await trackedWriteDoc(project.slug, doc, finalText);
+      await finalWrite;
     },
 
     rejectProposal(doc) {
