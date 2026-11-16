@@ -14,6 +14,7 @@ import { MediaStrip } from "./MediaStrip";
 import { PublishButton } from "./PublishButton";
 import { CommentButton } from "./CommentButton";
 import { SourcePicker } from "./SourcePicker";
+import { ThreadEditor } from "./ThreadEditor";
 
 const MASTER_PLACEHOLDER = "생각나는 대로 쓰세요. 이 원문이 모든 플랫폼으로 전파됩니다.";
 
@@ -56,6 +57,8 @@ export function DocPane({ tab, api }: { tab: TabId; api: DockviewPanelApi }) {
   return (
     <section
       className="flex h-full min-w-0 flex-col bg-[var(--surface)]"
+      draggable
+      onDragStart={(event) => event.dataTransfer.setData("application/x-hmb-doc", doc)}
       onPointerDownCapture={() => {
         if (!api.isActive) api.setActive();
         if (useStore.getState().activeDoc !== doc) useStore.setState({ activeDoc: doc });
@@ -124,7 +127,7 @@ export function DocPane({ tab, api }: { tab: TabId; api: DockviewPanelApi }) {
       )}
 
       <div className="min-h-0 flex-1">
-        <DocEditor doc={doc} value={project.docs[doc] ?? ""} proposal={proposal} placeholder={placeholderFor(doc)} />
+        {variant === "post" && (selected === "x" || selected === "threads") && !proposal ? <ThreadEditor platform={selected} value={project.docs[doc] ?? ""} /> : <DocEditor doc={doc} value={project.docs[doc] ?? ""} proposal={proposal} placeholder={placeholderFor(doc)} />}
       </div>
       {variant === "post" && <MediaStrip doc={doc} />}
       <footer className="flex h-7 shrink-0 items-center gap-3 border-t border-[var(--border)] px-3 text-[10.5px] text-[var(--muted)]">

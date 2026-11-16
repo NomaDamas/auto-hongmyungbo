@@ -248,6 +248,9 @@ export interface Api {
     move(slug: string, folder: string): Promise<string>;
     open(slug: string): Promise<ProjectData>;
     writeDoc(slug: string, doc: DocId, content: string): Promise<void>;
+    commit(slug: string, message: string): Promise<void>;
+    gitLog(slug: string): Promise<{ hash: string; message: string; at: string }[]>;
+    rollback(slug: string, hash: string): Promise<void>;
     writeMeta(slug: string, meta: ProjectMeta): Promise<void>;
     snapshot(slug: string, doc: DocId, content: string, label: string): Promise<Snapshot>;
     listSnapshots(slug: string, doc: DocId): Promise<Snapshot[]>;
