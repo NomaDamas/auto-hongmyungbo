@@ -62,7 +62,7 @@ export interface ThreadPost {
   id: string;
   text: string;
   media: MediaItem[];
-  status?: "draft" | "approved" | "sent" | "posted" | "failed";
+  status?: "draft" | "approved" | "scheduled" | "sent" | "posted" | "failed";
   url?: string;
   error?: string;
 }
