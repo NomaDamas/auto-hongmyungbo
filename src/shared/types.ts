@@ -55,6 +55,21 @@ export interface ProjectMeta {
   comments?: Partial<Record<PlatformId, CommentState>>;
   /** Latest engagement snapshot per platform, read by Aside from the live post page. */
   insights?: Partial<Record<PlatformId, PostInsights>>;
+  threads?: Partial<Record<PlatformId, ThreadDraft>>;
+}
+
+export interface ThreadPost {
+  id: string;
+  text: string;
+  media: MediaItem[];
+  status?: "draft" | "approved" | "sent" | "posted" | "failed";
+  url?: string;
+  error?: string;
+}
+
+export interface ThreadDraft {
+  platform: "x" | "threads";
+  posts: ThreadPost[];
 }
 
 /** Numbers Aside could read from a published post; absent = not shown by the platform. */
@@ -249,7 +264,7 @@ export interface Api {
     open(slug: string): Promise<ProjectData>;
     writeDoc(slug: string, doc: DocId, content: string): Promise<void>;
     commit(slug: string, message: string, doc?: DocId): Promise<void>;
-    gitLog(slug: string): Promise<{ hash: string; message: string; at: string }[]>;
+    gitLog(slug: string, doc?: DocId): Promise<{ hash: string; message: string; at: string }[]>;
     rollback(slug: string, hash: string, doc: DocId): Promise<string>;
     writeMeta(slug: string, meta: ProjectMeta): Promise<void>;
     snapshot(slug: string, doc: DocId, content: string, label: string): Promise<Snapshot>;

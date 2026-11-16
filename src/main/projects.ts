@@ -293,10 +293,10 @@ export async function commitProject(slug: string, message: string, doc?: DocId):
   await git(dir, ["-c", "user.name=Auto-HongMyungbo", "-c", "user.email=local@auto-hongmyungbo", "commit", "-m", message.slice(0, 120)]);
 }
 
-export async function gitLog(slug: string): Promise<{ hash: string; message: string; at: string }[]> {
+export async function gitLog(slug: string, doc?: DocId): Promise<{ hash: string; message: string; at: string }[]> {
   const dir = await projectDir(slug);
   try {
-    const output = await git(dir, ["log", "-20", "--format=%H%x09%aI%x09%s"]);
+    const output = await git(dir, ["log", "-20", "--format=%H%x09%aI%x09%s", ...(doc ? ["--", docFile(doc)] : [])]);
     return output.trim().split("\n").filter(Boolean).map((line) => {
       const [hash, at, ...message] = line.split("\t");
       return { hash, at, message: message.join("\t") };

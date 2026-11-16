@@ -14,7 +14,7 @@ export function HistoryPanel() {
   useEffect(() => {
     if (!doc || !project) return;
     void window.api.projects.listSnapshots(project.slug, doc).then(setItems);
-    void window.api.projects.gitLog(project.slug).then(setGitItems);
+    void window.api.projects.gitLog(project.slug, doc).then(setGitItems);
   }, [doc, project?.slug]);
 
   if (!doc || !project) return null;
