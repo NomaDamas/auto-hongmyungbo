@@ -257,12 +257,18 @@ export async function moveProject(slug: string, folder: string): Promise<string>
 
 /** Content we just wrote, so the watcher can ignore our own echoes. */
 const ownWrites = new Map<string, string>();
+const docWrites = new Map<string, Promise<void>>();
 
 export async function writeDoc(slug: string, doc: DocId, content: string): Promise<void> {
   validateDoc(doc);
   const path = join(await projectDir(slug), docFile(doc));
-  ownWrites.set(path, content);
-  await writeFile(path, content);
+  const previous = docWrites.get(path) ?? Promise.resolve();
+  const next = previous.then(async () => {
+    ownWrites.set(path, content);
+    await writeFile(path, content);
+  });
+  docWrites.set(path, next.catch(() => undefined));
+  await next;
 }
 
 export async function writeMeta(slug: string, meta: ProjectMeta): Promise<void> {

@@ -1,5 +1,7 @@
 # Unified Writing Workspace
 
+> Status: approved product roadmap. Items described as future behavior are not claimed as shipped until their implementation issue is merged.
+
 ## Approved product direction
 
 The product is a writing workspace that connects user-selected providers to a single integrated chat UI and platform-specific editable panes. It does not automatically mix several LLMs in a hidden pipeline. The user chooses which provider should perform each draft, rewrite, thread split, or polishing task.

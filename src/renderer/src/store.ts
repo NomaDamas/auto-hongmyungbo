@@ -123,32 +123,34 @@ interface State {
 }
 
 const saveTimers = new Map<string, number>();
+const pendingWrites = new Map<string, { slug: string; doc: DocId; text: string }>();
 let initStarted = false;
 const LAST_PROJECT_KEY = "hmb_last_project";
 
 function scheduleSave(slug: string, doc: DocId, text: string): void {
   const key = `${slug}:${doc}`;
+  pendingWrites.set(key, { slug, doc, text });
   clearTimeout(saveTimers.get(key));
   saveTimers.set(
     key,
     window.setTimeout(() => {
       saveTimers.delete(key);
-      void window.api.projects.writeDoc(slug, doc, text);
+      const pending = pendingWrites.get(key);
+      if (!pending) return;
+      pendingWrites.delete(key);
+      void window.api.projects.writeDoc(pending.slug, pending.doc, pending.text);
     }, 300),
   );
 }
 
-function flushPendingWrites(): void {
-  const { project } = useStore.getState();
-  if (!project) return;
+async function flushPendingWrites(): Promise<void> {
   for (const [key, timer] of saveTimers) {
-    if (!key.startsWith(`${project.slug}:`)) continue;
     clearTimeout(timer);
     saveTimers.delete(key);
   }
-  for (const [doc, text] of Object.entries(project.docs) as [DocId, string][]) {
-    void window.api.projects.writeDoc(project.slug, doc, text);
-  }
+  const writes = [...pendingWrites.values()];
+  pendingWrites.clear();
+  await Promise.all(writes.map(({ slug, doc, text }) => window.api.projects.writeDoc(slug, doc, text)));
 }
 
 export const useStore = create<State>((set, get) => {
@@ -214,11 +216,20 @@ export const useStore = create<State>((set, get) => {
       await Promise.all([get().refreshProjects(), get().refreshFolders()]);
       const lastProject = localStorage.getItem(LAST_PROJECT_KEY);
       if (lastProject && get().projects.some((item) => item.slug === lastProject)) {
-        await get().openProject(lastProject);
+        await get().openProject(lastProject).catch(() => localStorage.removeItem(LAST_PROJECT_KEY));
+      } else if (lastProject) {
+        localStorage.removeItem(LAST_PROJECT_KEY);
+        toast.message("이전에 열었던 프로젝트를 찾지 못했습니다.", { description: "프로젝트 목록에서 다시 선택하세요." });
       }
       void get().refreshAside();
 
-      window.addEventListener("beforeunload", flushPendingWrites);
+      let closingAfterFlush = false;
+      window.addEventListener("beforeunload", (event) => {
+        if (closingAfterFlush) return;
+        event.preventDefault();
+        closingAfterFlush = true;
+        void flushPendingWrites().finally(() => window.close());
+      });
 
       window.api.projects.onFileChanged(({ slug, doc, content }) => {
         const { project, proposals } = get();
@@ -288,6 +299,7 @@ export const useStore = create<State>((set, get) => {
     async createProject(title, folder) {
       const project = await window.api.projects.create(title, folder);
       openData(project);
+      localStorage.setItem(LAST_PROJECT_KEY, project.slug);
       await get().refreshProjects();
     },
 
