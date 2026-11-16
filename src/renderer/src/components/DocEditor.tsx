@@ -8,13 +8,13 @@ import type { DocId } from "@shared/types";
 import { useStore, type Proposal } from "@/store";
 
 const baseTheme = EditorView.theme({
-  "&": { height: "100%", fontSize: "14px", backgroundColor: "transparent" },
-  ".cm-scroller": { fontFamily: "var(--font-prose)", lineHeight: "1.7" },
-  ".cm-content": { padding: "4px 12px 120px", caretColor: "var(--fg)" },
+  "&": { height: "100%", fontSize: "var(--type-body-size)", letterSpacing: "var(--type-body-tracking)", backgroundColor: "transparent" },
+  ".cm-scroller": { fontFamily: "var(--font-prose)", lineHeight: "var(--type-body-leading)" },
+  ".cm-content": { padding: "12px 18px 120px", caretColor: "var(--fg)" },
   ".cm-gutters": { display: "none" },
   ".cm-activeLine": { backgroundColor: "transparent" },
   "&.cm-focused": { outline: "none" },
-  ".cm-placeholder": { color: "var(--muted)" },
+  ".cm-placeholder": { color: "var(--muted)", letterSpacing: "var(--type-body-tracking)" },
 });
 
 interface Props {

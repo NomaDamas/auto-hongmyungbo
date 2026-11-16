@@ -70,18 +70,21 @@ function createWindow(): void {
     return { action: "deny" };
   });
 
-  // Embedded AI tabs: keep OAuth popups (Google/Apple sign-in) in-app on the same
-  // partition so the session lands in the webview; plain links go to the browser.
+  // Google explicitly rejects embedded WebView OAuth. Send Google auth to the system browser;
+  // never attempt to spoof it or copy credentials/cookies back into the app.
   win.webContents.on("did-attach-webview", (_e, wc) => {
     wc.setWindowOpenHandler(({ url, disposition }) => {
-      if (disposition === "foreground-tab" || disposition === "background-tab") {
+      if (/accounts\.google\.com|oauth2?\.googleapis\.com|google\.com\/signin/i.test(url) || disposition === "foreground-tab" || disposition === "background-tab") {
         void shell.openExternal(url);
         return { action: "deny" };
       }
-      return {
-        action: "allow",
-        overrideBrowserWindowOptions: { width: 520, height: 720, webPreferences: { partition: WEB_PARTITION } },
-      };
+      return { action: "allow", overrideBrowserWindowOptions: { width: 520, height: 720, webPreferences: { partition: WEB_PARTITION } } };
+    });
+    wc.on("will-navigate", (event, url) => {
+      if (/accounts\.google\.com|oauth2?\.googleapis\.com|google\.com\/signin/i.test(url)) {
+        event.preventDefault();
+        void shell.openExternal(url);
+      }
     });
   });
 
