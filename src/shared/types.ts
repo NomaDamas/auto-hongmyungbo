@@ -250,7 +250,7 @@ export interface Api {
     writeDoc(slug: string, doc: DocId, content: string): Promise<void>;
     commit(slug: string, message: string, doc?: DocId): Promise<void>;
     gitLog(slug: string): Promise<{ hash: string; message: string; at: string }[]>;
-    rollback(slug: string, hash: string, doc: DocId): Promise<void>;
+    rollback(slug: string, hash: string, doc: DocId): Promise<string>;
     writeMeta(slug: string, meta: ProjectMeta): Promise<void>;
     snapshot(slug: string, doc: DocId, content: string, label: string): Promise<Snapshot>;
     listSnapshots(slug: string, doc: DocId): Promise<Snapshot[]>;

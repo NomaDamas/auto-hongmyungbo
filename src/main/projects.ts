@@ -304,13 +304,13 @@ export async function gitLog(slug: string): Promise<{ hash: string; message: str
   } catch { return []; }
 }
 
-export async function rollbackProject(slug: string, hash: string, doc: DocId): Promise<void> {
+export async function rollbackProject(slug: string, hash: string, doc: DocId): Promise<string> {
   if (!/^[0-9a-f]{7,64}$/i.test(hash)) throw new Error("invalid git revision");
   validateDoc(doc);
   const dir = await projectDir(slug);
   const relativePath = docFile(doc);
   const { stdout } = await execFileAsync("git", ["show", `${hash}:${relativePath}`], { cwd: dir, maxBuffer: 2 * 1024 * 1024 });
-  await writeDoc(slug, doc, stdout);
+  return stdout;
 }
 
 export async function writeMeta(slug: string, meta: ProjectMeta): Promise<void> {

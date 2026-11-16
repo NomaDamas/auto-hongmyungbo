@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Bot, Loader2, Send, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import type { DocId } from "@shared/types";
@@ -21,6 +21,7 @@ export function UnifiedChat() {
   const [instruction, setInstruction] = useState("");
   const [busy, setBusy] = useState(false);
   const [targets, setTargets] = useState<DocId[]>([activeDoc]);
+  useEffect(() => setTargets((current) => current.length === 1 ? [activeDoc] : current), [activeDoc]);
   const providers = useMemo(() => (settings?.providers ?? []).filter((provider) => provider.enabled), [settings?.providers]);
   const provider = providers.find((item) => item.id === providerId) ?? providers[0];
 
@@ -33,9 +34,13 @@ export function UnifiedChat() {
     const previousDock = useStore.getState().dockTab;
     if (provider.kind === "web") {
       const webId = provider.id === "claude-web" ? "claude" : provider.id;
+      if (!settings.webTabs.some((tab) => tab.id === webId)) return toast.error("이 Web Provider를 AI 탭에 먼저 등록하세요.");
       useStore.setState({ dockTab: `web:${webId}` });
     }
-    if (provider.kind === "cli") useStore.setState({ dockTab: `harness:${provider.id}` });
+    if (provider.kind === "cli") {
+      if (!settings.harnesses.some((harness) => harness.id === provider.id)) return toast.error("이 CLI Provider를 하네스 설정에 먼저 등록하세요.");
+      useStore.setState({ dockTab: `harness:${provider.id}` });
+    }
     const settingsHint = [provider.model && `model=${provider.model}`, provider.effort && `effort=${provider.effort}`].filter(Boolean).join(", ");
     const requestInstruction = settingsHint ? `${instruction}\n\nProvider settings: ${settingsHint}` : instruction;
     setBusy(true);

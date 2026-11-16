@@ -44,7 +44,7 @@ export function HistoryPanel() {
             </button>
           ))}
           {gitItems.map((item) => (
-            <button key={item.hash} className="mt-1 w-full rounded-md border border-[var(--border)] px-3 py-2 text-left hover:bg-[var(--surface-2)]" onClick={() => void window.api.projects.rollback(project.slug, item.hash, doc).then(() => useStore.getState().openProject(project.slug))}>
+            <button key={item.hash} className="mt-1 w-full rounded-md border border-[var(--border)] px-3 py-2 text-left hover:bg-[var(--surface-2)]" onClick={() => void window.api.projects.rollback(project.slug, item.hash, doc).then((text) => { close(); useStore.getState().propose(doc, text, `Git ${item.hash.slice(0, 7)} 복원`); }).catch(() => undefined)}>
               <div className="text-[12px]">{item.message}</div>
               <div className="text-[10px] text-[var(--muted)]">{new Date(item.at).toLocaleString()} · {item.hash.slice(0, 7)} · 복원</div>
             </button>
