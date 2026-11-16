@@ -54,6 +54,7 @@ const api: Api = {
     checkLogins: (platforms, profileId) => ipcRenderer.invoke("aside:checkLogins", platforms, profileId),
     openLogin: (platform, profileId) => ipcRenderer.invoke("aside:openLogin", platform, profileId),
     openImporter: (profileId) => ipcRenderer.invoke("aside:openImporter", profileId),
+    runWebPrompt: (url, prompt, profileId) => ipcRenderer.invoke("aside:runWebPrompt", url, prompt, profileId),
   },
   setup: {
     status: () => ipcRenderer.invoke("setup:status"),

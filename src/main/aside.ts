@@ -135,3 +135,39 @@ export async function asideOpenImporter(profileId?: string): Promise<void> {
   await repl(`await openTab("chrome://aside-import-data/"); console.log("RESULT" + "true");`, profileId, 30000);
   await run("/usr/bin/open", ["-b", ASIDE_BUNDLE_ID], { timeoutMs: 5000 }).catch(() => undefined);
 }
+
+/** Run a writing prompt in an existing Aside-managed AI session and return DOM text. */
+export async function asideRunWebPrompt(url: string, prompt: string, profileId?: string): Promise<string> {
+  if (!/^https:\/\/(chatgpt\.com|chat\.openai\.com|claude\.ai|gemini\.google\.com)\//i.test(url)) {
+    throw new Error("지원하지 않는 AI Web provider URL입니다.");
+  }
+  const script = `
+    const page = await openTab(${JSON.stringify(url)});
+    const composer = page.locator('textarea, [contenteditable="true"], rich-textarea .ql-editor').last();
+    await composer.waitFor({ state: "visible", timeout: 30000 });
+    await composer.fill(${JSON.stringify(prompt)});
+    await composer.press("Enter");
+    await sleep(1200);
+    const selectors = [
+      '[data-message-author-role="assistant"]',
+      '[data-assistant-markdown-root]',
+      '.font-claude-response',
+      '[data-testid="assistant-message"]',
+      'model-response message-content',
+      'model-response'
+    ];
+    let previous = "";
+    for (let i = 0; i < 450; i++) {
+      await sleep(800);
+      let text = "";
+      for (const selector of selectors) {
+        const nodes = await page.locator(selector).allTextContents().catch(() => []);
+        if (nodes.length) { text = nodes[nodes.length - 1].trim(); break; }
+      }
+      if (text && text === previous) { console.log("RESULT" + JSON.stringify(text)); return; }
+      previous = text;
+    }
+    throw new Error("AI Web 응답 대기 시간이 초과되었습니다.");
+  `;
+  return repl<string>(script, profileId, 7 * 60_000);
+}

@@ -27,7 +27,7 @@ import {
   writeMeta,
 } from "./projects";
 import { killAllPtys, killPty, resizePty, spawnPty, writePty } from "./pty";
-import { asideCheckLogins, asideOpenImporter, asideOpenLogin, asideStatus } from "./aside";
+import { asideCheckLogins, asideOpenImporter, asideOpenLogin, asideRunWebPrompt, asideStatus } from "./aside";
 import { installAsideApp, setupStatus } from "./setup";
 import { cancelPublish, initPublishing, publishComment, publishNow, refreshInsights, schedulePublish, shutdownPublishing } from "./publish";
 
@@ -156,6 +156,7 @@ function registerIpc(): void {
   ipcMain.handle("aside:checkLogins", (_e, platforms: PlatformId[], profileId?: string) => asideCheckLogins(platforms, profileId));
   ipcMain.handle("aside:openLogin", (_e, platform: PlatformId, profileId?: string) => asideOpenLogin(platform, profileId));
   ipcMain.handle("aside:openImporter", (_e, profileId?: string) => asideOpenImporter(profileId));
+  ipcMain.handle("aside:runWebPrompt", (_e, url: string, prompt: string, profileId?: string) => asideRunWebPrompt(url, prompt, profileId));
 
   ipcMain.handle("setup:status", () => setupStatus());
   ipcMain.handle("setup:installAsideApp", () => installAsideApp());
