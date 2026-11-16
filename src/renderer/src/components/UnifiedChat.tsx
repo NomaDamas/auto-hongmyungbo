@@ -56,13 +56,14 @@ export function UnifiedChat() {
       const fullInstruction = provider.skills.length ? `${requestInstruction}\n\nSkills: ${provider.skills.join(", ")}` : requestInstruction;
       let lastError: unknown;
       for (let attempt = 0; attempt <= provider.retries; attempt += 1) {
+        let timeoutHandle: number | undefined;
         try {
           await Promise.race([
             runIntent(fullInstruction, preset as never, targets),
-            new Promise<never>((_, reject) => window.setTimeout(() => {
-              cancelPending();
+            new Promise<never>((_, reject) => { timeoutHandle = window.setTimeout(() => {
+              if (executionKind === "web") cancelPending();
               reject(new Error(`${provider.label} timed out`));
-            }, provider.timeoutMs)),
+            }, provider.timeoutMs); }),
           ]);
           lastError = undefined;
           break;
@@ -74,6 +75,8 @@ export function UnifiedChat() {
           // CLI writes are fire-and-forget; replaying them cannot be made
           // idempotent, so provider retries apply only to web adapters.
           if (executionKind === "cli") break;
+        } finally {
+          if (timeoutHandle !== undefined) window.clearTimeout(timeoutHandle);
         }
       }
       if (lastError) throw lastError;
