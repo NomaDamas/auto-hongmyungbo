@@ -124,6 +124,7 @@ interface State {
 
 const saveTimers = new Map<string, number>();
 let initStarted = false;
+const LAST_PROJECT_KEY = "hmb_last_project";
 
 function scheduleSave(slug: string, doc: DocId, text: string): void {
   const key = `${slug}:${doc}`;
@@ -135,6 +136,19 @@ function scheduleSave(slug: string, doc: DocId, text: string): void {
       void window.api.projects.writeDoc(slug, doc, text);
     }, 300),
   );
+}
+
+function flushPendingWrites(): void {
+  const { project } = useStore.getState();
+  if (!project) return;
+  for (const [key, timer] of saveTimers) {
+    if (!key.startsWith(`${project.slug}:`)) continue;
+    clearTimeout(timer);
+    saveTimers.delete(key);
+  }
+  for (const [doc, text] of Object.entries(project.docs) as [DocId, string][]) {
+    void window.api.projects.writeDoc(project.slug, doc, text);
+  }
 }
 
 export const useStore = create<State>((set, get) => {
@@ -198,7 +212,13 @@ export const useStore = create<State>((set, get) => {
       set({ settings, setupOpen: !settings.onboarded, dockTab: settings.webTabs[0] ? `web:${settings.webTabs[0].id}` : "" });
       document.documentElement.classList.toggle("dark", settings.theme === "dark");
       await Promise.all([get().refreshProjects(), get().refreshFolders()]);
+      const lastProject = localStorage.getItem(LAST_PROJECT_KEY);
+      if (lastProject && get().projects.some((item) => item.slug === lastProject)) {
+        await get().openProject(lastProject);
+      }
       void get().refreshAside();
+
+      window.addEventListener("beforeunload", flushPendingWrites);
 
       window.api.projects.onFileChanged(({ slug, doc, content }) => {
         const { project, proposals } = get();
@@ -283,6 +303,7 @@ export const useStore = create<State>((set, get) => {
 
     async openProject(slug) {
       openData(await window.api.projects.open(slug));
+      localStorage.setItem(LAST_PROJECT_KEY, slug);
     },
 
     closeProject() {
