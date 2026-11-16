@@ -69,15 +69,14 @@ function spec(doc: DocId): string {
   return `${d.label} (max ${d.limit} chars${platform === "x" ? ", CJK counts as 2" : ""}): ${d.guide}`;
 }
 
-function platformSkill(docs: DocId[], preset?: Preset): string[] {
-  if (preset === "x-viral" || preset === "linkedin" || preset === "threads") return [];
-  const platforms = new Set(docs.map((doc) => parseDoc(doc).platform).filter(Boolean));
-  const hints: string[] = [];
-  if (platforms.has("x")) hints.push(PRESETS["x-viral"].instruction);
-  if (platforms.has("linkedin")) hints.push(PRESETS.linkedin.instruction);
-  if (platforms.has("threads")) hints.push(PRESETS.threads.instruction);
-  return hints;
+function platformHint(doc: DocId): string {
+  const platform = parseDoc(doc).platform;
+  if (platform === "x") return PRESETS["x-viral"].instruction;
+  if (platform === "linkedin") return PRESETS.linkedin.instruction;
+  if (platform === "threads") return PRESETS.threads.instruction;
+  return "";
 }
+
 
 function sourceBlock(source: SourceProject | undefined, target: Target): string[] {
   if (!source) return [];
@@ -252,7 +251,6 @@ export function intent(req: IntentRequest, target: Target): string {
   const korean = isKorean(sample);
   const humanize = preset === "humanize";
   const instruction = [preset && !humanize ? PRESETS[preset].instruction : "", req.instruction.trim()].filter(Boolean).join(" ");
-  const platformHints = platformSkill(docs, preset);
 
   if (target === "harness") {
     const files = docs.map(docFile).join(", ");
@@ -263,7 +261,6 @@ export function intent(req: IntentRequest, target: Target): string {
       ...sourceBlock(req.source, target),
       `${empty ? "Write" : "Rewrite"} ${what}`,
       ...[skill, instruction].filter(Boolean),
-      ...platformHints,
       ...(brief.trim() ? [`Standing brief: ${brief.trim()}`] : []),
       docs.length > 1 ? "Apply it to each file, keeping each platform's rules from AGENTS.md." : "",
       "Edit in place and change nothing else.",
@@ -277,7 +274,6 @@ export function intent(req: IntentRequest, target: Target): string {
     ...briefBlock(brief),
     ...(humanize ? [humanizeRules(korean)] : []),
     ...(instruction ? [`Instruction: ${instruction}`] : []),
-    ...platformHints,
   ];
 
   if (docs.length === 1) {
@@ -301,7 +297,7 @@ export function intent(req: IntentRequest, target: Target): string {
   return [
     ...head,
     "Apply the instruction to every text below. Keep each one's platform style and limit:",
-    ...docs.map((d) => `- ${spec(d)}`),
+    ...docs.map((d) => `- ${spec(d)}${platformHint(d) ? `\n  Platform guidance: ${platformHint(d)}` : ""}`),
     "",
     ...sectionsOutput(docs),
     "",

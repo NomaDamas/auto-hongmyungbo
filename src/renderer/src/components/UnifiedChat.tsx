@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Bot, Loader2, Send, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import type { DocId } from "@shared/types";
+import type { Preset } from "@/lib/prompts";
 import { useStore } from "@/store";
 import { cancelPending, runIntent } from "@/lib/dispatch";
 import { shellQuote } from "@/lib/term-bridge";
@@ -31,7 +32,7 @@ export function UnifiedChat() {
 
   if (!project || !settings) return null;
 
-  const send = async (preset?: string) => {
+  const send = async (preset?: Preset) => {
     if (!provider) return toast.error("Provider를 먼저 설정하세요.");
     const executionKind = provider.kind === "custom" ? (provider.command ? "cli" : provider.url ? "web" : "unsupported") : provider.kind === "browser" ? (provider.url ? "web" : "unsupported") : provider.kind;
     if (executionKind !== "web" && executionKind !== "cli") return toast.error("Provider에 실행 명령 또는 URL을 설정하세요.");
@@ -62,7 +63,7 @@ export function UnifiedChat() {
         let timeoutHandle: number | undefined;
         try {
           await Promise.race([
-            runIntent(fullInstruction, preset as never, targets),
+            runIntent(fullInstruction, preset, targets),
             new Promise<never>((_, reject) => { timeoutHandle = window.setTimeout(() => {
               if (executionKind === "web") cancelPending();
               reject(new Error(`${provider.label} timed out`));
