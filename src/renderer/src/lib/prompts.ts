@@ -4,7 +4,7 @@ import { PLATFORMS, commentDoc, docFile, docLabel, docLimit, isDocId, parseDoc }
 /** Where a prompt is going: a chat web UI (paste text, reply comes back) or a harness in the project folder (edits files). */
 export type Target = "web" | "harness";
 
-export type Preset = "humanize" | "shorter" | "hook" | "casual" | "professional" | "translate-en" | "translate-ko" | "fit";
+export type Preset = "humanize" | "shorter" | "hook" | "casual" | "professional" | "translate-en" | "translate-ko" | "fit" | "x-viral" | "linkedin" | "threads";
 
 export const PRESETS: Record<Preset, { label: string; instruction: string }> = {
   humanize: { label: "윤문", instruction: "" },
@@ -15,6 +15,9 @@ export const PRESETS: Record<Preset, { label: string; instruction: string }> = {
   "translate-en": { label: "영어로", instruction: "Translate into natural, native-sounding English." },
   "translate-ko": { label: "한국어로", instruction: "Translate into natural Korean (not translationese)." },
   fit: { label: "글자수 맞추기", instruction: "Fit within the platform's character limit. Cut, don't cram." },
+  "x-viral": { label: "X 확산형", instruction: "Optimize for X discovery and conversation: lead with a concrete hook, one clear idea, readable line breaks, and a specific reason to respond. Never use fabricated claims, spam, engagement bait, or guaranteed-virality language." },
+  linkedin: { label: "LinkedIn", instruction: "Adapt for LinkedIn: open with a concrete professional insight, use short readable paragraphs, preserve the author's evidence, and end with a useful takeaway or focused question without clickbait." },
+  threads: { label: "Threads", instruction: "Adapt for Threads: keep a conversational opening, short paragraphs, natural pacing, and one clear thought per post. Preserve the author's voice and avoid engagement bait." },
 };
 
 const HANGUL = /[\uac00-\ud7a3]/g;
@@ -64,6 +67,16 @@ function spec(doc: DocId): string {
     return `${d.label} comment (max ${docLimit(doc)} chars${platform === "x" ? ", CJK counts as 2" : ""}): a short, natural, human first comment that adds value rather than praising or promoting.${examples}`;
   }
   return `${d.label} (max ${d.limit} chars${platform === "x" ? ", CJK counts as 2" : ""}): ${d.guide}`;
+}
+
+function platformSkill(docs: DocId[], preset?: Preset): string[] {
+  if (preset === "x-viral" || preset === "linkedin" || preset === "threads") return [];
+  const platforms = new Set(docs.map((doc) => parseDoc(doc).platform).filter(Boolean));
+  const hints: string[] = [];
+  if (platforms.has("x")) hints.push(PRESETS["x-viral"].instruction);
+  if (platforms.has("linkedin")) hints.push(PRESETS.linkedin.instruction);
+  if (platforms.has("threads")) hints.push(PRESETS.threads.instruction);
+  return hints;
 }
 
 function sourceBlock(source: SourceProject | undefined, target: Target): string[] {
@@ -239,6 +252,7 @@ export function intent(req: IntentRequest, target: Target): string {
   const korean = isKorean(sample);
   const humanize = preset === "humanize";
   const instruction = [preset && !humanize ? PRESETS[preset].instruction : "", req.instruction.trim()].filter(Boolean).join(" ");
+  const platformHints = platformSkill(docs, preset);
 
   if (target === "harness") {
     const files = docs.map(docFile).join(", ");
@@ -249,6 +263,7 @@ export function intent(req: IntentRequest, target: Target): string {
       ...sourceBlock(req.source, target),
       `${empty ? "Write" : "Rewrite"} ${what}`,
       ...[skill, instruction].filter(Boolean),
+      ...platformHints,
       ...(brief.trim() ? [`Standing brief: ${brief.trim()}`] : []),
       docs.length > 1 ? "Apply it to each file, keeping each platform's rules from AGENTS.md." : "",
       "Edit in place and change nothing else.",
@@ -262,6 +277,7 @@ export function intent(req: IntentRequest, target: Target): string {
     ...briefBlock(brief),
     ...(humanize ? [humanizeRules(korean)] : []),
     ...(instruction ? [`Instruction: ${instruction}`] : []),
+    ...platformHints,
   ];
 
   if (docs.length === 1) {

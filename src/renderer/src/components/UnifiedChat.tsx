@@ -12,6 +12,9 @@ const SKILLS = [
   ["hook", "훅 강화"],
   ["casual", "캐주얼"],
   ["professional", "전문적으로"],
+  ["x-viral", "X 확산형"],
+  ["linkedin", "LinkedIn"],
+  ["threads", "Threads"],
 ] as const;
 
 export function UnifiedChat() {
