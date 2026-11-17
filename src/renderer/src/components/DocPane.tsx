@@ -3,7 +3,7 @@ import { Check, Eye, RefreshCw, X as XIcon } from "lucide-react";
 import clsx from "clsx";
 import type { DockviewPanelApi } from "dockview-react";
 import type { DocId, PlatformId } from "@shared/types";
-import { PLATFORMS, TITLE_PLATFORMS, commentDoc, parseDoc, platformsInTab, type TabId } from "@shared/platforms";
+import { PLATFORMS, TABS, TITLE_PLATFORMS, commentDoc, parseDoc, platformsInTab, type TabId } from "@shared/platforms";
 import { isStale, useStore } from "@/store";
 import { countFor } from "@/lib/count";
 import { runPropagate } from "@/lib/dispatch";
@@ -90,6 +90,7 @@ export function DocPane({ tab, api }: { tab: TabId; api: DockviewPanelApi }) {
           </div>
         )}
         <div className="ml-auto flex shrink-0 items-center gap-1">
+          {tab !== "master" && <button className="icon-btn" title={`${TABS.find((item) => item.id === tab)?.label ?? tab} Pane 닫기`} onClick={() => api.close()}><XIcon size={12} /></button>}
           {publish?.status === "scheduled" && publish.scheduledAt && (
             <span className="pill bg-[color-mix(in_srgb,var(--focus)_12%,transparent)] text-[var(--focus)]">예약 {shortTime(publish.scheduledAt)}</span>
           )}

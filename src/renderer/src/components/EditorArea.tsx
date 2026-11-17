@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   DockviewReact,
   themeDark,
@@ -9,6 +9,7 @@ import {
   type SerializedDockview,
 } from "dockview-react";
 import "dockview-react/dist/styles/dockview.css";
+import { Plus } from "lucide-react";
 import { TABS, commentDoc, platformsInTab, type TabId } from "@shared/platforms";
 import { useStore } from "@/store";
 import { DocPane } from "./DocPane";
@@ -31,6 +32,7 @@ export function EditorArea() {
   const disposables = useRef<{ dispose: () => void }[]>([]);
   const visibleTabs = TABS.filter((tab) => tab.id === "master" || platformsInTab(tab.id, enabled).length > 0);
   const layoutKey = `${project.slug}:${visibleTabs.map((tab) => tab.id).join(",")}`;
+  const [openPanels, setOpenPanels] = useState<TabId[]>(visibleTabs.map((tab) => tab.id));
 
   useEffect(() => {
     const onFocus = (event: Event) => {
@@ -40,9 +42,19 @@ export function EditorArea() {
       panel.api.setActive();
       panel.focus();
     };
+    const onReopen = (event: Event) => {
+      const tab = (event as CustomEvent<TabId>).detail;
+      const api = apiRef.current;
+      if (!api || api.getPanel(tab)) return;
+      const label = TABS.find((item) => item.id === tab)?.label ?? tab;
+      api.addPanel({ id: tab, component: "doc", title: label, params: { tab }, position: { referencePanel: "master", direction: "right" } });
+      setOpenPanels(api.panels.map((panel) => panel.id as TabId));
+    };
     window.addEventListener("hmb:focus-tab", onFocus);
+    window.addEventListener("hmb:reopen-tab", onReopen);
     return () => {
       window.removeEventListener("hmb:focus-tab", onFocus);
+      window.removeEventListener("hmb:reopen-tab", onReopen);
       disposables.current.forEach((disposable) => disposable.dispose());
       disposables.current = [];
       apiRef.current = null;
@@ -82,9 +94,11 @@ export function EditorArea() {
       if (selected) useStore.setState({ activeDoc: state.mode === "comment" ? commentDoc(selected) : selected });
     };
     activate(api.activePanel?.id as TabId | undefined);
+    setOpenPanels(api.panels.map((panel) => panel.id as TabId));
     disposables.current = [
       api.onDidActivePanelChange(({ panel }) => activate(panel?.id as TabId | undefined)),
       api.onDidLayoutChange(() => {
+        setOpenPanels(api.panels.map((panel) => panel.id as TabId));
         try {
           localStorage.setItem(`hmb_layout_${project.slug}`, JSON.stringify(api.toJSON()));
         } catch {
@@ -97,6 +111,10 @@ export function EditorArea() {
   return (
     <div className="flex h-full min-h-0 flex-col">
       <ReviewBar />
+      <div className="flex h-8 shrink-0 items-center gap-1 border-b border-[var(--border)] px-2">
+        <span className="mr-1 text-[10px] text-[var(--muted)]">Pane</span>
+        {visibleTabs.filter((tab) => !openPanels.includes(tab.id)).map((tab) => <button key={tab.id} className="btn btn-xs btn-ghost" onClick={() => window.dispatchEvent(new CustomEvent<TabId>("hmb:reopen-tab", { detail: tab.id }))}><Plus size={11} /> {tab.label}</button>)}
+      </div>
       <DockviewReact
         key={layoutKey}
         className="hmb-dockview min-h-0 flex-1"
