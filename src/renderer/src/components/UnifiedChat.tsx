@@ -142,14 +142,17 @@ export function UnifiedChat({ initialTab = "promotion", hideHeader = false, onCl
   const togglePlatform = (id: PlatformId) => setSelectedPlatforms((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id]);
   return (
     <div className={splitTab && !hideHeader ? "grid h-full min-h-0 grid-cols-2 gap-px bg-[var(--border)]" : "h-full min-h-0"}>
-    <section className="flex h-full min-h-0 flex-col bg-[var(--surface)]">
+    <section className="flex h-full min-h-0 flex-col bg-[var(--surface)]" onDragOver={(event) => event.preventDefault()} onDrop={(event) => {
+      const tab = event.dataTransfer.getData("application/x-hmb-chat-tab") as "promotion" | "files" | "library";
+      if (tab && tab !== chatTab) { event.preventDefault(); setSplitTab(tab); }
+    }}>
       {!hideHeader && <header className="flex h-11 shrink-0 items-center gap-2 border-b border-[var(--border)] px-3">
         <Bot size={14} className="text-[var(--focus)]" />
         <div className="flex items-center gap-1 rounded-md bg-[var(--surface-2)] p-0.5" onDragOver={(event) => event.preventDefault()} onDrop={(event) => { const from = event.dataTransfer.getData("application/x-hmb-chat-tab") as typeof chatTab; if (from) reorderChatTab(from, chatTabs.length); }}>
           {chatTabs.map((tab, index) => <div key={tab} draggable className={`flex items-center rounded ${chatTab === tab ? "bg-[var(--surface-3)]" : ""}`} onDragStart={(event) => event.dataTransfer.setData("application/x-hmb-chat-tab", tab)} onDragOver={(event) => event.preventDefault()} onDrop={(event) => { event.preventDefault(); event.stopPropagation(); const from = event.dataTransfer.getData("application/x-hmb-chat-tab") as typeof chatTab; if (from) reorderChatTab(from, index); }}><button className={`btn btn-xs ${chatTab === tab ? "btn-primary" : "btn-ghost"}`} onClick={() => setChatTab(tab)}>{tab === "files" ? <FileSearch size={12} /> : tab === "library" ? <GitBranch size={12} /> : null}{tab === "promotion" ? "통합 Chat" : tabLabel[tab]}</button><button className="icon-btn h-5 w-5" title={`${tabLabel[tab]} 닫기`} onClick={() => closeChatTab(tab)}><X size={11} /></button></div>)}
           {closedChatTabs.length > 0 && <div className="relative"><button className="icon-btn h-6 w-6" title="닫힌 Chat 탭 다시 열기" onClick={() => { const tab = closedChatTabs[0]; if (tab) reopenChatTab(tab); }}>+</button></div>}
         </div>
-        <select className="input ml-auto h-7 py-0 text-[11px]" value={provider?.id ?? ""} onChange={(event) => setProviderId(event.target.value)}>
+        <select className="input ml-auto h-7 max-w-36 py-0 text-[11px]" value={provider?.id ?? ""} onChange={(event) => setProviderId(event.target.value)}>
           {providers.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
         </select>
       </header>}
@@ -183,9 +186,13 @@ export function UnifiedChat({ initialTab = "promotion", hideHeader = false, onCl
         <div className="relative flex items-end gap-2">
           <div className="relative flex-1">
             {slashOpen && <div className="absolute bottom-full left-0 z-10 mb-1 w-64 rounded-lg border border-[var(--border)] bg-[var(--surface)] p-1 shadow-xl"><div className="px-2 py-1 text-[10px] text-[var(--muted)]">Skill 선택 · 입력하면 필터링</div>{visibleSkills.map(([preset, label]) => <button key={preset} className="block w-full rounded px-2 py-1.5 text-left text-[11px] hover:bg-[var(--surface-2)]" onClick={() => sendSkill(preset)}>{label}</button>)}<div className="border-t border-[var(--border)] px-2 py-1 text-[10px] text-[var(--muted)]">외부 Skill은 이름을 입력하거나 추천을 요청하세요.</div></div>}
-            <textarea data-unified-chat-input className="input min-h-20 w-full resize-none pb-8 pl-40" value={instruction} onChange={(event) => { const value = event.target.value; setInstruction(value); setSlashOpen(/(?:^|\s)\/[^\s]*$/.test(value)); }} placeholder="현재 글에 원하는 작업을 입력하세요…" onKeyDown={(event) => { if ((event.metaKey || event.ctrlKey) && event.key === "Enter") { event.preventDefault(); void send(); } }} />
-            <div className="absolute bottom-1.5 left-2 flex items-center gap-1">{provider && <><input list="hmb-models" className="input h-6 w-32 border-0 bg-transparent py-0 text-[10px]" value={provider.model ?? ""} placeholder="모델" onChange={(event) => void useStore.getState().updateSettings({ providers: settings.providers.map((item) => item.id === provider.id ? { ...item, model: event.target.value || undefined } : item) })} /><datalist id="hmb-models">{[...new Set([...COMMON_MODELS, ...(provider.model ? [provider.model] : [])])].map((model) => <option key={model} value={model} />)}</datalist></>}{provider && <select className="input h-6 w-16 border-0 bg-transparent py-0 text-[10px]" value={provider.effort ?? "medium"} onChange={(event) => void useStore.getState().updateSettings({ providers: settings.providers.map((item) => item.id === provider.id ? { ...item, effort: event.target.value as typeof provider.effort } : item) })}><option value="low">low</option><option value="medium">medium</option><option value="high">high</option><option value="xhigh">xhigh</option></select>}</div>
-            <div className="absolute bottom-1.5 right-1.5 flex items-center gap-1">{RECOMMENDED_SKILLS.slice(0, 2).map(([preset, label]) => <button key={preset} className="btn btn-xs" disabled={busy} onClick={() => void send(preset)}>{label}</button>)}<button className="btn btn-xs btn-primary" disabled={busy || !instruction.trim()} onClick={() => void send()}>{busy ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />}</button></div>
+            <div className="absolute bottom-1.5 left-2 right-1.5 flex items-center gap-1 overflow-x-auto">
+              {RECOMMENDED_SKILLS.slice(0, 2).map(([preset, label]) => <button key={preset} className="btn btn-xs" disabled={busy} onClick={() => void send(preset)}>{label}</button>)}
+              {provider && <input list="hmb-models" className="input h-6 w-28 shrink-0 border-0 bg-transparent py-0 text-[10px]" value={provider.model ?? ""} placeholder="모델 선택" onChange={(event) => void useStore.getState().updateSettings({ providers: settings.providers.map((item) => item.id === provider.id ? { ...item, model: event.target.value || undefined } : item) })} />}
+              <datalist id="hmb-models">{[...new Set([...COMMON_MODELS, ...(provider?.model ? [provider.model] : [])])].map((model) => <option key={model} value={model} />)}</datalist>
+              {provider && <select aria-label="추론 effort" className="input h-6 w-36 shrink-0 border-0 bg-transparent py-0 text-[10px]" value={provider.effort ?? "medium"} onChange={(event) => void useStore.getState().updateSettings({ providers: settings.providers.map((item) => item.id === provider.id ? { ...item, effort: event.target.value as typeof provider.effort } : item) })}><option value="low">Low · 빠른 응답</option><option value="medium">Medium · 균형</option><option value="high">High · 깊은 추론</option><option value="xhigh">XHigh · 최대 추론</option></select>}
+              <button className="btn btn-xs btn-primary ml-auto shrink-0" disabled={busy || !instruction.trim()} onClick={() => void send()}>{busy ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />} 전송</button>
+            </div>
           </div>
         </div>
       </div>}

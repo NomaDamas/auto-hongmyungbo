@@ -1,6 +1,6 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Group, Panel, Separator, usePanelRef } from "react-resizable-panels";
-import { FilePlus2, Loader2, PanelRightClose, PanelRightOpen, Radio, Settings, ShieldCheck, Wand2 } from "lucide-react";
+import { FilePlus2, Loader2, PanelRightClose, PanelRightOpen, Moon, Settings, ShieldCheck, Sun, Wand2, ZoomIn, ZoomOut } from "lucide-react";
 import { Toaster } from "sonner";
 import { TABS, parseDoc } from "@shared/platforms";
 import { useStore } from "@/store";
@@ -89,13 +89,10 @@ export function App() {
       <header className="drag relative flex h-12 shrink-0 items-center gap-2 pl-[84px] pr-3">
         <span className="max-w-[320px] truncate text-[13px] font-medium">{project?.meta.title ?? "Auto-HongMyungbo"}</span>
         {project && <ModeSwitch />}
-        {project && mode !== "insights" && (
-          <button className="no-drag btn btn-sm btn-primary ml-2" onClick={() => void runPropagate()} title="원문 → 모든 플랫폼 (⌘↵)">
-            <Radio size={13} /> 원문 전파
-          </button>
-        )}
         <DockToggle />
         <div className="no-drag ml-1 flex items-center gap-1">
+          <ZoomControls />
+          <button className="icon-btn" onClick={() => void useStore.getState().updateSettings({ theme: settings.theme === "dark" ? "light" : "dark" })} title="다크/라이트 모드 전환">{settings.theme === "dark" ? <Sun size={14} /> : <Moon size={14} />}</button>
           <button className="btn btn-xs btn-ghost" onClick={() => useStore.setState({ asideOpen: true })} title="Aside 연결"><ShieldCheck size={12} /> Aside</button>
           <button className="btn btn-xs btn-ghost" onClick={() => useStore.setState({ setupOpen: true })} title="설정 마법사"><Wand2 size={12} /> 설정 마법사</button>
           <button className="icon-btn" onClick={() => useStore.setState({ settingsOpen: true })} title="설정"><Settings size={14} /></button>
@@ -160,6 +157,21 @@ export function App() {
       <Toaster theme={settings.theme} position="bottom-center" richColors closeButton />
     </div>
   );
+}
+
+function ZoomControls() {
+  const [zoom, setZoom] = useState(() => Number(localStorage.getItem("hmb_ui_zoom") ?? "1"));
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (!(event.metaKey || event.ctrlKey) || !["+", "=", "-"].includes(event.key)) return;
+      event.preventDefault();
+      setZoom((value) => Math.min(1.3, Math.max(0.85, Number((value + (event.key === "-" ? -0.05 : 0.05)).toFixed(2)))));
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+  useEffect(() => { localStorage.setItem("hmb_ui_zoom", String(zoom)); document.documentElement.style.zoom = String(zoom); }, [zoom]);
+  return <div className="flex items-center gap-0.5 rounded-md border border-[var(--border)] px-0.5" aria-label="전체 글자 크기"><button className="icon-btn h-6 w-6" title="글자 축소 (⌘-)" onClick={() => setZoom((value) => Math.max(0.85, Number((value - 0.05).toFixed(2))))}><ZoomOut size={13} /></button><span className="w-8 text-center text-[10px]">{Math.round(zoom * 100)}%</span><button className="icon-btn h-6 w-6" title="글자 확대 (⌘+)" onClick={() => setZoom((value) => Math.min(1.3, Number((value + 0.05).toFixed(2))))}><ZoomIn size={13} /></button></div>;
 }
 
 function ModeSwitch() {
