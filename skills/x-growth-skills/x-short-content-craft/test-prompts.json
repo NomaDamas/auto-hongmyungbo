@@ -1,0 +1,73 @@
+{
+  "skill": "x-short-content-craft",
+  "version": "0.1.0",
+  "source_book": "X秘籍 — 向阳乔木 / AIP出海教程(@带队教练/GoSailGlobal)",
+  "darwin_compatible": true,
+  "test_cases": [
+    {
+      "id": "should-trigger-01",
+      "type": "should_trigger",
+      "prompt": "我想发一条教人用 Raycast 启动器的推文,怎么写才能有人看?",
+      "expected_behavior": "应激活 x-short-content-craft, 先按目标(建忠诚/教工具)选教程型, 再用 Hook-Body-CTA 起草: Hook='为什么 95% 的人没用对启动器', Body=3 步操作路径, CTA=评论要配置包; 或套爆款公式=Raycast+搜剪贴板场景+3 步",
+      "notes": "正面场景: 用户明确要起草一条教工具的推文, 典型的教程型+爆款公式应用"
+    },
+    {
+      "id": "should-trigger-02",
+      "type": "should_trigger",
+      "prompt": "怎么写一条容易被收藏的 X 帖子?我有一堆 AI 工具想整理分享",
+      "expected_behavior": "应激活 x-short-content-craft, 按目标(收藏)选列表型, 用 Hook-Body-CTA 起草: Hook 用'最实用/免费'等低门槛信号开头, Body 用编号/bullet points 结构化整理工具列表, CTA 引导收藏",
+      "notes": "正面场景: 用户想要高收藏, 对应列表型; 且有工具资源可套爆款公式"
+    },
+    {
+      "id": "should-trigger-03",
+      "type": "should_trigger",
+      "prompt": "I have a controversial take on why most AI startups will fail. How should I structure this tweet to get maximum engagement?",
+      "expected_behavior": "应激活 x-short-content-craft, 按目标(互动)选观点型, Hook 直接点明争议视角(my controversial opinion is...), Body 简洁表达主观立场不中立, CTA 引发辩论; 保持简短以放大争议性",
+      "notes": "正面场景(英文): 用户有争议观点想引发互动, 对应观点型; 测试英文 trigger 词 structure/engagement"
+    },
+    {
+      "id": "should-trigger-04",
+      "type": "should_trigger",
+      "prompt": "我昨天一条短视频 5 小时跑了 30 万浏览,想把这段经历写成推文,该怎么组织?",
+      "expected_behavior": "应激活 x-short-content-craft, 按目标(涨粉)选故事型, Hook 用数字悬念(5 小时 30 万浏览, How?), Body 展开个人经历和策略, CTA 引导关注/评论换资源",
+      "notes": "正面场景: 用户有亲身经历想分享, 典型的故事型 Hook-Body-CTA, 且与 A1 案例 Vivek Burman 高度相似"
+    },
+    {
+      "id": "should-not-trigger-01",
+      "type": "should_not_trigger",
+      "prompt": "我写好了一条推文,帮我检查一下五件套齐不齐,有没有缺什么?",
+      "expected_behavior": "不应激活本 skill, 应激活 x-five-piece-checklist(五件套: 价值承诺/场景/入口/证据/收藏理由)。用户已有草稿要做完备性检查, 不是起草阶段",
+      "notes": "兄弟诱饵: 用户说'检查''齐不齐'是检查场景而非起草场景, 应路由到 x-five-piece-checklist"
+    },
+    {
+      "id": "should-not-trigger-02",
+      "type": "should_not_trigger",
+      "prompt": "把我们产品公告'已支持长上下文功能'改成对用户友好的推文",
+      "expected_behavior": "不应激活本 skill, 应激活 x-three-translations(三次翻译: 发布→帮助, 能力→场景, 结论→证据)。用户要做的是语言转换而非选结构骨架",
+      "notes": "兄弟诱饵: 用户要把公告腔改写成帮助式, 是三次翻译的典型场景, 应路由到 x-three-translations"
+    },
+    {
+      "id": "should-not-trigger-03",
+      "type": "should_not_trigger",
+      "prompt": "我发了一条纯感叹'AI 太强了',为什么没人理?我的内容是不是选错了类型?",
+      "expected_behavior": "不应激活本 skill, 应激活 x-content-archetypes(四类内容原型: 资源入口/工具教程/AI工具发现/普通表达)。用户在问内容分类和传播预测(普通表达型中位互动仅 16), 不是在起草",
+      "notes": "兄弟诱饵: 用户问'选错类型'看似相关, 但 x-content-archetypes 按'读者拿到能做什么'分类预测传播, 而本 skill 按叙事结构分类型指导起草; 用户是在复盘而非起草"
+    },
+    {
+      "id": "edge-01",
+      "type": "edge_case",
+      "prompt": "我想发一条分享新发现的 AI 工具的推文,该用什么结构写?",
+      "expected_behavior": "边界判断: 若用户关注'读者拿到能做什么'(资源入口 vs 工具教程)→路由到 x-content-archetypes 预测传播; 若用户关注'用什么叙事结构写出来'→激活本 skill 选类型(教程型/列表型)+Hook-Body-CTA+爆款公式。用户说'结构'可能指向任一, 应追问意图: '你是想预测这条能不能爆, 还是想直接起草?'",
+      "notes": "边界: x-content-archetypes(按读者功能分类预测传播)与本 skill(按叙事结构起草)的交叉地带。'分享 AI 工具'同时触达两个 skill 的 trigger, 需区分用户要'预测'还是'起草'"
+    },
+    {
+      "id": "edge-02",
+      "type": "edge_case",
+      "prompt": "我想写一篇关于 Claude Code 使用指南的长文,怎么组织结构?",
+      "expected_behavior": "边界判断: 本 skill 的 Hook-Body-CTA 适用于短帖/Thread 首条, 但用户说'长文'可能指 X Article(最长 25000 字符)。若用户确实要写 Article→本 skill 不完全适用(Article 有独立的扫读结构/视觉元素/强结尾等要求); 若用户要写短帖/Thread→激活本 skill 选教程型+Hook-Body-CTA。应提醒: X 是短内容平台(ce12), 长文不等于有流量, 先确认是否真需要长文格式",
+      "notes": "边界: ce12 长文迷信。用户说'长文'触发本 skill 的边界——Hook-Body-CTA 是短内容骨架, 长文 Article 结构不同。应先确认格式再决定是否适用"
+    }
+  ],
+  "minimum_pass_rate": 0.8,
+  "notes": "4 条 should_trigger + 3 条 should_not_trigger(含 3 条兄弟诱饵: x-five-piece-checklist/x-three-translations/x-content-archetypes) + 2 条 edge_case。全部 should_not_trigger 必须通过(诱饵容错为 0)。"
+}

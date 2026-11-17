@@ -1,0 +1,59 @@
+{
+  "skill": "x-data-review",
+  "version": "0.1.0",
+  "source_book": "X秘籍 — AIP出海教程(@带队教练/GoSailGlobal)",
+  "darwin_compatible": true,
+  "test_cases": [
+    {
+      "id": "should-trigger-01",
+      "type": "should_trigger",
+      "prompt": "这周发了15条推文,只有2条过百,其他基本都是几十个互动。帮我复盘一下数据,看看哪些内容类型互动率最高,下周该怎么调整内容策略。",
+      "expected_behavior": "应激活 x-data-review, 执行四步闭环:步1按类型分组拉数据(故事/列表/观点/教程各几条,互动多少);步2对比分析(哪种类型互动高/收藏高,查Hook/Body/CTA差异);步3问'如果重来怎么做更好',找20%贡献80%的内容加倍投入;步4建议建Notion复盘模板记录追踪",
+      "notes": "正面场景: V2典型问题——连发一批后需要结构化数据复盘。用户明确说'复盘数据''调整内容策略',是本skill最核心的trigger。"
+    },
+    {
+      "id": "should-trigger-02",
+      "type": "should_trigger",
+      "prompt": "上个月发了40多条推文,想做个月度复盘。整体互动率大概1.5%,收藏率也不高。帮我分析一下哪些类型的表现好,下个月要不要调整方向?",
+      "expected_behavior": "应激活 x-data-review, 区分月复盘深度(月复盘审视战略而非仅数据):步1收集月度全部帖子数据;步2按类型对比+查战略层面问题(定位/变现路径是否需调整);步3设定战略级行动计划;步4记录追踪。互动率1.5%低于2%目标,需诊断原因",
+      "notes": "正面场景: 月复盘——用户明确要做月度复盘且关注互动率和方向调整。月复盘比周复盘更偏战略,本skill的'周复盘聚焦数据,月复盘审视战略'分层覆盖此场景。"
+    },
+    {
+      "id": "should-trigger-03",
+      "type": "should_trigger",
+      "prompt": "I've been posting for 3 weeks and want to review which content types get more saves vs likes. List posts seem to get bookmarked a lot but opinion posts get more replies. How should I optimize my content mix for next week?",
+      "expected_behavior": "应激活 x-data-review, 用四步闭环分析:步1确认已有按类型分组数据(列表型收藏高/观点型回复高);步2分析原因(列表型=工具箱属性/观点型=引发讨论);步3'如果重来'——下周增加列表型比例以积累收藏资产;步4建追踪模板",
+      "notes": "正面场景: 英文prompt,用户已在做按类型对比分析且问'怎么优化下周内容组合',是data-review的典型操作。description中英文trigger词覆盖此场景。"
+    },
+    {
+      "id": "should-trigger-04",
+      "type": "should_trigger",
+      "prompt": "最近互动率只有1.2%,低于2%的目标。帮我看看是哪里出了问题,是Hook不够吸引还是发布时间不对?",
+      "expected_behavior": "应激活 x-data-review, 执行步2原因分析:逐条查Hook是否3秒抓痛点/Body是否有深度/CTA是否引导行动;同时分析发布时间段是否匹配内容类型(午间工具教程/晚间观点案例)。互动率1.2%<2%目标是诊断信号",
+      "notes": "正面场景: 指标不健康需要诊断。用户引用了具体指标(互动率1.2%<2%目标)并问原因分析,是data-review步2的核心场景。"
+    },
+    {
+      "id": "should-not-trigger-01",
+      "type": "should_not_trigger",
+      "prompt": "我连发了20条推文,只有2条过百,其他基本没人理。我是不是不适合做X?要不要放弃?",
+      "expected_behavior": "不应激活本 skill, 应激活 x-longtail-strategy。用户处于焦虑/自我怀疑状态('是不是不适合''要不要放弃'),需要的是长尾心态校准(中位数42,2条过百已高于中位)而非复盘操作流程。",
+      "notes": "兄弟skill诱饵: x-longtail-strategy'帖子没爆焦虑'场景。虽然提到'20条只2条过百'表面像复盘,但用户的核心诉求是心态调整('该不该放弃'),不是'帮我分析数据怎么优化'。本skill是'复盘数据/优化下步'时用,不是'怀疑人生'时用。"
+    },
+    {
+      "id": "should-not-trigger-02",
+      "type": "should_not_trigger",
+      "prompt": "X的For You算法是怎么决定推荐哪些内容给我的?我的帖子为什么没被推到For You信息流里?有没有什么技巧让算法多推我的内容?",
+      "expected_behavior": "不应激活本 skill, 应激活 x-foryou-algorithm。用户问的是推荐算法的工作机制(双源召回/多动作加权/候选隔离)和如何被推荐,不是数据复盘。",
+      "notes": "兄弟skill诱饵: x-foryou-algorithm'理解推荐'场景。虽然'帖子没被推荐'表面涉及数据表现,但用户问的是算法机制,应走算法skill。本skill是基于结果数据的复盘,不解释算法原理。"
+    },
+    {
+      "id": "edge-01",
+      "type": "edge_case",
+      "prompt": "最近一个月数据很平淡,没什么爆款也没有特别差的,大部分帖子都是几十个互动。这种情况需要复盘吗?还是说其实算正常的?",
+      "expected_behavior": "边界判断: 用户同时问了两个问题——'需要复盘吗'(data-review方向)和'这算正常吗'(longtail方向)。应先用x-longtail-strategy回答'算不算正常'(中位数42,几十个互动在正常范围内),再引导到x-data-review做复盘(即使数据平淡也应复盘找20%内容加倍投入,只是没有明显爆款不代表没有优化空间)。如果用户侧重前者,优先longtail;如果侧重后者,优先data-review。合理做法是先给长尾基准再引导复盘。",
+      "notes": "边界: 长尾心态校准和数据复盘操作在此重叠。'数据平淡需不需要复盘'是典型边界——longtail说'平淡是常态',data-review说'平淡也要复盘找优化点'。判断依据是用户的核心诉求:'这正常吗'偏longtail,'怎么改'偏data-review。"
+    }
+  ],
+  "minimum_pass_rate": 0.8,
+  "notes": "至少 3 条 should_trigger + 2 条 should_not_trigger + 1 条 edge_case。全部 should_not_trigger 必须通过 (诱饵容错为 0), 且其中至少 1 条是同书兄弟 skill 的场景 (跨 skill 混淆测试)。本skill的should_not_trigger均为兄弟skill诱饵(x-longtail-strategy焦虑心态 + x-foryou-algorithm理解算法),这两个是最容易与本skill混淆的场景——'帖子没爆'可能走复盘也可能走心态,'没被推荐'可能走复盘也可能走算法理解。"
+}

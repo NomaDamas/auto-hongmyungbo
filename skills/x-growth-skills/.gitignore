@@ -1,0 +1,7 @@
+.DS_Store
+
+# Internal Cangjie distillation artifacts
+candidates/
+rejected/
+PIPELINE_STATE.md
+verified.md

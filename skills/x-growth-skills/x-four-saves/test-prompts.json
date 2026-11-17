@@ -1,0 +1,59 @@
+{
+  "skill": "x-four-saves",
+  "version": "0.1.0",
+  "source_book": "《X秘籍》 — 向阳乔木",
+  "darwin_compatible": true,
+  "test_cases": [
+    {
+      "id": "should-trigger-01",
+      "type": "should_trigger",
+      "prompt": "我刚写完一条AI工具推荐帖,大概200字,说了工具名和一句话介绍。帮我看看这条值不值得发?",
+      "expected_behavior": "应激活 x-four-saves, 逐项自检四省(省搜索/省理解/省试错/省表达), 判断省了几步并给出'发/不发/改造后发'结论",
+      "notes": "正面场景: 发帖前价值自检, 用户明确问'值不值得发'"
+    },
+    {
+      "id": "should-trigger-02",
+      "type": "should_trigger",
+      "prompt": "I have three topic ideas for X posts but limited time to write. How do I decide which one is worth posting?",
+      "expected_behavior": "应激活 x-four-saves, 用四省框架逐一评估三个选题各省了几步路, 比较价值大小后排序推荐",
+      "notes": "正面场景: 多选题比较, 英文提问, trigger词 'worth posting'"
+    },
+    {
+      "id": "should-trigger-03",
+      "type": "should_trigger",
+      "prompt": "上周发了一条纯感叹'这个AI工具太强了',几乎没人理。我想搞清楚到底哪里出了问题。",
+      "expected_behavior": "应激活 x-four-saves, 自检这条内容四省里省了几步(大概率一步不省只是感叹), 解释为什么内容缺乏价值导致没人理",
+      "notes": "正面场景: 复盘'为什么没人理', 用四省诊断内容价值缺失"
+    },
+    {
+      "id": "should-trigger-04",
+      "type": "should_trigger",
+      "prompt": "我想分享一个Notion模板,但不确定只是丢个链接够不够。帮读者省了什么?这个内容有发布价值吗?",
+      "expected_behavior": "应激活 x-four-saves, 用户直接提到'帮读者省了什么'和'有发布价值吗', 逐项自检四省并判断链接-only内容省了几步",
+      "notes": "正面场景: 用户直接使用了四省模型的语言信号'帮读者省了什么'"
+    },
+    {
+      "id": "should-not-trigger-01",
+      "type": "should_not_trigger",
+      "prompt": "帮我检查这条推文五件套齐不齐:有没有价值承诺、使用场景、入口链接、证据、收藏理由?",
+      "expected_behavior": "不应激活 x-four-saves, 应激活 x-five-piece-checklist 做结构完备性检查",
+      "notes": "跨skill混淆诱饵(兄弟skill场景): 用户问的是'齐不齐'(结构审计), 不是'值不值'(内容估值)。五件套检查和四省模型最易混淆"
+    },
+    {
+      "id": "should-not-trigger-02",
+      "type": "should_not_trigger",
+      "prompt": "我这条推文属于四类内容原型里的哪一类?是资源入口型还是工具教程型?",
+      "expected_behavior": "不应激活 x-four-saves, 应激活 x-content-archetypes 做内容原型分类",
+      "notes": "跨skill混淆诱饵(兄弟skill场景): 用户问的是'属于哪类'(分类), 不是'值不值得发'(估值)"
+    },
+    {
+      "id": "edge-01",
+      "type": "edge_case",
+      "prompt": "我刚写完一条推文,帮我看看。",
+      "expected_behavior": "边界模糊: 用户意图不明确。若理解为'值不值得发'→四省; 若理解为'结构全不全'→五件套; 若理解为'写得好不好'→short-content-craft。期望agent先追问用户意图,或按最可能的意图(发前自检→四省)处理并说明判断理由",
+      "notes": "边界: 意图模糊场景, 测试skill是否能在信息不足时合理判断而非盲目激活"
+    }
+  ],
+  "minimum_pass_rate": 0.8,
+  "notes": "至少 3 条 should_trigger + 2 条 should_not_trigger + 1 条 edge_case。全部 should_not_trigger 必须通过 (诱饵容错为 0), 且其中至少 1 条是同书兄弟 skill 的场景 (跨 skill 混淆测试)。"
+}

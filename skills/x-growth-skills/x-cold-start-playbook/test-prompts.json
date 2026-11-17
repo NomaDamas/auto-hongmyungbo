@@ -1,0 +1,59 @@
+{
+  "skill": "x-cold-start-playbook",
+  "version": "0.1.0",
+  "source_book": "《X秘籍》 — AIP出海教程 / 木马人",
+  "darwin_compatible": true,
+  "test_cases": [
+    {
+      "id": "should-trigger-01",
+      "type": "should_trigger",
+      "prompt": "我的X账号刚注册两周,发了十几条推文,粉丝还是个位数,每条推文只有几个曝光。新号没粉丝,发的内容没人看,到底该怎么办?",
+      "expected_behavior": "应激活 x-cold-start-playbook, 先用涨粉四步漏斗诊断丢在哪步(大概率推文没曝光), 再按边际回报排序推荐策略1大V评论区抢占+策略5引用转发为最高优先, 并提示前24h主动加热机制",
+      "notes": "正面场景: 新号没粉丝+帖子没人看, 是冷启动skill的核心触发信号, 用户直接说了'没粉丝''没人看'"
+    },
+    {
+      "id": "should-trigger-02",
+      "type": "should_trigger",
+      "prompt": "I just started on X two weeks ago, still 0 followers. My posts get basically no engagement. How do I get my first 100 followers and survive the cold start phase?",
+      "expected_behavior": "应激活 x-cold-start-playbook, 英文prompt含'0 followers''no engagement''cold start'三个trigger词, 用漏斗诊断+六策略按边际回报排序+前24h加热机制回应",
+      "notes": "正面场景: 英文提问, 测试description中英文trigger词覆盖, 用户明确说'cold start'和'first 100 followers'"
+    },
+    {
+      "id": "should-trigger-03",
+      "type": "should_trigger",
+      "prompt": "我每天花两小时运营X,但粉丝涨不动,推文曝光一直上不去。时间有限,冷启动阶段到底应该优先做什么策略效果最好?",
+      "expected_behavior": "应激活 x-cold-start-playbook, 用户问'优先做什么策略效果最好', 正是按边际回报排序六策略的典型场景, 给出策略1+策略5最高优先(投60%时间)的策略组合",
+      "notes": "正面场景: 用户明确问策略优先级排序, 是六策略按边际回报投资的核心用例"
+    },
+    {
+      "id": "should-trigger-04",
+      "type": "should_trigger",
+      "prompt": "我发了条推文,刚发完一个小时了,一个互动都没有。我该不该做点什么?还是就等着看它能不能自然跑起来?",
+      "expected_behavior": "应激活 x-cold-start-playbook, 用户问'发完推文要不要主动加热', 正是前24h加热机制的触发场景, 告诉用户不能等——前几小时安安静静帖子就沉了, 要主动找人帮转/社群加热",
+      "notes": "正面场景: 发完推文后的黄金窗口加热, 对应ce05反例(发完不管错过窗口)"
+    },
+    {
+      "id": "should-not-trigger-01",
+      "type": "should_not_trigger",
+      "prompt": "我的X账号刚注册第一天,头像和昵称都还没弄,简介也是空的。新号第一天到底应该先做什么?要不要先开蓝V?",
+      "expected_behavior": "不应激活 x-cold-start-playbook, 应激活 x-account-setup 做开业准备(装修四要素+蓝V+养号)",
+      "notes": "跨skill混淆诱饵(兄弟skill场景): 用户问的是'开业前准备'(装修/蓝V/养号), 不是'开业后获客'(没粉丝/帖子没人看)。account-setup是发内容前, cold-start是发内容后。用户说'第一天''头像昵称还没弄'指向account-setup"
+    },
+    {
+      "id": "should-not-trigger-02",
+      "type": "should_not_trigger",
+      "prompt": "在大V的帖子下面评论,怎么写才能获得曝光又不被当成蹭流量的?有没有什么评论互动的技巧和模板?",
+      "expected_behavior": "不应激活 x-cold-start-playbook, 应激活 x-comment-engagement 做评论互动方法论指导(六法+坎宁汉姆定律+Repost vs Quote)",
+      "notes": "跨skill混淆诱饵(兄弟skill场景): 用户问的是'怎么评论'(评论互动技巧), 不是'冷启动该做什么策略'。本skill把评论区抢占作为策略之一使用但不展开评论方法论, comment-engagement才是全面评论技巧skill"
+    },
+    {
+      "id": "edge-01",
+      "type": "edge_case",
+      "prompt": "我的账号有500粉丝了,但每条推文还是只有几十个曝光,互动也很少。这算不算还在冷启动期?该怎么突破?",
+      "expected_behavior": "边界模糊: 500粉已不算严格意义上的新号冷启动(0→1阶段), 但帖子低曝光+互动少说明仍存在冷启动类似问题。期望agent先做漏斗诊断(是推文没曝光还是门面接不住流量), 若诊断发现是门面/内容质量问题则建议转对应skill, 若诊断发现确实是初始流量池未突破则可用冷启动策略。关键是要说明判断理由而非盲目套用六策略",
+      "notes": "边界: 500粉是否还算冷启动? 测试skill是否能在'已有少量粉丝但互动低迷'的灰色地带合理判断, 而非机械地按粉丝数一刀切"
+    }
+  ],
+  "minimum_pass_rate": 0.8,
+  "notes": "至少 3 条 should_trigger + 2 条 should_not_trigger + 1 条 edge_case。全部 should_not_trigger 必须通过 (诱饵容错为 0), 且其中至少 1 条是同书兄弟 skill 的场景 (跨 skill 混淆测试)。"
+}

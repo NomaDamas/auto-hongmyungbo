@@ -1,0 +1,73 @@
+{
+  "skill": "x-account-setup",
+  "version": "0.1.0",
+  "source_book": "《X秘籍》 — 多位创作者合集",
+  "darwin_compatible": true,
+  "test_cases": [
+    {
+      "id": "should-trigger-01",
+      "type": "should_trigger",
+      "prompt": "我刚注册了一个新的X账号，第一天应该干什么？是直接发推文还是先做别的准备？",
+      "expected_behavior": "应激活 x-account-setup, 按开店模型给出三步开业准备: 装修Profile四要素(头像真人/昵称关键词+身份/简介价值承诺/背景图) → 开蓝V(Premium) → 养号3天只浏览 → 再发内容",
+      "notes": "正面场景: 新号第一天, 完美匹配开店模型全套流程"
+    },
+    {
+      "id": "should-trigger-02",
+      "type": "should_trigger",
+      "prompt": "推特蓝V到底要不要开？一个月8刀感觉有点贵，而且有三档不知道选哪个",
+      "expected_behavior": "应激活 x-account-setup, 给出蓝V必开的理由(评论不被折叠/涨粉不受限/广告分成) + 档位选择(开Premium, 不开Basic, 不必Premium+) + 审核期不改资料的警告",
+      "notes": "正面场景: 蓝V决策纠结, 匹配开店模型第二步"
+    },
+    {
+      "id": "should-trigger-03",
+      "type": "should_trigger",
+      "prompt": "我的X账号头像还是默认的，昵称也随便取的，简介空的。想好好装修一下主页，头像用什么好？昵称怎么取？简介怎么写？",
+      "expected_behavior": "应激活 x-account-setup, 逐项给出装修四要素清单: 头像(真人首选/风格化备选/禁忌)、昵称(关键词+身份格式)、简介(身份+方向+价值承诺)、背景图(视觉延伸+引导关注)",
+      "notes": "正面场景: 装修Profile四要素, 匹配开店模型第一步"
+    },
+    {
+      "id": "should-trigger-04",
+      "type": "should_trigger",
+      "prompt": "新注册的号能直接开始关注别人和点赞吗？还是需要先养号？养号具体怎么做？",
+      "expected_behavior": "应激活 x-account-setup, 给出养号原则: 新号至少3天只浏览(每天约1小时)、不急于点赞/评论/关注、关注数不要远多于粉丝数、避免被判机器人",
+      "notes": "正面场景: 新号养号问题, 匹配开店模型第三步"
+    },
+    {
+      "id": "should-not-trigger-01",
+      "type": "should_not_trigger",
+      "prompt": "我X账号发了两周推文了，一条都没有流量，粉丝也没涨几个，怎么办？",
+      "expected_behavior": "不应激活 x-account-setup, 应激活 x-cold-start-playbook。用户已在发内容阶段(开业后), 问题是获客而非开业准备。cold-start的六策略+漏斗诊断才是正确工具。",
+      "notes": "跨skill混淆诱饵(兄弟skill): 发了内容没流量→冷启动获客问题, 不是开业准备问题。用户已有内容产出, 缺的是冷启动策略而非Profile装修。"
+    },
+    {
+      "id": "should-not-trigger-02",
+      "type": "should_not_trigger",
+      "prompt": "昨天突然发现我的推文搜不到了，账号好像被限流了，是不是被封了？怎么排查？",
+      "expected_behavior": "不应激活 x-account-setup, 应激活 x-account-pitfalls。用户账号已出问题(限流/封号), 需要的是排查+申诉(治疗), 不是开业准备(预防)。",
+      "notes": "跨skill混淆诱饵(兄弟skill): 被限流→避坑/申诉问题, 不是开业准备问题。x-account-pitfalls处理限流/封号/标签排查。"
+    },
+    {
+      "id": "should-not-trigger-03",
+      "type": "should_not_trigger",
+      "prompt": "我每天发3条推文，但不知道发什么内容能火，选题怎么找？",
+      "expected_behavior": "不应激活 x-account-setup。用户在问日常内容选题/创作, 属于内容生产类问题, 不是账号开业准备。应指向内容创作类skill(如x-content-archetypes或x-short-content-craft)。",
+      "notes": "诱饵: 内容选题/创作问题, 非Profile装修/蓝V/养号。"
+    },
+    {
+      "id": "edge-01",
+      "type": "edge_case",
+      "prompt": "我的账号用了三个月了，一直在发内容，有几十个粉丝但涨不动。我看了下主页确实比较简陋，头像还是默认的，简介也没写。要不要重新装修一下主页？",
+      "expected_behavior": "可部分激活 x-account-setup 的装修四要素部分(头像/昵称/简介/背景图), 因为Profile确实需要装修。但应同时指出: 已运营三个月粉丝少的核心问题更可能是冷启动策略不足, 应结合 x-cold-start-playbook 诊断漏斗。装修是漏斗第3步, 只装修不解决冷启动=治标不治本。",
+      "notes": "边界: 已运营账号想重新装修Profile。装修四要素本身适用(无论新旧号), 但用户的核心痛点(涨不动)不全靠装修解决, 需配合冷启动诊断。edge在于: 本skill的装修部分适用, 但不应作为唯一解。"
+    },
+    {
+      "id": "edge-02",
+      "type": "edge_case",
+      "prompt": "我有一个老号之前被封了刚申诉回来，现在想重新开始做，需要养号吗？还是可以直接发内容？",
+      "expected_behavior": "应激活 x-account-setup 的养号部分。老号解冻后初始权重低、易被判机器人, 需养号1-2天(比新号3天短)。同时建议检查Profile四要素是否需要更新, 以及确认蓝V状态(可能需要重新开)。",
+      "notes": "边界: 老号解冻而非新注册, 但养号原则同样适用(只是周期更短1-2天vs新号3天)。属于本skill覆盖范围, 但场景偏edge。"
+    }
+  ],
+  "minimum_pass_rate": 0.8,
+  "notes": "至少 3 条 should_trigger + 2 条 should_not_trigger + 1 条 edge_case。全部 should_not_trigger 必须通过 (诱饵容错为 0), 且其中至少 1 条是同书兄弟 skill 的场景 (跨 skill 混淆测试)。本skill有2条兄弟skill诱饵(should-not-trigger-01→x-cold-start-playbook, should-not-trigger-02→x-account-pitfalls)。"
+}

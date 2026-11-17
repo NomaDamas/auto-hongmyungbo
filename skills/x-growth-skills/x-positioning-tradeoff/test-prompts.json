@@ -1,0 +1,73 @@
+{
+  "skill": "x-positioning-tradeoff",
+  "version": "0.1.0",
+  "source_book": "《X秘籍》 — 多位创作者合集",
+  "darwin_compatible": true,
+  "test_cases": [
+    {
+      "id": "should-trigger-01",
+      "type": "should_trigger",
+      "prompt": "我想在X上做AI赛道赚钱，是该追粉丝数量还是做个人IP？纠结很久了，感觉两个方向内容完全不一样",
+      "expected_behavior": "应激活 x-positioning-tradeoff, 用不可能三角引导用户先定变现模式: 卖产品/服务/咨询→选IP路线(深度+变现,放弃泛传播); 靠广告→选泛流量(传播,放弃深度)。明确指出泛流量不值钱(匹配度低/转化差), 先定放弃哪个角再选内容策略",
+      "notes": "正面场景: V2预测力测试原题——'做X赚钱该追粉丝还是做IP', 完美匹配不可能三角+IP vs泛流量决策"
+    },
+    {
+      "id": "should-trigger-02",
+      "type": "should_trigger",
+      "prompt": "我做AI工具赛道的，内容是该写深度教程还是追热点泛流量？感觉深度教程涨粉慢但追热点又怕变现差",
+      "expected_behavior": "应激活 x-positioning-tradeoff, 用不可能三角分析: 深度教程=深度+变现(IP路线,前期慢但转化高); 追热点=传播力(泛流量,涨粉快但变现差)。引导用户先定变现模式再选内容方向, 而非在内容层面纠结",
+      "notes": "正面场景: 深度vs传播的内容方向权衡, 本质是不可能三角的定位决策"
+    },
+    {
+      "id": "should-trigger-03",
+      "type": "should_trigger",
+      "prompt": "听说泛流量不值钱是什么意思？我有5万粉但商单询价很少，品牌方聊完就没下文了",
+      "expected_behavior": "应激活 x-positioning-tradeoff, 解释泛流量不值钱的机制: 粉丝画像不精准→品牌匹配度低→转化率低→广告主不愿支付高价。泛流量转化需'反复种草-建立信任-刺激下单', 而IP粉丝自带信任决策链路极短。建议考虑转型IP路线或接受变现卡在底层",
+      "notes": "正面场景: '泛流量不值钱'反常识(V3), 用户已有泛流量但变现差的痛点, 匹配ce13反例"
+    },
+    {
+      "id": "should-trigger-04",
+      "type": "should_trigger",
+      "prompt": "我是做consulting服务的，有自己的方法论和课程，X账号该怎么定位才能配合变现？",
+      "expected_behavior": "应激活 x-positioning-tradeoff, 因用户已有变现产品/服务→直接选IP路线(深度+变现), 用不可能三角解释: 已有产品=变现力强, 需配深度内容建信任, 放弃泛传播。IP路线信任缩短转化链路(关注=信任=付费)",
+      "notes": "正面场景: 已有变现产品倒推定位, 判停条件命中(有产品→直接IP路线)"
+    },
+    {
+      "id": "should-not-trigger-01",
+      "type": "should_not_trigger",
+      "prompt": "我已经有3万粉了，想开始变现，有哪些赚钱方法？具体怎么操作？",
+      "expected_behavior": "不应激活 x-positioning-tradeoff, 应激活 x-monetization-pyramid。用户已有粉丝和定位, 问题是'怎么变现的具体路径'(金字塔三层+5种赚钱方法), 不是'选IP还是泛流量'的战略定位。本skill是选路线, monetization是选定路线后怎么变现。",
+      "notes": "跨skill混淆诱饵(兄弟skill): '怎么变现'→x-monetization-pyramid。用户已有定位, 问的是变现方法不是定位选择。"
+    },
+    {
+      "id": "should-not-trigger-02",
+      "type": "should_not_trigger",
+      "prompt": "我想做AI工具赛道，怎么找3-5个对标账号，分析他们的爆款内容找差异化？",
+      "expected_behavior": "不应激活 x-positioning-tradeoff, 应激活 x-benchmark-research。用户问的是'找对标账号研究'(5步法+三变形公式), 不是'选IP还是泛流量'的定位决策。本skill定自己的方向, benchmark是研究别人的方向。",
+      "notes": "跨skill混淆诱饵(兄弟skill): '找对标'→x-benchmark-research。用户在做对标研究, 非定位选择。"
+    },
+    {
+      "id": "should-not-trigger-03",
+      "type": "should_not_trigger",
+      "prompt": "我的推文展开率很低，用户刷到了但不点开看，怎么优化hook？",
+      "expected_behavior": "不应激活 x-positioning-tradeoff。用户问的是内容创作技巧(hook优化), 属于内容生产类问题, 不是账号定位决策。应指向内容创作类skill(如x-short-content-craft或x-five-piece-checklist)。",
+      "notes": "诱饵: 内容创作/hook优化问题, 非定位选择。description明确排除'已有定位后的日常内容生产'。"
+    },
+    {
+      "id": "edge-01",
+      "type": "edge_case",
+      "prompt": "我有5万泛流量粉丝，变现很差，是不是该转型做IP？但担心转型会掉粉",
+      "expected_behavior": "可激活 x-positioning-tradeoff。用户在问'是否从泛流量转IP', 本质是重新做定位决策——不可能三角的路线选择。应分析: 泛流量变现差(ce13机制), IP路线的信任资产+复利优势, 以及转型代价(前期泛化粉丝可能流失但精准IP粉转化更高, 参考Yangyi先精准后泛化路径)。edge在于: 用户已有账号不是从零开始, 需考虑迁移成本。",
+      "notes": "边界: 已有泛流量账号想转型IP。定位决策适用, 但需额外分析转型代价和迁移路径。"
+    },
+    {
+      "id": "edge-02",
+      "type": "edge_case",
+      "prompt": "我是做搞笑段子的，感觉深度内容不适合我的赛道，但又担心泛流量变现差",
+      "expected_behavior": "可激活 x-positioning-tradeoff, 但判断应 nuanced。搞笑段子赛道天然偏泛流量路线(传播力>深度), 不可能三角的取舍方向因赛道而异。应指出: 搞笑/娱乐赛道选传播是合理的, 泛流量不值钱主要针对'想变现但粉丝画像不精准'的情况; 搞笑赛道的变现模式(广告/流量主)本身依赖传播力。如果用户想提高变现, 可考虑在泛流量基础上加个人IP元素(人格化/系列化), 而非完全转深度。edge在于: 作者盲点'IP不一定优于泛流量, 取决于赛道'在此场景最突出。",
+      "notes": "边界: 赛道天然不适合深度内容。不可能三角的取舍方向因赛道而异, IP不一定优于泛流量(作者盲点)。"
+    }
+  ],
+  "minimum_pass_rate": 0.8,
+  "notes": "至少 3 条 should_trigger + 2 条 should_not_trigger + 1 条 edge_case。全部 should_not_trigger 必须通过 (诱饵容错为 0), 且其中至少 1 条是同书兄弟 skill 的场景 (跨 skill 混淆测试)。本skill有2条兄弟skill诱饵(should-not-trigger-01→x-monetization-pyramid, should-not-trigger-02→x-benchmark-research)。"
+}

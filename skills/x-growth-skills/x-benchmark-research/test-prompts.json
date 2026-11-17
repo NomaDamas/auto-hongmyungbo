@@ -1,0 +1,66 @@
+{
+  "skill": "x-benchmark-research",
+  "version": "0.1.0",
+  "source_book": "X秘籍 — AIP出海教程(@带队教练/GoSailGlobal)",
+  "darwin_compatible": true,
+  "test_cases": [
+    {
+      "id": "should-trigger-01",
+      "type": "should_trigger",
+      "prompt": "我想做AI工具赛道,但已经有很多人在做了,怎么找到自己的差异化定位?",
+      "expected_behavior": "应激活 x-benchmark-research, 按5步法执行: 先找3-5个低粉高爆对标(高级搜索from:xxx min_faves:10)→拆90天爆款抓隐性需求→学互动策略→拆变现模式→用三公式变形(场景细化/人群聚焦/观点反转)产出差异化选题。重点在第5步变形出差异, 避免ce19盲目模仿",
+      "notes": "正面场景: V2验证原题('怎么做AI工具赛道怎么找差异化'), 用户明确要找差异化定位, 是本skill的核心trigger"
+    },
+    {
+      "id": "should-trigger-02",
+      "type": "should_trigger",
+      "prompt": "帮我分析几个对标账号的爆款逻辑,我想借鉴但不抄",
+      "expected_behavior": "应激活 x-benchmark-research, 用户说'借鉴但不抄'直接对应'借别人验证过的流量逻辑不抄内容'的核心原则。按5步走, 重点在步骤2(拆爆款抓隐性需求)和步骤4(三公式变形)",
+      "notes": "正面场景: 用户明确要分析对标账号爆款, 且'借鉴但不抄'精准匹配本skill的核心原则"
+    },
+    {
+      "id": "should-trigger-03",
+      "type": "should_trigger",
+      "prompt": "I want to find 3-5 benchmark accounts in the AI tools niche and figure out what makes their viral posts work. How should I approach this?",
+      "expected_behavior": "应激活 x-benchmark-research, 英文prompt测试中英双写trigger。'find benchmark accounts''what makes viral posts work'匹配description中的英文trigger词。按5步走, 步骤1用高级搜索语法找低粉高爆账号",
+      "notes": "正面场景(英文): 用户要找对标账号并分析爆款逻辑, 测试英文trigger词benchmark accounts/viral posts"
+    },
+    {
+      "id": "should-trigger-04",
+      "type": "should_trigger",
+      "prompt": "我刚注册X号做AI出海内容,不知道该学谁的风格,怎么找适合自己的对标账号?",
+      "expected_behavior": "应激活 x-benchmark-research, 用户是新号找对标场景。按5步走, 步骤1重点教高级搜索语法(from:xxx min_faves:10)和低粉高爆筛选标准(用户重合度80%+、近60天3篇以上爆文), 避免伪对标",
+      "notes": "正面场景: 新号找对标, 对应AIP教程2.3的原始场景(账号搭建时按5步走)"
+    },
+    {
+      "id": "should-not-trigger-01",
+      "type": "should_not_trigger",
+      "prompt": "我决定做AI工具赛道了,每天该发什么内容?怎么写推文能让更多人看?",
+      "expected_behavior": "不应激活本 skill, 应激活 x-short-content-craft。用户已定好方向(AI工具赛道), 问题是'怎么写推文'即选叙事结构+Hook-Body-CTA起草, 属于内容生产阶段而非对标研究阶段",
+      "notes": "兄弟诱饵: 用户说'怎么写推文'是x-short-content-craft的核心trigger, 应路由到该skill。本skill是'找对标/分析竞品'时用, 不是'日常发内容'时用"
+    },
+    {
+      "id": "should-not-trigger-02",
+      "type": "should_not_trigger",
+      "prompt": "我该做IP个人号还是泛流量矩阵?哪个变现更好?",
+      "expected_behavior": "不应激活本 skill, 应激活 x-positioning-tradeoff。用户在战略层面纠结'IP vs 泛流量', 是不可能三角的取舍决策, 属于定位阶段而非对标研究阶段",
+      "notes": "兄弟诱饵(硬性要求): 用户问'选IP还是泛流量'是x-positioning-tradeoff的核心trigger。本skill是方向已定后找对标, 不是做方向选择"
+    },
+    {
+      "id": "edge-01",
+      "type": "edge_case",
+      "prompt": "我做了一个月X没涨粉,想看看同赛道做得好的人是怎么发的",
+      "expected_behavior": "边界判断: 用户既可能需要复盘自己的数据(x-data-review), 也可能需要分析竞品(本skill)。合理判断: 先追问'你想先复盘自己这一个月的数据找问题, 还是直接看别人怎么做来学?'若用户要分析自己数据→路由到x-data-review; 若用户要研究竞品→激活本skill。若用户同时需要两者, 建议先data-review找问题再benchmark-research找方向",
+      "notes": "边界: '没涨粉想看别人怎么做'同时触达x-data-review(复盘自己)和本skill(研究竞品)。需区分用户要'复盘自己'还是'研究别人'"
+    },
+    {
+      "id": "edge-02",
+      "type": "edge_case",
+      "prompt": "我看@dotey做得很好,想模仿他的风格做AI深层干货,可以吗?",
+      "expected_behavior": "边界判断: 应激活本skill但需重点警告ce19(盲目模仿)。用户说'模仿'正好踩中ce19反例——本skill第5步的核心是'变形出差异'而非'模仿'。合理判断: 激活本skill, 用5步法拆解@dotey的爆款逻辑(A1案例1有完整拆解), 但在步骤5强调必须用三公式变形, 不能直接模仿风格。提醒: '模仿风格=沦为千篇一律的营销号, 简体中文区用户更愿关注真实有态度的活人'",
+      "notes": "边界: 用户提到具体账号(@dotey)和'模仿', 字面像benchmark研究但intent是copy。应激活本skill但重在引导从'模仿'转向'变形出差异'(ce19)"
+    }
+  ],
+  "minimum_pass_rate": 0.8,
+  "notes": "4 条 should_trigger + 2 条 should_not_trigger(含2条兄弟诱饵: x-short-content-craft'怎么写推文'/x-positioning-tradeoff'选IP还是泛流量') + 2 条 edge_case。全部 should_not_trigger 必须通过(诱饵容错为 0)。"
+}
