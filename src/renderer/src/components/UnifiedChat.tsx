@@ -33,6 +33,8 @@ export function UnifiedChat() {
   const [fileQuery, setFileQuery] = useState("");
   const [fileResults, setFileResults] = useState<FileSearchResult[]>([]);
   const [fileContext, setFileContext] = useState<FileSearchResult[]>([]);
+  const [newItem, setNewItem] = useState<"post" | "folder" | null>(null);
+  const [newTitle, setNewTitle] = useState("");
   useEffect(() => { setFileQuery(""); setFileResults([]); setFileContext([]); }, [project?.slug]);
   const [targets, setTargets] = useState<DocId[]>([]);
   const providers = useMemo(() => (settings?.providers ?? []).filter((provider) => provider.enabled), [settings?.providers]);
@@ -46,7 +48,8 @@ export function UnifiedChat() {
     if (executionKind !== "web" && executionKind !== "cli") return toast.error("Provider에 실행 명령 또는 URL을 설정하세요.");
     const enabled = useStore.getState().enabledPlatforms();
     const scopedPlatforms = scope === "all" ? enabled : platformsInTab(scope, enabled);
-    const requestTargets = targets.length ? targets : scopedPlatforms;
+    const requestedTargets = targets.length ? targets : scopedPlatforms;
+    const requestTargets = requestedTargets.filter((doc) => !!project.docs[doc]?.trim());
     if (!requestTargets.length) return toast.error("대상 플랫폼을 먼저 설정하세요.");
     if (!requestTargets.some((doc) => project.docs[doc]?.trim()) && !preset) return toast.error("현재 문서에 내용을 먼저 입력하세요.");
     const previousDock = useStore.getState().dockTab;
@@ -129,6 +132,8 @@ export function UnifiedChat() {
         <div className="min-h-0 flex-1 overflow-y-auto p-3">
           <div className="mb-2 text-[11px] text-[var(--muted)]">홍보 글과 Git 버전 기록</div>
           <div className="space-y-1">
+            <div className="mb-2 flex gap-1"><button className="btn btn-xs" onClick={() => { setNewItem("post"); setNewTitle(""); }}>새 글</button><button className="btn btn-xs" onClick={() => { setNewItem("folder"); setNewTitle(""); }}>새 폴더</button></div>
+            {newItem && <form className="mb-2 flex gap-1" onSubmit={(event) => { event.preventDefault(); const title = newTitle.trim(); if (!title) return; void (newItem === "post" ? useStore.getState().createProject(title, "") : useStore.getState().createFolder(title)).then(() => { setNewItem(null); setNewTitle(""); }); }}><input autoFocus className="input min-w-0 flex-1 text-[11px]" value={newTitle} onChange={(event) => setNewTitle(event.target.value)} placeholder={newItem === "post" ? "글 제목" : "폴더 이름"} /><button className="btn btn-xs btn-primary">확인</button></form>}
             {projects.map((item) => <button key={item.slug} className={`block w-full rounded-md px-2 py-2 text-left text-[12px] hover:bg-[var(--surface-2)] ${project.slug === item.slug ? "bg-[var(--surface-3)]" : ""}`} onClick={() => void useStore.getState().openProject(item.slug)}>{item.title}<span className="ml-2 text-[10px] text-[var(--muted)]">{new Date(item.updatedAt).toLocaleDateString()}</span></button>)}
           </div>
           <button className="btn btn-sm mt-3 w-full" onClick={() => useStore.setState({ historyDoc: activeDoc })}>현재 문서 Git 버전 기록</button>
