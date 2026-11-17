@@ -21,7 +21,7 @@ const HIDDEN_SKILL_MATCHERS: readonly [string, string][] = [
 const RECOMMENDED_SKILLS = [["humanize", "윤문"], ["hook", "훅 강화"], ["shorter", "짧게"], ["professional", "전문적으로"]] as const;
 type Scope = "all" | TabId;
 
-export function UnifiedChat() {
+export function UnifiedChat({ initialTab = "promotion", hideHeader = false }: { initialTab?: "promotion" | "files" | "library"; hideHeader?: boolean } = {}) {
   const settings = useStore((s) => s.settings);
   const project = useStore((s) => s.project);
   const projects = useStore((s) => s.projects);
@@ -29,7 +29,8 @@ export function UnifiedChat() {
   const [providerId, setProviderId] = useState("");
   const [instruction, setInstruction] = useState("");
   const [busy, setBusy] = useState(false);
-  const [chatTab, setChatTab] = useState<"promotion" | "files" | "library">("promotion");
+  const [chatTab, setChatTab] = useState<"promotion" | "files" | "library">(initialTab);
+  const [splitTab, setSplitTab] = useState<"promotion" | "files" | "library" | null>(null);
   const [scope, setScope] = useState<Scope>("all");
   const [fileQuery, setFileQuery] = useState("");
   const [fileResults, setFileResults] = useState<FileSearchResult[]>([]);
@@ -129,19 +130,18 @@ export function UnifiedChat() {
   const tabLabel = { promotion: "홍보관리", files: "파일 에이전트", library: "글 목록" } as const;
   const sendSkill = (skill: Preset) => { setInstruction(""); setSlashOpen(false); void send(skill); };
   return (
+    <div className={splitTab && !hideHeader ? "grid h-full min-h-0 grid-cols-2 gap-px bg-[var(--border)]" : "h-full min-h-0"}>
     <section className="flex h-full min-h-0 flex-col bg-[var(--surface)]">
-      <header className="flex h-11 shrink-0 items-center gap-2 border-b border-[var(--border)] px-3">
+      {!hideHeader && <header className="flex h-11 shrink-0 items-center gap-2 border-b border-[var(--border)] px-3">
         <Bot size={14} className="text-[var(--focus)]" />
         <div className="flex items-center gap-1 rounded-md bg-[var(--surface-2)] p-0.5" onDragOver={(event) => event.preventDefault()} onDrop={(event) => { const from = event.dataTransfer.getData("application/x-hmb-chat-tab") as typeof chatTab; if (from) setChatTabs((current) => { const next = current.filter((item) => item !== from); return [...next.slice(0, 1), from, ...next.slice(1)]; }); }}>
-          {chatTabs.map((tab) => <button key={tab} draggable className={`btn btn-xs ${chatTab === tab ? "btn-primary" : "btn-ghost"}`} onClick={() => setChatTab(tab)} onDragStart={(event) => event.dataTransfer.setData("application/x-hmb-chat-tab", tab)}>{tab === "files" ? <FileSearch size={12} /> : tab === "library" ? <GitBranch size={12} /> : null}{tabLabel[tab]}</button>)}
+          {chatTabs.map((tab) => <button key={tab} draggable className={`btn btn-xs ${chatTab === tab ? "btn-primary" : "btn-ghost"}`} onClick={() => setChatTab(tab)} onDragStart={(event) => event.dataTransfer.setData("application/x-hmb-chat-tab", tab)}>{tab === "files" ? <FileSearch size={12} /> : tab === "library" ? <GitBranch size={12} /> : null}{tab === "promotion" ? "통합 Chat" : tabLabel[tab]}</button>)}
         </div>
         <span className="text-[12px] font-medium">통합 Chat</span>
         <select className="input ml-auto h-7 py-0 text-[11px]" value={provider?.id ?? ""} onChange={(event) => setProviderId(event.target.value)}>
           {providers.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
         </select>
-        {provider && <select className="input h-7 max-w-32 py-0 text-[10px]" value={provider.model ?? ""} onChange={(event) => void useStore.getState().updateSettings({ providers: settings.providers.map((item) => item.id === provider.id ? { ...item, model: event.target.value || undefined } : item) })}><option value="">기본 모델</option>{provider.model && <option value={provider.model}>{provider.model}</option>}</select>}
-        {provider && <select className="input h-7 w-20 py-0 text-[10px]" value={provider.effort ?? "medium"} onChange={(event) => void useStore.getState().updateSettings({ providers: settings.providers.map((item) => item.id === provider.id ? { ...item, effort: event.target.value as typeof provider.effort } : item) })}><option value="low">low</option><option value="medium">medium</option><option value="high">high</option><option value="xhigh">xhigh</option></select>}
-      </header>
+      </header>}
       {chatTab === "library" ? (
         <div className="min-h-0 flex-1 overflow-y-auto p-3">
           <div className="mb-2 text-[11px] text-[var(--muted)]">홍보 글과 Git 버전 기록</div>
@@ -164,7 +164,7 @@ export function UnifiedChat() {
           </div>
           <div className="text-[11px] text-[var(--muted)]">Chat에 전달할 파일: {fileContext.map((item) => item.path).join(", ") || "없음"}</div>
         </div>
-      ) : <div className="flex min-h-0 flex-1 flex-col justify-end gap-3 p-3">
+      ) : <div className="flex min-h-0 flex-1 flex-col justify-end gap-3 p-3" onDragOver={(event) => event.preventDefault()} onDrop={(event) => { const tab = event.dataTransfer.getData("application/x-hmb-chat-tab") as "promotion" | "files" | "library"; if (tab && tab !== chatTab) setSplitTab(tab); }}>
         <div className="rounded-xl border border-[var(--border)] bg-[var(--surface-2)] p-3 text-[11.5px] text-[var(--muted)]" onDragOver={(event) => event.preventDefault()} onDrop={(event) => { event.preventDefault(); const doc = event.dataTransfer.getData("application/x-hmb-doc") as DocId; if (doc) setTargets([doc]); }}>
           <Sparkles size={13} className="mb-1 text-[var(--focus)]" />
           <div>대상: <strong className="text-[var(--fg)]">{targets.join(", ") || (scope === "all" ? "전체" : scope)}</strong></div>
@@ -173,12 +173,14 @@ export function UnifiedChat() {
         <div className="relative flex items-end gap-2">
           <div className="relative flex-1">
             {slashOpen && <div className="absolute bottom-full left-0 z-10 mb-1 w-64 rounded-lg border border-[var(--border)] bg-[var(--surface)] p-1 shadow-xl"><div className="px-2 py-1 text-[10px] text-[var(--muted)]">Skill 선택 · 입력하면 필터링</div>{RECOMMENDED_SKILLS.map(([preset, label]) => <button key={preset} className="block w-full rounded px-2 py-1.5 text-left text-[11px] hover:bg-[var(--surface-2)]" onClick={() => sendSkill(preset)}>{label}</button>)}<div className="border-t border-[var(--border)] px-2 py-1 text-[10px] text-[var(--muted)]">외부 Skill은 이름을 입력하거나 추천을 요청하세요.</div></div>}
-            <textarea className="input min-h-20 w-full resize-none pb-8" value={instruction} onChange={(event) => { const value = event.target.value; setInstruction(value); setSlashOpen(value.endsWith("/")); }} placeholder="현재 글에 원하는 작업을 입력하세요…" onKeyDown={(event) => { if ((event.metaKey || event.ctrlKey) && event.key === "Enter") { event.preventDefault(); void send(); } }} />
-            <div className="absolute bottom-1.5 left-2 flex items-center gap-1"><select className="input h-6 w-28 border-0 bg-transparent py-0 text-[10px]" value={scope} onChange={(event) => { setScope(event.target.value as Scope); setTargets([]); }}><option value="all">대상: 전체</option><option value="sns">대상: SNS</option><option value="community">대상: 커뮤니티</option><option value="blog">대상: 블로그</option></select></div>
+            <textarea className="input min-h-20 w-full resize-none pb-8 pl-40" value={instruction} onChange={(event) => { const value = event.target.value; setInstruction(value); setSlashOpen(value.endsWith("/")); }} placeholder="현재 글에 원하는 작업을 입력하세요…" onKeyDown={(event) => { if ((event.metaKey || event.ctrlKey) && event.key === "Enter") { event.preventDefault(); void send(); } }} />
+            <div className="absolute bottom-1.5 left-2 flex items-center gap-1"><select className="input h-6 w-28 border-0 bg-transparent py-0 text-[10px]" value={scope} onChange={(event) => { setScope(event.target.value as Scope); setTargets([]); }}><option value="all">대상: 전체</option><option value="sns">대상: SNS</option><option value="community">대상: 커뮤니티</option><option value="blog">대상: 블로그</option></select>{provider && <select className="input h-6 w-24 border-0 bg-transparent py-0 text-[10px]" value={provider.model ?? ""} onChange={(event) => void useStore.getState().updateSettings({ providers: settings.providers.map((item) => item.id === provider.id ? { ...item, model: event.target.value || undefined } : item) })}><option value="">모델</option>{provider.model && <option value={provider.model}>{provider.model}</option>}</select>}{provider && <select className="input h-6 w-16 border-0 bg-transparent py-0 text-[10px]" value={provider.effort ?? "medium"} onChange={(event) => void useStore.getState().updateSettings({ providers: settings.providers.map((item) => item.id === provider.id ? { ...item, effort: event.target.value as typeof provider.effort } : item) })}><option value="low">low</option><option value="medium">medium</option><option value="high">high</option><option value="xhigh">xhigh</option></select>}</div>
             <div className="absolute bottom-1.5 right-1.5 flex items-center gap-1">{RECOMMENDED_SKILLS.slice(0, 2).map(([preset, label]) => <button key={preset} className="btn btn-xs" disabled={busy} onClick={() => void send(preset)}>{label}</button>)}<button className="btn btn-xs btn-primary" disabled={busy || !instruction.trim()} onClick={() => void send()}>{busy ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />}</button></div>
           </div>
         </div>
       </div>}
     </section>
+    {splitTab && !hideHeader && <UnifiedChat initialTab={splitTab} hideHeader />}
+    </div>
   );
 }
