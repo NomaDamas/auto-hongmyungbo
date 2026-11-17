@@ -1,0 +1,66 @@
+{
+  "skill": "x-foryou-algorithm",
+  "version": "0.1.0",
+  "source_book": "X秘籍 — xAI官方算法仓库 / AIP出海教程",
+  "darwin_compatible": true,
+  "test_cases": [
+    {
+      "id": "should-trigger-01",
+      "type": "should_trigger",
+      "prompt": "我只有200个粉丝，发的内容真的能被推荐吗？X的算法会不会只推大号的帖子？小号还有机会吗？",
+      "expected_behavior": "应激活 x-foryou-algorithm, 用OON占比60-70%+候选隔离解释小号单帖可凭自身质量进入推荐池, 不靠粉丝量",
+      "notes": "正面场景: 小号想理解算法机会, 核心trigger '小号能被推荐吗'+'算法'"
+    },
+    {
+      "id": "should-trigger-02",
+      "type": "should_trigger",
+      "prompt": "X的For You算法到底是怎么决定推什么内容的？为什么有的帖子几万曝光有的只有几十？推荐机制是怎样的？",
+      "expected_behavior": "应激活 x-foryou-algorithm, 讲解双源召回+多动作加权打分+候选隔离的算法结构",
+      "notes": "正面场景: 直接问算法机制, 核心trigger 'For You算法'+'推荐机制'"
+    },
+    {
+      "id": "should-trigger-03",
+      "type": "should_trigger",
+      "prompt": "我注意到发争议性内容互动很高但曝光反而下降了，是不是算法在压我？rage-bait是不是被降权了？",
+      "expected_behavior": "应激活 x-foryou-algorithm, 用多动作加权解释rage-bait虽P(reply)高但block/mute/report负权重更高, 综合分反而降低",
+      "notes": "正面场景: 想理解负权重降权机制, 核心trigger '算法降权'+'rage-bait'"
+    },
+    {
+      "id": "should-trigger-04",
+      "type": "should_trigger",
+      "prompt": "收藏和点赞对X算法来说权重一样吗？我应该优化哪个指标来提升推荐？",
+      "expected_behavior": "应激活 x-foryou-algorithm, 用多动作加权模型解释收藏(未来行动信号)权重高于点赞, 应优化收藏/回复",
+      "notes": "正面场景: 想理解多动作权重差异, 核心trigger '收藏和点赞'+'算法权重'+'推荐'"
+    },
+    {
+      "id": "should-not-trigger-01",
+      "type": "should_not_trigger",
+      "prompt": "我连发了20条只有2条过百，是不是该放弃了？感觉自己不适合做X，一条没爆就怀疑人生。",
+      "expected_behavior": "不应激活本 skill, 应激活 x-longtail-strategy (长尾分布心态: 中位数42是常态, 目标是提高进前10%概率而非每条都爆)",
+      "notes": "跨skill混淆诱饵: 用户是心态焦虑'帖子没爆怎么办', 这是longtail-strategy的长尾心态场景, 不是问算法机制"
+    },
+    {
+      "id": "should-not-trigger-02",
+      "type": "should_not_trigger",
+      "prompt": "怎么在大V的评论区获得曝光又不像蹭流量？评论区互动有什么技巧可以快速涨粉？",
+      "expected_behavior": "不应激活本 skill, 应激活 x-comment-engagement (评论互动策略: 重述观点+补充经验模板, Repost vs Quote决策)",
+      "notes": "跨skill混淆诱饵: 用户问'怎么互动获曝光'是行动层, 本skill只解释'算法如何评估互动价值'是机制层"
+    },
+    {
+      "id": "should-not-trigger-03",
+      "type": "should_not_trigger",
+      "prompt": "帮我写一条介绍Raycast这个工具的推文，要有点击欲的那种。",
+      "expected_behavior": "不应激活本 skill, 应激活 x-short-content-craft (短内容类型与结构: Hook-Body-CTA起草)",
+      "notes": "诱饵: 纯写内容不问机制, 虽然提到'点击欲'但用户要的是内容写作不是算法理解"
+    },
+    {
+      "id": "edge-01",
+      "type": "edge_case",
+      "prompt": "我的帖子发出去前1小时没什么互动然后就沉了，这正常吗？算法是怎么判断要不要继续推的？",
+      "expected_behavior": "边界判断: 用户同时问了'算法怎么判断'(机制层→可触发本skill)和'怎么办'(执行层→cold-start)。因用户明确问'算法是怎么判断要不要继续推的', 侧重理解机制, 可触发本skill讲解算法依赖初始互动信号决定是否推入更大池; 但若用户后续追问'我该怎么办'则应转交x-cold-start-playbook",
+      "notes": "边界: 既涉及算法机制(初始互动信号→算法判定质量)又涉及冷启动(前几小时加热)。区分关键: 问'算法为什么这样做'→本skill; 问'我该怎么操作'→cold-start"
+    }
+  ],
+  "minimum_pass_rate": 0.8,
+  "notes": "至少3条should_trigger + 2条should_not_trigger + 1条edge_case。should_not_trigger全部必须通过(诱饵容错为0), 其中2条是同书兄弟skill场景(should-not-trigger-01→longtail-strategy, should-not-trigger-02→comment-engagement)。"
+}

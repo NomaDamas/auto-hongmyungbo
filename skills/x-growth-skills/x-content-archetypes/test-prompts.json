@@ -1,0 +1,59 @@
+{
+  "skill": "x-content-archetypes",
+  "version": "0.1.0",
+  "source_book": "X秘籍 — 向阳乔木 @vista8",
+  "darwin_compatible": true,
+  "test_cases": [
+    {
+      "id": "should-trigger-01",
+      "type": "should_trigger",
+      "prompt": "我最近一个月发了20多条帖子,大部分是AI相关的观点和感受,互动都很低,是不是内容类型有问题?",
+      "expected_behavior": "应激活 x-content-archetypes, 引导用户审计内容原型结构占比, 指出普通表达型(观点/感叹)中位互动仅16,建议转化为资源入口型或工具教程型",
+      "notes": "正面场景: 用户审计内容结构, 典型 trigger '互动低+内容类型'"
+    },
+    {
+      "id": "should-trigger-02",
+      "type": "should_trigger",
+      "prompt": "我发了条'AI太强了,GPT又升级了'这种感叹,为什么完全没人理?",
+      "expected_behavior": "应激活 x-content-archetypes, 判定此帖为普通表达型(中位互动16, 进前10%概率约9%), 建议转化为资源入口型(加工具入口)或工具教程型(加使用步骤)",
+      "notes": "正面场景: V2经典测试用例, 纯感叹=普通表达型"
+    },
+    {
+      "id": "should-trigger-03",
+      "type": "should_trigger",
+      "prompt": "我想做AI工具赛道,资源入口型和工具教程型哪个传播上限更高?该怎么选?",
+      "expected_behavior": "应激活 x-content-archetypes, 对比资源入口型(中位2965/进前10%约40%)与工具教程型(中位2035/约24%), 给出选择建议",
+      "notes": "正面场景: 原型比较与传播上限预测"
+    },
+    {
+      "id": "should-trigger-04",
+      "type": "should_trigger",
+      "prompt": "帮我看一下这条帖子的content archetype,看看viral ceiling怎么样。帖子里就是分享了一个观点,没有任何链接或工具。",
+      "expected_behavior": "应激活 x-content-archetypes, 归类为普通表达型, 指出中位互动16/进前10%概率约9%的传播上限",
+      "notes": "正面场景: 英文trigger词(content archetype/viral ceiling)触发, 单条帖子分类"
+    },
+    {
+      "id": "should-not-trigger-01",
+      "type": "should_not_trigger",
+      "prompt": "我想写一条教程型的短内容,Hook该怎么写才能3秒抓住眼球,Body用bullet points还是短句组织?",
+      "expected_behavior": "不应激活本 skill, 应激活 x-short-content-craft (四种短内容类型+Hook-Body-CTA结构生产)",
+      "notes": "跨skill混淆诱饵(兄弟skill): 用户已确定写教程型, 需要的是结构生产而非分类预测"
+    },
+    {
+      "id": "should-not-trigger-02",
+      "type": "should_not_trigger",
+      "prompt": "帮我检查这条推文五件套是否完备:价值承诺、场景、入口、证据、收藏理由,缺哪件补哪件。",
+      "expected_behavior": "不应激活本 skill, 应激活 x-five-piece-checklist (五件套完备性检查)",
+      "notes": "跨skill混淆诱饵(兄弟skill): 用户需要要素检查而非原型分类"
+    },
+    {
+      "id": "edge-01",
+      "type": "edge_case",
+      "prompt": "我的内容一半是资源分享(带链接带工具),一半是个人观点和感受,这种混合型算什么原型?可以混着发吗?",
+      "expected_behavior": "可激活本 skill 做审计: 逐条归类——带入口的归资源入口型,纯观点的归普通表达型,分别统计占比。建议资源入口型占比>50%,普通表达型控制在20%以下。混合发可以但需控制比例,而非笼统归为一个'混合型'",
+      "notes": "边界: 混合型内容——不是把混合当一类,而是拆开逐条分类审计占比"
+    }
+  ],
+  "minimum_pass_rate": 0.8,
+  "notes": "4条should_trigger + 2条should_not_trigger(均为兄弟skill诱饵: x-short-content-craft / x-five-piece-checklist) + 1条edge_case。诱饵容错为0。"
+}

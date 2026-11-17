@@ -1,0 +1,73 @@
+{
+  "skill": "x-three-translations",
+  "version": "0.1.0",
+  "source_book": "X秘籍 — 向阳乔木 @vista8 + X官方 @XCreators",
+  "darwin_compatible": true,
+  "test_cases": [
+    {
+      "id": "should-trigger-01",
+      "type": "should_trigger",
+      "prompt": "我写了条推文'我们上线了长上下文功能，支持20万token输入'，发出去基本没人理。怎么改成强推文?",
+      "expected_behavior": "应激活 x-three-translations, 识别'我们上线了'为发布式内部语言、'支持20万token'为能力式内部语言，执行第二次翻译(能力→场景:如'一次性读完行业报告并找出竞品变化')和第三次翻译(结论→证据:放前后对比截图)",
+      "notes": "正面场景: 典型公告式表达(发布+能力)，用户明确要求改写"
+    },
+    {
+      "id": "should-trigger-02",
+      "type": "should_trigger",
+      "prompt": "This tweet just says '效果很好，非常强大，体验极佳' — nobody engages with it. What's wrong?",
+      "expected_behavior": "应激活 x-three-translations, 识别'效果很好/非常强大/体验极佳'为结论式内部语言，执行第三次翻译(结论→证据:用截图/数字/步骤/前后对比替换空泛结论)",
+      "notes": "正面场景: 英文提问，纯结论式表达无证据，trigger词 show don't tell / helpful expression"
+    },
+    {
+      "id": "should-trigger-03",
+      "type": "should_trigger",
+      "prompt": "我们产品更新了API，推文写的是'支持流式输出、支持函数调用、支持多模态输入'，感觉像功能列表没人看。怎么把功能介绍写得吸引人?",
+      "expected_behavior": "应激活 x-three-translations, 识别三个'支持X'为能力式内部语言(功能列表)，执行第二次翻译(能力→场景:把每个能力嵌入读者真实任务)",
+      "notes": "正面场景: 功能列表=能力式内部语言，用户明确问'怎么写得吸引人'"
+    },
+    {
+      "id": "should-trigger-04",
+      "type": "should_trigger",
+      "prompt": "这条推文读起来太像公告了，像产品更新说明，怎么改得不像自嗨?",
+      "expected_behavior": "应激活 x-three-translations, 用户直接使用'公告''自嗨'等trigger词，执行三次翻译识别并改写内部语言",
+      "notes": "正面场景: 用户直接命中trigger词'公告式表达/自嗨'"
+    },
+    {
+      "id": "should-not-trigger-01",
+      "type": "should_not_trigger",
+      "prompt": "帮我检查这条推文五件套齐不齐:价值承诺、使用场景、入口、证据、收藏理由。",
+      "expected_behavior": "不应激活本 skill, 应激活 x-five-piece-checklist。用户要的是结构完备性检查(五要素齐全)，不是语言视角转换",
+      "notes": "跨 skill 混淆诱饵: 应触发 x-five-piece-checklist 的五件套检查场景，不是翻译场景"
+    },
+    {
+      "id": "should-not-trigger-02",
+      "type": "should_not_trigger",
+      "prompt": "我想发一条教人用 Raycast 的推文，从零开始怎么起草?",
+      "expected_behavior": "不应激活本 skill, 应激活 x-short-content-craft。用户是从零起草新内容(选类型+Hook-Body-CTA)，不是对已有初稿做视角转换改写",
+      "notes": "跨 skill 混淆诱饵: 应触发 x-short-content-craft 的起草场景。三次翻译是对已有初稿的改写工具，不是起草工具"
+    },
+    {
+      "id": "should-not-trigger-03",
+      "type": "should_not_trigger",
+      "prompt": "我准备发一条AI工具推荐帖，大概200字，值不值得发?",
+      "expected_behavior": "不应激活本 skill, 应激活 x-four-saves。用户问的是内容估值(值不值得发=帮读者省几步路)，不是已有初稿的改写",
+      "notes": "跨 skill 混淆诱饵: 应触发 x-four-saves 的估值场景。四省是发之前的筛选，翻译是筛选之后的表达优化"
+    },
+    {
+      "id": "edge-01",
+      "type": "edge_case",
+      "prompt": "我写了条推文'我们上线了新功能，能帮你把80页报告变3页提纲，试了一下3分钟搞定，截图如下'，需要改吗?",
+      "expected_behavior": "边界判断: 初稿已做了第一次翻译(发布→帮助:'帮你把80页报告变3页提纲')和第三次翻译(结论→证据:'3分钟搞定+截图')，基本已是外部语言。应告知用户已完成翻译无需大改，仅可微调措辞。不应执行完整三次翻译流程",
+      "notes": "边界: 初稿已包含帮助式表达+证据，大部分已是外部语言。过度翻译会过度修饰"
+    },
+    {
+      "id": "edge-02",
+      "type": "edge_case",
+      "prompt": "我们公司要发一条官方版本更新公告，面向企业客户，需要改得不像公告吗?",
+      "expected_behavior": "边界判断: 官方版本更新公告的目标是传递事实，受众是企业客户(需要官方语调)，不应做帮助式翻译。应告知用户此类场景不需要三次翻译——有些内容天然是公告，翻译反而降低专业性",
+      "notes": "边界: B2B/企业客户场景，公告语调是受众期望的，翻译不适用"
+    }
+  ],
+  "minimum_pass_rate": 0.8,
+  "notes": "4 条 should_trigger + 3 条 should_not_trigger(含 3 条跨 skill 诱饵: x-five-piece-checklist/x-short-content-craft/x-four-saves) + 2 条 edge_case。全部 should_not_trigger 必须通过 (诱饵容错为 0)。"
+}

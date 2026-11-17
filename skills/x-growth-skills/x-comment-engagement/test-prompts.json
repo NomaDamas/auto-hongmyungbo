@@ -1,0 +1,66 @@
+{
+  "skill": "x-comment-engagement",
+  "version": "0.1.0",
+  "source_book": "X秘籍 — Yangyi @Yangyixxxx + 木马人 @cnyzgkc",
+  "darwin_compatible": true,
+  "test_cases": [
+    {
+      "id": "should-trigger-01",
+      "type": "should_trigger",
+      "prompt": "我是新号，想在大V的帖子下面评论获取曝光，但怕被当成蹭流量的，评论应该怎么写?",
+      "expected_behavior": "应激活 x-comment-engagement, 识别为'大V帖下评论获取曝光'场景，提供'重述观点+补充经验'模板(策略1变体)或从六法中选择适合当前原帖主题的策略，并做质量门槛检查(有增量价值/不硬蹭/不涉敏感)",
+      "notes": "正面场景: 典型'怎么在大V帖下获曝光又不被当蹭流量'，用户命中多个trigger词"
+    },
+    {
+      "id": "should-trigger-02",
+      "type": "should_trigger",
+      "prompt": "看到一条好帖，我应该Repost还是Quote?这两个有什么区别?",
+      "expected_behavior": "应激活 x-comment-engagement, 识别为Repost vs Quote决策场景，区分Repost=替人筛选(不增辨识度)vs Quote=展示思考(补充增量观点)，建议新人优先Quote+增量观点，并检查Quote内容是否有实质增量(非'太强了'式感叹)",
+      "notes": "正面场景: 用户直接命中trigger词'Repost还是Quote'"
+    },
+    {
+      "id": "should-trigger-03",
+      "type": "should_trigger",
+      "prompt": "I want to get noticed by replying under big accounts' posts without looking like I'm clout-chasing. How should I write my replies?",
+      "expected_behavior": "应激活 x-comment-engagement, 英文提问但命中trigger词'get noticed by replying'和'clout-chasing'(蹭流量)，提供高质量回复策略(增量价值+与原帖相关)，避免硬蹭(ce06)和低质回复",
+      "notes": "正面场景: 英文trigger，description中'how to reply for exposure'覆盖此场景"
+    },
+    {
+      "id": "should-trigger-04",
+      "type": "should_trigger",
+      "prompt": "自己发的推文评论区好冷清，有什么互动技巧能让评论区热闹起来?",
+      "expected_behavior": "应激活 x-comment-engagement, 识别为'激活自己评论区'场景，从六法中选择策略(价值型建形象/争议型冲量/低门槛型破冰)，并附争议型策略的频次警告",
+      "notes": "正面场景: 用户问'怎么引发互动/让评论区热闹'，命中trigger词'互动技巧'"
+    },
+    {
+      "id": "should-not-trigger-01",
+      "type": "should_not_trigger",
+      "prompt": "我是新号没粉丝，应该怎么起量?发什么内容能火?",
+      "expected_behavior": "不应激活本 skill, 应激活 x-cold-start-playbook。用户问的是整体冷启动策略(没粉丝怎么起量)，不是评论/Quote的具体战术",
+      "notes": "跨 skill 混淆诱饵: 应触发 x-cold-start-playbook 的冷启动策略排序场景。本skill专注评论互动和Quote/Repost的具体战术，不解决'把有限时间投到哪'的策略排序"
+    },
+    {
+      "id": "should-not-trigger-02",
+      "type": "should_not_trigger",
+      "prompt": "我想写一条教人用 Claude Code 的推文，从零开始怎么写?",
+      "expected_behavior": "不应激活本 skill, 应激活 x-short-content-craft。用户是从零起草自己的原创帖(选类型+Hook-Body-CTA)，不是在别人帖下评论/回复/Quote",
+      "notes": "跨 skill 混淆诱饵: 应触发 x-short-content-craft 的起草场景。本skill解决'在别人帖下怎么互动'，不解决'自己的原创帖怎么写'"
+    },
+    {
+      "id": "edge-01",
+      "type": "edge_case",
+      "prompt": "我Quote了一条大V的推文，加了句'说得好，深有同感'，这样行吗?",
+      "expected_behavior": "应激活 x-comment-engagement, 识别为低质Quote(ce18风险)。'说得好，深有同感'只有感叹无增量价值，应建议用户补充具体观点/经验/新角度，否则容易被当蹭流量。这是本skill的边界场景——用户已做了Quote但质量不足，需要质量门槛检查(E步骤3)",
+      "notes": "边界: 用户已选Quote(正确方向)但内容是低质感叹(ce18风险)。应激活本skill做质量检查而非不激活"
+    },
+    {
+      "id": "edge-02",
+      "type": "edge_case",
+      "prompt": "我想用坎宁汉姆定律，故意在推文里把一个AI术语说错来引发纠正评论，这周已经用了两次了，还能再用吗?",
+      "expected_behavior": "应激活 x-comment-engagement, 识别坎宁汉姆定律策略但触发频次警告(ce08)。E步骤3判停条件: 若近期已用≥2次争议型策略，提示'频次过高损专业形象'，建议换价值型策略(提问/请教)。这是本skill内部的边界——策略可用但频次有上限",
+      "notes": "边界: 策略本身在本skill范围内，但频次触发ce08警告。应激活并给出频次建议而非不激活"
+    }
+  ],
+  "minimum_pass_rate": 0.8,
+  "notes": "4 条 should_trigger + 2 条 should_not_trigger(均为跨 skill 诱饵: x-cold-start-playbook/x-short-content-craft) + 2 条 edge_case。全部 should_not_trigger 必须通过 (诱饵容错为 0)。"
+}

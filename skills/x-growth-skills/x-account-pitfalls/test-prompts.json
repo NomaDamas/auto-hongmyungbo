@@ -1,0 +1,66 @@
+{
+  "skill": "x-account-pitfalls",
+  "version": "0.1.0",
+  "source_book": "《X秘籍》 — 多位创作者合集",
+  "darwin_compatible": true,
+  "test_cases": [
+    {
+      "id": "should-trigger-01",
+      "type": "should_trigger",
+      "prompt": "我的推文突然搜不到了，用搜索框搜 from:@我的用户名 什么都搜不到，是不是被限流了？怎么排查？",
+      "expected_behavior": "应激活 x-account-pitfalls, 执行限流自检流程: 确认 from:@搜不到=被限流 → 先检查 Settings→Privacy and Safety→Your Posts 是否关闭 → 发新推文再搜 → 区分临时标签(等24h不动)vs正式标签(申诉+48h静默)",
+      "notes": "正面场景: 推文搜不到+from:@搜索, 完美匹配限流自检核心trigger"
+    },
+    {
+      "id": "should-trigger-02",
+      "type": "should_trigger",
+      "prompt": "我昨天换了个科学上网节点，今天发推就没流量了，账号提示有异常活动。是不是触发风控了？临时标签和限流有什么区别？",
+      "expected_behavior": "应激活 x-account-pitfalls, 解释频繁换IP触发风控(ce02) + 区分临时标签(几小时~24h自愈,不动账号)与正式限流(from:@搜不到,需申诉) + 给出处理建议",
+      "notes": "正面场景: 换IP后异常+临时标签疑问, 匹配7大坑第1条+限流区分"
+    },
+    {
+      "id": "should-trigger-03",
+      "type": "should_trigger",
+      "prompt": "My X account got suspended and I lost all my followers. How do I write an appeal email? Is it even worth trying?",
+      "expected_behavior": "应激活 x-account-pitfalls, 给出申诉流程: @Support申诉 + 申诉文案模板(英文) + 48h不做任何操作 + 木马人申诉12次找回的案例鼓励不要放弃",
+      "notes": "正面场景: 英文提问, 账号被封+申诉需求, 匹配7大坑第7条+申诉流程. 验证英文trigger词(account suspended/appeal)是否生效"
+    },
+    {
+      "id": "should-trigger-04",
+      "type": "should_trigger",
+      "prompt": "我最近每天关注取关好几十个人想快速涨粉，今天突然提示账号异常，是不是被判脚本了？该怎么办？",
+      "expected_behavior": "应激活 x-account-pitfalls, 解释批量关注取关=脚本特征(ce03) → 立即停止批量操作 → 自检是否被限流(from:@搜索) → 若限流则走申诉流程 → 预防: 互关每天≤15+不批量操作",
+      "notes": "正面场景: 批量操作触发风控, 匹配7大坑第2条+ce03"
+    },
+    {
+      "id": "should-not-trigger-01",
+      "type": "should_not_trigger",
+      "prompt": "我刚注册了一个新的X账号，第一天应该干什么？要先装修主页、开蓝V、养号吗？",
+      "expected_behavior": "不应激活 x-account-pitfalls, 应激活 x-account-setup。用户是新号开业准备(预防), 不是账号出问题后的恢复(治疗)。description明确排除'新号开业装修养号→x-account-setup'。",
+      "notes": "跨skill混淆诱饵(兄弟skill): 新号第一天→开业准备, 不是限流恢复。x-account-setup处理装修+蓝V+养号。"
+    },
+    {
+      "id": "should-not-trigger-02",
+      "type": "should_not_trigger",
+      "prompt": "我发了两周推文了，一条都没有流量，粉丝也没涨几个，怎么办？",
+      "expected_behavior": "不应激活 x-account-pitfalls, 应激活 x-cold-start-playbook。用户在发内容但没流量(获客问题), 不是账号被限流(健康问题)。判断关键: 应用from:@搜索确认能搜到推文=没限流=不是本skill。description明确排除'没粉丝怎么起量→x-cold-start-playbook'。",
+      "notes": "跨skill混淆诱饵(兄弟skill): 发了内容没流量→冷启动获客, 不是限流。需区分'没流量'(cold-start)和'搜不到'(pitfalls)。"
+    },
+    {
+      "id": "should-not-trigger-03",
+      "type": "should_not_trigger",
+      "prompt": "怎么写一条能火的推文？选题怎么找？什么内容容易收藏？",
+      "expected_behavior": "不应激活 x-account-pitfalls。用户在问内容创作/选题, 属内容生产类问题, 与账号健康/风控/限流无关。应指向内容创作类skill(如x-content-archetypes或x-short-content-craft)。",
+      "notes": "诱饵: 内容选题/创作问题, 非账号健康/风控/限流。"
+    },
+    {
+      "id": "edge-01",
+      "type": "edge_case",
+      "prompt": "我账号最近曝光降了不少，但用 from:@我的用户名 搜还能搜到推文。是限流了还是只是内容质量下降了？",
+      "expected_behavior": "应部分激活 x-account-pitfalls 的排查部分, 但明确告知: 能搜到推文=没有被正式限流。曝光下降更可能是内容质量/冷启动不足/算法自然波动, 应结合 x-cold-start-playbook 和 x-data-review 诊断。不过仍建议检查近期操作是否有风控风险(换IP/批量操作), 做预防性自查。",
+      "notes": "边界: 能搜到推文(未限流)但曝光下降。核心判断: from:@搜得到=没限流→不是本skill的主场景, 但预防性自查仍适用。关键区分点: '搜不到'是本skill, '搜到但没流量'是cold-start。"
+    }
+  ],
+  "minimum_pass_rate": 0.8,
+  "notes": "至少 3 条 should_trigger + 2 条 should_not_trigger + 1 条 edge_case。全部 should_not_trigger 必须通过 (诱饵容错为 0), 且其中至少 1 条是同书兄弟 skill 的场景 (跨 skill 混淆测试)。本skill有2条兄弟skill诱饵(should-not-trigger-01→x-account-setup, should-not-trigger-02→x-cold-start-playbook)。"
+}

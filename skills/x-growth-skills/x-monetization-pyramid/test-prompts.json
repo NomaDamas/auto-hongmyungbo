@@ -1,0 +1,66 @@
+{
+  "skill": "x-monetization-pyramid",
+  "version": "0.1.0",
+  "source_book": "《X秘籍》 — AIP出海教程/Yangyi",
+  "darwin_compatible": true,
+  "test_cases": [
+    {
+      "id": "should-trigger-01",
+      "type": "should_trigger",
+      "prompt": "我3万粉做AI赛道，一直在发内容但还没开始变现。现在该怎么规划变现路径？",
+      "expected_behavior": "应激活 x-monetization-pyramid, 用三层金字塔定位: 检查底层门槛(500蓝V+3月5M曝光是否达标)→评估中层可行性(课程/付费专栏/带货)→储备顶层(咨询)。IP路线可叠三层, 给出从当前层往上的具体路径",
+      "notes": "正面场景: V2核心新问题, 用户有粉丝量明确问'怎么变现/规划变现路径', 是金字塔定位的典型用例"
+    },
+    {
+      "id": "should-trigger-02",
+      "type": "should_trigger",
+      "prompt": "I have 500 followers with blue verification and about 6 million impressions in the last 3 months. Do I qualify for X creator ad revenue sharing? What's the best way to monetize from here?",
+      "expected_behavior": "应激活 x-monetization-pyramid, 确认底层广告分成门槛(500蓝V+3月5M曝光)已达标, 可开启创作者收益; 然后用金字塔规划往中层推(课程/付费专栏)和顶层储备(咨询)",
+      "notes": "正面场景: 英文提问, 用户明确问'够不够格开创作者收益', trigger词 'qualify for ad revenue sharing' + 'monetize'"
+    },
+    {
+      "id": "should-trigger-03",
+      "type": "should_trigger",
+      "prompt": "我现在主要靠接商单赚钱，每个月收入不太稳定，想往上层走。该做什么产品还是做什么服务比较好？",
+      "expected_behavior": "应激活 x-monetization-pyramid, 诊断用户当前在底层(商单=流量型), 规划往中层(课程/付费专栏/带货分销)或顶层(咨询/私教/高端社群)的路径, 解释利润率递进逻辑",
+      "notes": "正面场景: 变现方式单一不稳定想升级, 典型的'往上一层走'触发场景"
+    },
+    {
+      "id": "should-trigger-04",
+      "type": "should_trigger",
+      "prompt": "我做泛流量的，73万粉，但商单价格一直上不去，品牌方询价后经常没下文。为什么我粉丝这么多变现这么差？",
+      "expected_behavior": "应激活 x-monetization-pyramid, 用金字塔解释泛流量卡底层的机制(ce13: 粉丝画像不精准/品牌匹配度低/转化需反复种草), 告知泛流量天花板在底层, 建议要么接受底层现实要么转IP路线",
+      "notes": "正面场景: 泛流量变现差, 用户问'为什么变现差', 金字塔+ce13反例直接解释根因"
+    },
+    {
+      "id": "should-not-trigger-01",
+      "type": "should_not_trigger",
+      "prompt": "我刚起号，还在纠结该做IP路线还是泛流量矩阵。哪个长期来看更赚钱？",
+      "expected_behavior": "不应激活 x-monetization-pyramid, 应激活 x-positioning-tradeoff 做'IP vs泛流量'的战略定位决策",
+      "notes": "跨skill混淆诱饵(兄弟skill场景): 用户问的是'选IP还是泛流量'(定位决策), 不是'给定定位后怎么变现'(变现规划)。positioning-tradeoff是'选哪条路', monetization-pyramid是'路上怎么收口'"
+    },
+    {
+      "id": "should-not-trigger-02",
+      "type": "should_not_trigger",
+      "prompt": "蓝V怎么开？听说切日区能便宜点，具体怎么操作？",
+      "expected_behavior": "不应激活 x-monetization-pyramid, 应激活 x-account-setup 指导开蓝V的操作步骤(切日区/网页端支付/养号等)",
+      "notes": "跨skill混淆诱饵(兄弟skill场景): 用户问的是'蓝V怎么开'(账号装修操作), 不是'蓝V+500粉够不够开收益'(变现门槛判断)"
+    },
+    {
+      "id": "should-not-trigger-03",
+      "type": "should_not_trigger",
+      "prompt": "我的号刚注册三天，还没发过内容，也没有粉丝。我该怎么开始？",
+      "expected_behavior": "不应激活 x-monetization-pyramid, 应激活 x-cold-start-playbook 做冷启动规划(养号/装修/冷启动六策略)",
+      "notes": "诱饵: 用户还没粉丝, 谈不上变现规划。变现金字塔是'有粉后怎么收口', 不是'没粉怎么开始'"
+    },
+    {
+      "id": "edge-01",
+      "type": "edge_case",
+      "prompt": "我想在X上卖我的Notion模板，但只有200粉，能行吗？",
+      "expected_behavior": "边界模糊: 用户在问变现(卖产品=中层), 但粉丝量极低(200粉)。期望agent激活本skill但明确指出: 200粉做中层产品变现为时过早, 底层门槛(500蓝V)也未达标, 建议先走冷启动(→x-cold-start-playbook)积累粉丝, 同时可提前规划产品方向。不应直接说'不能变现'了事, 应给出分层判断和路径建议",
+      "notes": "边界: 用户有变现意愿但条件不成熟, 测试skill能否在条件不足时仍提供有价值的分层诊断而非简单拒绝"
+    }
+  ],
+  "minimum_pass_rate": 0.8,
+  "notes": "至少 3 条 should_trigger + 2 条 should_not_trigger + 1 条 edge_case。全部 should_not_trigger 必须通过 (诱饵容错为 0), 且其中至少 1 条是同书兄弟 skill 的场景 (跨 skill 混淆测试)。"
+}

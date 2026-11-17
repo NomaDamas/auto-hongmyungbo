@@ -1,0 +1,73 @@
+{
+  "skill": "x-five-piece-checklist",
+  "version": "0.1.0",
+  "source_book": "X秘籍 — 向阳乔木 @vista8",
+  "darwin_compatible": true,
+  "test_cases": [
+    {
+      "id": "should-trigger-01",
+      "type": "should_trigger",
+      "prompt": "我写了一条推荐AI工具的推文初稿,帮我看看还缺什么",
+      "expected_behavior": "应激活 x-five-piece-checklist, 逐件检查五件套(价值承诺/场景/入口/证据/收藏理由)并标注✓/✗, 对第4件做三个可检验, 输出缺件补件建议",
+      "notes": "正面场景: 初稿已写完、发布前做完备性自检, 是五件套的核心触发场景"
+    },
+    {
+      "id": "should-trigger-02",
+      "type": "should_trigger",
+      "prompt": "这条推文发出去会有人收藏吗?",
+      "expected_behavior": "应激活 x-five-piece-checklist, 逐件查收藏理由(第5件)及前四件是否齐全, 缺件导致读者在该环节流失从而不收藏",
+      "notes": "正面场景: 纠结'会有人收藏吗'正是五件套的V2预测力验证问题"
+    },
+    {
+      "id": "should-trigger-03",
+      "type": "should_trigger",
+      "prompt": "帮我检查这条推文的证据够不够,有没有满足三个可",
+      "expected_behavior": "应激活 x-five-piece-checklist, 聚焦第4件(证据)做三个可检验: 可见(截图/录屏)/可点(链接/工具名)/可算(数字/成本/步骤), 逐一标注",
+      "notes": "正面场景: 用户直接提到'三个可', 是第4件证据标准的关键trigger词"
+    },
+    {
+      "id": "should-trigger-04",
+      "type": "should_trigger",
+      "prompt": "I finished drafting a tweet but it feels like something is missing, can you check if it's complete?",
+      "expected_behavior": "应激活 x-five-piece-checklist, 逐件检查五件套完备性, 定位缺哪件并给补件建议",
+      "notes": "正面场景(英文): 'feels like something is missing' + 'check if complete' 是完备性检查的典型英文trigger"
+    },
+    {
+      "id": "should-not-trigger-01",
+      "type": "should_not_trigger",
+      "prompt": "我有个选题想发推,帮我看看值不值得发",
+      "expected_behavior": "不应激活本 skill, 应激活 x-four-saves(四省模型), 因为用户在评估'值不值得发'而非检查初稿完备性",
+      "notes": "跨skill混淆诱饵(兄弟skill): x-four-saves 是估值工具(值不值得发), x-five-piece-checklist 是检查工具(发之前查缺)。用户还没写初稿, 且问的是估值而非检查"
+    },
+    {
+      "id": "should-not-trigger-02",
+      "type": "should_not_trigger",
+      "prompt": "我想发一条教人用Raycast的推文,怎么写?",
+      "expected_behavior": "不应激活本 skill, 应激活 x-short-content-craft(短内容工艺), 因为用户还没写初稿、需要起草工具",
+      "notes": "跨skill混淆诱饵(兄弟skill): x-short-content-craft 是起草工具(怎么写), x-five-piece-checklist 是检查工具(写完查缺)。用户处于起草阶段而非检查阶段"
+    },
+    {
+      "id": "should-not-trigger-03",
+      "type": "should_not_trigger",
+      "prompt": "帮我查一下这个API的参数怎么填",
+      "expected_behavior": "不应激活本 skill, 这是纯信息查询, 与推文内容完备性检查无关",
+      "notes": "诱饵: 非内容检查场景, 纯技术信息查询"
+    },
+    {
+      "id": "edge-01",
+      "type": "edge_case",
+      "prompt": "我刚写了一条纯观点的推文,帮我检查五件套",
+      "expected_behavior": "可激活但应说明适用性边界: 五件套最适用资源入口型/工具教程型, 纯观点型(普通表达型)不强求五件齐全; 应建议先评估内容原型, 若确为普通表达型则不必机械套五件套, 或建议转化为资源入口型/工具教程型再查",
+      "notes": "边界: 纯观点型内容对五件套的需求不同, 不应机械套用。B段明确: 普通表达型不强求五件"
+    },
+    {
+      "id": "edge-02",
+      "type": "edge_case",
+      "prompt": "我的推文还没写完,只有个大纲,帮我检查五件套",
+      "expected_behavior": "不应激活(或建议先完成初稿再查), 因为五件套是检查工具不是写作模板, 需要有初稿才能逐件查",
+      "notes": "边界: 五件套的前提是已有初稿。只有大纲时应先触发起草工具(x-short-content-craft), 写完再用五件套检查"
+    }
+  ],
+  "minimum_pass_rate": 0.8,
+  "notes": "至少 3 条 should_trigger + 2 条 should_not_trigger + 1 条 edge_case。全部 should_not_trigger 必须通过 (诱饵容错为 0), 且其中至少 1 条是同书兄弟 skill 的场景 (跨 skill 混淆测试)。本 skill 诱饵含 2 条兄弟场景: should-not-trigger-01(x-four-saves 估值), should-not-trigger-02(x-short-content-craft 起草)。"
+}
