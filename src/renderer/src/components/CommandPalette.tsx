@@ -22,9 +22,9 @@ export function CommandPalette() {
     close();
     void fn();
   };
-  // window.prompt is unsupported in Electron; open the sidebar's inline form instead.
-  const newPost = () => useStore.setState({ sidebarOpen: true, sidebarInput: { kind: "post", path: "" } });
-  const newFolder = () => useStore.setState({ sidebarOpen: true, sidebarInput: { kind: "folder", path: "" } });
+  // The project tree is now in Unified Chat's 글 목록 tab.
+  const newPost = () => window.dispatchEvent(new CustomEvent<"post" | "folder">("hmb:library-create", { detail: "post" }));
+  const newFolder = () => window.dispatchEvent(new CustomEvent<"post" | "folder">("hmb:library-create", { detail: "folder" }));
 
   return (
     <div className="scrim items-start justify-center pt-[15vh]" onMouseDown={close}>
