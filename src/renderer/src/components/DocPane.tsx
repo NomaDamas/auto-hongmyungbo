@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Check, Eye, RefreshCw, X as XIcon } from "lucide-react";
 import clsx from "clsx";
 import type { DockviewPanelApi } from "dockview-react";
@@ -7,6 +7,7 @@ import { PLATFORMS, TABS, TITLE_PLATFORMS, commentDoc, parseDoc, platformsInTab,
 import { isStale, useStore } from "@/store";
 import { countFor } from "@/lib/count";
 import { runPropagate } from "@/lib/dispatch";
+import { runIntent } from "@/lib/dispatch";
 import { DocEditor, resolveAll } from "./DocEditor";
 import { PlatformIcon } from "./PlatformIcon";
 import { AdvancedMenu } from "./AdvancedMenu";
@@ -53,6 +54,13 @@ export function DocPane({ tab, api }: { tab: TabId; api: DockviewPanelApi }) {
     api.setActive();
   };
   const publish = selected && variant === "post" ? project.meta.publish[selected] : undefined;
+  const [paneInstruction, setPaneInstruction] = useState("");
+  const submitPaneInstruction = () => {
+    const value = paneInstruction.trim();
+    if (!value || doc === "master") return;
+    setPaneInstruction("");
+    void runIntent(value, undefined, [doc]);
+  };
 
   return (
     <section
@@ -131,6 +139,7 @@ export function DocPane({ tab, api }: { tab: TabId; api: DockviewPanelApi }) {
         {variant === "post" && (selected === "x" || selected === "threads") && !proposal ? <ThreadEditor platform={selected} value={project.docs[doc] ?? ""} /> : <DocEditor doc={doc} value={project.docs[doc] ?? ""} proposal={proposal} placeholder={placeholderFor(doc)} />}
       </div>
       {variant === "post" && <MediaStrip doc={doc} />}
+      {doc !== "master" && <div className="flex shrink-0 items-center gap-2 border-t border-[var(--border)] px-2 py-1.5"><span className="shrink-0 text-[10px] text-[var(--muted)]">{PLATFORMS[selected!]?.label} 작업</span><input className="input h-7 min-w-0 flex-1 text-[11px]" value={paneInstruction} onChange={(event) => setPaneInstruction(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.nativeEvent.isComposing) submitPaneInstruction(); }} placeholder="이 플랫폼 글만 수정…" /><button className="btn btn-xs" disabled={!paneInstruction.trim()} onClick={submitPaneInstruction}>전송</button></div>}
       <footer className="flex h-7 shrink-0 items-center gap-3 border-t border-[var(--border)] px-3 text-[10.5px] text-[var(--muted)]">
         <CountGauge used={count.used} limit={count.limit} />
         {count.note && <span>{count.note}</span>}
