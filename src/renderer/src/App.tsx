@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { Group, Panel, Separator, usePanelRef } from "react-resizable-panels";
-import { FilePlus2, Loader2, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Radio } from "lucide-react";
+import { FilePlus2, Loader2, PanelRightClose, PanelRightOpen, Radio, Settings, ShieldCheck, Wand2 } from "lucide-react";
 import { Toaster } from "sonner";
 import { TABS, parseDoc } from "@shared/platforms";
 import { useStore } from "@/store";
@@ -14,7 +14,6 @@ import { IntentBar } from "@/components/IntentBar";
 import { AsidePanel } from "@/components/AsidePanel";
 import { PreviewModal } from "@/components/PreviewModal";
 import { OnboardingWizard } from "@/components/OnboardingWizard";
-import { Sidebar } from "@/components/Sidebar";
 import { EditorArea, focusEditorTab } from "@/components/EditorArea";
 import { EmbedInbox } from "@/components/EmbedInbox";
 import { InsightsBoard } from "@/components/InsightsBoard";
@@ -24,7 +23,6 @@ export function App() {
   const settings = useStore((s) => s.settings);
   const project = useStore((s) => s.project);
   const dockOpen = useStore((s) => s.dockOpen);
-  const sidebarOpen = useStore((s) => s.sidebarOpen);
   const mode = useStore((s) => s.mode);
 
   useEffect(() => {
@@ -53,9 +51,6 @@ export function App() {
       if (key === "k") {
         e.preventDefault();
         useStore.setState({ paletteOpen: !s.paletteOpen });
-      } else if (key === "b") {
-        e.preventDefault();
-        useStore.setState({ sidebarOpen: !s.sidebarOpen });
       } else if (key === "j") {
         e.preventDefault();
         useStore.setState({ dockOpen: !s.dockOpen });
@@ -93,9 +88,6 @@ export function App() {
   return (
     <div className="flex h-screen flex-col">
       <header className="drag relative flex h-12 shrink-0 items-center gap-2 pl-[84px] pr-3">
-        <button className="no-drag icon-btn" onClick={() => useStore.setState({ sidebarOpen: !sidebarOpen })} title="사이드바 (⌘B)">
-          {sidebarOpen ? <PanelLeftClose size={15} /> : <PanelLeftOpen size={15} />}
-        </button>
         <span className="max-w-[320px] truncate text-[13px] font-medium">{project?.meta.title ?? "Auto-HongMyungbo"}</span>
         {project && <ModeSwitch />}
         {project && mode !== "insights" && (
@@ -104,10 +96,14 @@ export function App() {
           </button>
         )}
         <DockToggle />
+        <div className="no-drag ml-1 flex items-center gap-1">
+          <button className="btn btn-xs btn-ghost" onClick={() => useStore.setState({ asideOpen: true })} title="Aside 연결"><ShieldCheck size={12} /> Aside</button>
+          <button className="btn btn-xs btn-ghost" onClick={() => useStore.setState({ setupOpen: true })} title="설정 마법사"><Wand2 size={12} /> 설정 마법사</button>
+          <button className="icon-btn" onClick={() => useStore.setState({ settingsOpen: true })} title="설정"><Settings size={14} /></button>
+        </div>
       </header>
 
       <div className="flex min-h-0 flex-1">
-        {sidebarOpen && <Sidebar />}
         <Group orientation="horizontal" className="min-h-0 min-w-0 flex-1">
           <Panel id="editor" minSize="35" defaultSize="64">
             {project ? (
