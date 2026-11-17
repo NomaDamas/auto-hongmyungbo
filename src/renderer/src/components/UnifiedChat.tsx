@@ -36,6 +36,16 @@ export function UnifiedChat() {
   const [newItem, setNewItem] = useState<"post" | "folder" | null>(null);
   const [newTitle, setNewTitle] = useState("");
   useEffect(() => { setFileQuery(""); setFileResults([]); setFileContext([]); }, [project?.slug]);
+  useEffect(() => {
+    const onLibraryCreate = (event: Event) => {
+      const detail = (event as CustomEvent<"post" | "folder">).detail;
+      setChatTab("library");
+      setNewItem(detail);
+      setNewTitle("");
+    };
+    window.addEventListener("hmb:library-create", onLibraryCreate);
+    return () => window.removeEventListener("hmb:library-create", onLibraryCreate);
+  }, []);
   const [targets, setTargets] = useState<DocId[]>([]);
   const providers = useMemo(() => (settings?.providers ?? []).filter((provider) => provider.enabled), [settings?.providers]);
   const provider = providers.find((item) => item.id === providerId) ?? providers[0];
