@@ -10,7 +10,6 @@ import { Dock } from "@/components/Dock";
 import { CommandPalette } from "@/components/CommandPalette";
 import { HistoryPanel } from "@/components/HistoryPanel";
 import { SettingsDialog } from "@/components/SettingsDialog";
-import { IntentBar } from "@/components/IntentBar";
 import { AsidePanel } from "@/components/AsidePanel";
 import { PreviewModal } from "@/components/PreviewModal";
 import { OnboardingWizard } from "@/components/OnboardingWizard";
@@ -114,7 +113,6 @@ export function App() {
                   <>
                     <EditorArea />
                     <EmbedInbox />
-                    <IntentBar />
                   </>
                 )}
               </div>
