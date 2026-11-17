@@ -17,6 +17,18 @@ const SKILLS = [
   ["linkedin", "LinkedIn"],
   ["threads", "Threads"],
 ] as const;
+const EXTERNAL_SKILLS = [
+  ["marketingskills/social", "Marketing Social"],
+  ["marketingskills/copywriting", "Marketing Copywriting"],
+  ["marketingskills/content-strategy", "Content Strategy"],
+  ["x-skills/x-post-writer", "X Post Writer"],
+  ["x-skills/x-hook-extractor", "X Hook Extractor"],
+  ["x-skills/x-thread-builder", "X Thread Builder"],
+  ["x-skills/x-humanizer", "X Humanizer"],
+  ["x-growth-skills/x-cold-start-playbook", "X Cold Start"],
+  ["x-growth-skills/x-foryou-algorithm", "X For You"],
+  ["x-growth-skills/x-data-review", "X Data Review"],
+] as const;
 
 export function UnifiedChat() {
   const settings = useStore((s) => s.settings);
@@ -29,6 +41,7 @@ export function UnifiedChat() {
   const [fileQuery, setFileQuery] = useState("");
   const [fileResults, setFileResults] = useState<FileSearchResult[]>([]);
   const [fileContext, setFileContext] = useState<FileSearchResult[]>([]);
+  const [enabledExternalSkills, setEnabledExternalSkills] = useState<string[]>([]);
   useEffect(() => { setFileQuery(""); setFileResults([]); setFileContext([]); }, [project?.slug]);
   const [targets, setTargets] = useState<DocId[]>([activeDoc]);
   useEffect(() => setTargets((current) => current.length === 1 ? [activeDoc] : current), [activeDoc]);
@@ -63,7 +76,8 @@ export function UnifiedChat() {
     const requestInstruction = settingsHint ? `${instruction}\n\nProvider settings: ${settingsHint}${context}` : `${instruction}${context}`;
     setBusy(true);
     try {
-      const fullInstruction = provider.skills.length ? `${requestInstruction}\n\nSkills: ${provider.skills.join(", ")}` : requestInstruction;
+      const skills = [...new Set([...provider.skills, ...enabledExternalSkills])];
+      const fullInstruction = skills.length ? `${requestInstruction}\n\nSkills (use only these explicitly enabled skills): ${skills.join(", ")}` : requestInstruction;
       let lastError: unknown;
       for (let attempt = 0; attempt <= provider.retries; attempt += 1) {
         let timeoutHandle: number | undefined;
@@ -135,6 +149,12 @@ export function UnifiedChat() {
         </div>
         <div className="flex flex-wrap gap-1.5">
           {SKILLS.map(([preset, label]) => <button key={preset} className="btn btn-xs" disabled={busy} onClick={() => void send(preset)}>{label}</button>)}
+        </div>
+        <div className="rounded-lg border border-[var(--border)] p-2">
+          <div className="mb-1 text-[10.5px] text-[var(--muted)]">외부 skill · 버튼을 켠 경우에만 이번 요청에 사용</div>
+          <div className="flex flex-wrap gap-1.5">
+            {EXTERNAL_SKILLS.map(([id, label]) => <button key={id} className={`btn btn-xs ${enabledExternalSkills.includes(id) ? "btn-primary" : "btn-ghost"}`} disabled={busy} onClick={() => setEnabledExternalSkills((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id])}>{label}</button>)}
+          </div>
         </div>
         <div className="flex items-end gap-2">
           <textarea className="input min-h-20 flex-1 resize-none" value={instruction} onChange={(event) => setInstruction(event.target.value)} placeholder="현재 글에 원하는 작업을 입력하세요…" onKeyDown={(event) => { if ((event.metaKey || event.ctrlKey) && event.key === "Enter") { event.preventDefault(); void send(); } }} />
