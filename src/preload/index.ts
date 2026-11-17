@@ -36,6 +36,7 @@ const api: Api = {
     pathForFile: (file) => webUtils.getPathForFile(file),
     mediaUrl: (slug, file) => `hmb-media://media/${encodeURIComponent(slug)}/${encodeURIComponent(file)}`,
     pickSource: () => ipcRenderer.invoke("projects:pickSource"),
+    searchFiles: (slug, query) => ipcRenderer.invoke("projects:searchFiles", slug, query),
   },
   pty: {
     spawn: (id, command, cwd, cols, rows) => ipcRenderer.invoke("pty:spawn", id, command, cwd, cols, rows),

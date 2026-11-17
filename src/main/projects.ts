@@ -1,6 +1,6 @@
 import { dialog, shell, type WebContents } from "electron";
 import { watch, type FSWatcher } from "chokidar";
-import { access, copyFile, mkdir, readFile, readdir, rename, stat, writeFile } from "node:fs/promises";
+import { access, copyFile, lstat, mkdir, readFile, readdir, rename, stat, writeFile } from "node:fs/promises";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { basename, dirname, extname, isAbsolute, join, relative, resolve, sep, win32 } from "node:path";
@@ -24,6 +24,7 @@ const HISTORY = ".history";
 const MEDIA = "media";
 const IMAGE_EXTENSIONS: Record<string, true> = { ".jpg": true, ".jpeg": true, ".png": true, ".gif": true, ".webp": true, ".heic": true };
 const VIDEO_EXTENSIONS: Record<string, true> = { ".mp4": true, ".mov": true, ".webm": true, ".m4v": true };
+const BINARY_EXTENSIONS: Record<string, true> = { ...IMAGE_EXTENSIONS, ...VIDEO_EXTENSIONS, ".pdf": true, ".zip": true, ".gz": true, ".dmg": true, ".woff": true, ".woff2": true, ".ttf": true, ".otf": true, ".sqlite": true };
 const execFileAsync = promisify(execFile);
 
 async function git(cwd: string, args: string[]): Promise<string> {
@@ -479,6 +480,36 @@ export async function pickSource(): Promise<SourceProject | null> {
     links,
     summary: details.summary,
   };
+}
+
+/** Search project text files for the file agent. Binary/media and hidden metadata are excluded. */
+export async function searchFiles(slug: string, query: string): Promise<{ path: string; snippet: string }[]> {
+  const project = await openProject(slug);
+  const needle = query.trim().toLowerCase();
+  if (!needle) return [];
+  const results: { path: string; snippet: string }[] = [];
+  async function walk(dir: string): Promise<void> {
+    for (const entry of await readdir(dir, { withFileTypes: true })) {
+      if (entry.name.startsWith(".") || entry.name === "node_modules" || entry.name === "media") continue;
+      const absolute = join(dir, entry.name);
+      if (entry.isDirectory()) { await walk(absolute); continue; }
+      if ((await lstat(absolute).catch(() => null))?.isSymbolicLink()) continue;
+      if (results.length >= 50 || await stat(absolute).then((s) => s.size > 2_000_000).catch(() => true)) continue;
+      if (BINARY_EXTENSIONS[extname(entry.name).toLowerCase()]) continue;
+      const text = await readFile(absolute, "utf8").catch(() => "");
+      if (text.includes("\0")) continue;
+      const index = text.toLowerCase().indexOf(needle);
+      if (index < 0 && !entry.name.toLowerCase().includes(needle)) continue;
+      if (index < 0) {
+        results.push({ path: relative(project.dir, absolute), snippet: "파일 이름이 검색어와 일치합니다." });
+        continue;
+      }
+      const start = Math.max(0, index - 180);
+      results.push({ path: relative(project.dir, absolute), snippet: text.slice(start, Math.min(text.length, index + needle.length + 260)).replace(/\s+/g, " ").trim() });
+    }
+  }
+  await walk(project.dir);
+  return results;
 }
 
 let watcher: FSWatcher | null = null;
