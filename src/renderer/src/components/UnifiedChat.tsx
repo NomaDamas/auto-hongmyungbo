@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { Bot, FileSearch, GitBranch, Loader2, Send, Sparkles, X } from "lucide-react";
 import { toast } from "sonner";
-import type { DocId, FileSearchResult } from "@shared/types";
-import { platformsInTab, type TabId } from "@shared/platforms";
+import type { DocId, FileSearchResult, PlatformId } from "@shared/types";
+import { PLATFORMS, platformsInTab, type TabId } from "@shared/platforms";
 import type { Preset } from "@/lib/prompts";
 import { useStore } from "@/store";
 import { cancelPending, runAsideIntent, runIntent } from "@/lib/dispatch";
@@ -32,7 +32,7 @@ export function UnifiedChat({ initialTab = "promotion", hideHeader = false }: { 
   const [busy, setBusy] = useState(false);
   const [chatTab, setChatTab] = useState<"promotion" | "files" | "library">(initialTab);
   const [splitTab, setSplitTab] = useState<"promotion" | "files" | "library" | null>(null);
-  const [scope, setScope] = useState<Scope>("all");
+  const [selectedPlatforms, setSelectedPlatforms] = useState<PlatformId[]>([]);
   const [fileQuery, setFileQuery] = useState("");
   const [fileResults, setFileResults] = useState<FileSearchResult[]>([]);
   const [fileContext, setFileContext] = useState<FileSearchResult[]>([]);
@@ -63,7 +63,7 @@ export function UnifiedChat({ initialTab = "promotion", hideHeader = false }: { 
     const executionKind = provider.kind === "custom" ? (provider.command ? "cli" : provider.url ? "web" : "unsupported") : provider.kind === "browser" ? (provider.url ? "web" : "unsupported") : provider.kind;
     if (executionKind !== "web" && executionKind !== "cli") return toast.error("Provider에 실행 명령 또는 URL을 설정하세요.");
     const enabled = useStore.getState().enabledPlatforms();
-    const scopedPlatforms = scope === "all" ? enabled : platformsInTab(scope, enabled);
+    const scopedPlatforms = selectedPlatforms.length ? selectedPlatforms : enabled;
     const requestedTargets = targets.length ? targets : scopedPlatforms;
     const requestTargets = requestedTargets.filter((doc) => !!project.docs[doc]?.trim());
     if (!requestTargets.length) return toast.error("대상 플랫폼을 먼저 설정하세요.");
@@ -92,7 +92,7 @@ export function UnifiedChat({ initialTab = "promotion", hideHeader = false }: { 
       const normalizedInstruction = `${instruction} ${preset ?? ""}`.toLowerCase();
       const requestedSkills = HIDDEN_SKILL_MATCHERS.filter(([term]) => normalizedInstruction.includes(term.toLowerCase())).map(([, skill]) => skill);
       const skills = [...new Set([...provider.skills, ...requestedSkills])];
-      const fullInstruction = `${requestInstruction}\n\n대상 범위: ${targets.length ? "드래그한 문서만" : scope === "all" ? "전체 SNS·커뮤니티·블로그" : scope}\n사용 가능한 외부 skill은 사용자가 이름을 요청하거나 추천을 요청할 때만 연결: ${HIDDEN_SKILLS}${skills.length ? `\n명시적으로 켠 provider skill: ${skills.join(", ")}` : ""}`;
+      const fullInstruction = `${requestInstruction}\n\n선택한 플랫폼: ${targets.length ? "드래그한 문서" : scopedPlatforms.join(", ")}\n사용 가능한 외부 skill은 사용자가 이름을 요청하거나 추천을 요청할 때만 연결: ${HIDDEN_SKILLS}${skills.length ? `\n명시적으로 켠 provider skill: ${skills.join(", ")}` : ""}`;
       let lastError: unknown;
       for (let attempt = 0; attempt <= provider.retries; attempt += 1) {
         let timeoutHandle: number | undefined;
@@ -133,6 +133,10 @@ export function UnifiedChat({ initialTab = "promotion", hideHeader = false }: { 
   const slashQuery = instruction.endsWith("/") ? "" : instruction.split("/").at(-1)?.toLowerCase() ?? "";
   const visibleSkills = RECOMMENDED_SKILLS.filter(([id, label]) => !slashQuery || id.includes(slashQuery) || label.toLowerCase().includes(slashQuery));
   const reorderChatTab = (from: "promotion" | "files" | "library", toIndex: number) => setChatTabs((current) => { const next = current.filter((item) => item !== from); next.splice(Math.max(0, Math.min(toIndex, next.length)), 0, from); return next; });
+  const enabled = useStore.getState().enabledPlatforms();
+  const groupState = (tab: TabId) => { const ids = platformsInTab(tab, enabled); const count = ids.filter((id) => selectedPlatforms.includes(id)).length; return { ids, checked: ids.length > 0 && count === ids.length, partial: count > 0 && count < ids.length }; };
+  const toggleGroup = (tab: TabId) => { const { ids, checked } = groupState(tab); setSelectedPlatforms((current) => checked ? current.filter((id) => !ids.includes(id)) : [...new Set([...current, ...ids])]); };
+  const togglePlatform = (id: PlatformId) => setSelectedPlatforms((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id]);
   return (
     <div className={splitTab && !hideHeader ? "grid h-full min-h-0 grid-cols-2 gap-px bg-[var(--border)]" : "h-full min-h-0"}>
     <section className="flex h-full min-h-0 flex-col bg-[var(--surface)]">
@@ -168,16 +172,15 @@ export function UnifiedChat({ initialTab = "promotion", hideHeader = false }: { 
           <div className="text-[11px] text-[var(--muted)]">Chat에 전달할 파일: {fileContext.map((item) => item.path).join(", ") || "없음"}</div>
         </div>
       ) : <div className="flex min-h-0 flex-1 flex-col justify-end gap-3 p-3" onDragOver={(event) => event.preventDefault()} onDrop={(event) => { const tab = event.dataTransfer.getData("application/x-hmb-chat-tab") as "promotion" | "files" | "library"; if (tab && tab !== chatTab) setSplitTab(tab); }}>
-        <div className="rounded-xl border border-[var(--border)] bg-[var(--surface-2)] p-3 text-[11.5px] text-[var(--muted)]" onDragOver={(event) => event.preventDefault()} onDrop={(event) => { event.preventDefault(); const doc = event.dataTransfer.getData("application/x-hmb-doc") as DocId; if (doc) setTargets([doc]); }}>
-          <Sparkles size={13} className="mb-1 text-[var(--focus)]" />
-          <div>대상: <strong className="text-[var(--fg)]">{targets.join(", ") || (scope === "all" ? "전체" : scope)}</strong></div>
-          <div>선택한 Provider가 백그라운드에서 실행되고 결과는 해당 문서의 diff로 돌아옵니다.</div>
+        <div className="flex flex-wrap gap-1.5" onDragOver={(event) => event.preventDefault()} onDrop={(event) => { event.preventDefault(); const doc = event.dataTransfer.getData("application/x-hmb-doc") as DocId; if (doc) setTargets([doc]); }}>
+          {(["sns", "community", "blog"] as const).map((tab) => { const state = groupState(tab); return <div key={tab} className="group relative rounded-lg border border-[var(--border)] px-2 py-1"><label className="flex items-center gap-1 text-[10.5px]"><input type="checkbox" checked={state.checked} ref={(element) => { if (element) element.indeterminate = state.partial; }} onChange={() => toggleGroup(tab)} />{tab === "sns" ? "SNS" : tab === "community" ? "커뮤니티" : "블로그"}</label><div className="absolute left-0 top-full z-10 hidden min-w-40 rounded-md border border-[var(--border)] bg-[var(--surface)] p-1 shadow-xl group-hover:block">{state.ids.map((id) => <label key={id} className="flex items-center gap-1 px-2 py-1 text-[10.5px]"><input type="checkbox" checked={selectedPlatforms.includes(id)} onChange={() => togglePlatform(id)} />{PLATFORMS[id].label}</label>)}</div></div>; })}
+          {targets.length > 0 && <button className="btn btn-xs" onClick={() => setTargets([])}>{targets.join(", ")} ×</button>}
         </div>
         <div className="relative flex items-end gap-2">
           <div className="relative flex-1">
             {slashOpen && <div className="absolute bottom-full left-0 z-10 mb-1 w-64 rounded-lg border border-[var(--border)] bg-[var(--surface)] p-1 shadow-xl"><div className="px-2 py-1 text-[10px] text-[var(--muted)]">Skill 선택 · 입력하면 필터링</div>{visibleSkills.map(([preset, label]) => <button key={preset} className="block w-full rounded px-2 py-1.5 text-left text-[11px] hover:bg-[var(--surface-2)]" onClick={() => sendSkill(preset)}>{label}</button>)}<div className="border-t border-[var(--border)] px-2 py-1 text-[10px] text-[var(--muted)]">외부 Skill은 이름을 입력하거나 추천을 요청하세요.</div></div>}
-            <textarea className="input min-h-20 w-full resize-none pb-8 pl-40" value={instruction} onChange={(event) => { const value = event.target.value; setInstruction(value); setSlashOpen(/(?:^|\s)\/[^\s]*$/.test(value)); }} placeholder="현재 글에 원하는 작업을 입력하세요…" onKeyDown={(event) => { if ((event.metaKey || event.ctrlKey) && event.key === "Enter") { event.preventDefault(); void send(); } }} />
-            <div className="absolute bottom-1.5 left-2 flex items-center gap-1"><select className="input h-6 w-28 border-0 bg-transparent py-0 text-[10px]" value={scope} onChange={(event) => { setScope(event.target.value as Scope); setTargets([]); }}><option value="all">대상: 전체</option><option value="sns">대상: SNS</option><option value="community">대상: 커뮤니티</option><option value="blog">대상: 블로그</option></select>{provider && <><input list="hmb-models" className="input h-6 w-32 border-0 bg-transparent py-0 text-[10px]" value={provider.model ?? ""} placeholder="모델" onChange={(event) => void useStore.getState().updateSettings({ providers: settings.providers.map((item) => item.id === provider.id ? { ...item, model: event.target.value || undefined } : item) })} /><datalist id="hmb-models">{[...new Set([...COMMON_MODELS, ...(provider.model ? [provider.model] : [])])].map((model) => <option key={model} value={model} />)}</datalist></>}{provider && <select className="input h-6 w-16 border-0 bg-transparent py-0 text-[10px]" value={provider.effort ?? "medium"} onChange={(event) => void useStore.getState().updateSettings({ providers: settings.providers.map((item) => item.id === provider.id ? { ...item, effort: event.target.value as typeof provider.effort } : item) })}><option value="low">low</option><option value="medium">medium</option><option value="high">high</option><option value="xhigh">xhigh</option></select>}</div>
+            <textarea data-unified-chat-input className="input min-h-20 w-full resize-none pb-8 pl-40" value={instruction} onChange={(event) => { const value = event.target.value; setInstruction(value); setSlashOpen(/(?:^|\s)\/[^\s]*$/.test(value)); }} placeholder="현재 글에 원하는 작업을 입력하세요…" onKeyDown={(event) => { if ((event.metaKey || event.ctrlKey) && event.key === "Enter") { event.preventDefault(); void send(); } }} />
+            <div className="absolute bottom-1.5 left-2 flex items-center gap-1">{provider && <><input list="hmb-models" className="input h-6 w-32 border-0 bg-transparent py-0 text-[10px]" value={provider.model ?? ""} placeholder="모델" onChange={(event) => void useStore.getState().updateSettings({ providers: settings.providers.map((item) => item.id === provider.id ? { ...item, model: event.target.value || undefined } : item) })} /><datalist id="hmb-models">{[...new Set([...COMMON_MODELS, ...(provider.model ? [provider.model] : [])])].map((model) => <option key={model} value={model} />)}</datalist></>}{provider && <select className="input h-6 w-16 border-0 bg-transparent py-0 text-[10px]" value={provider.effort ?? "medium"} onChange={(event) => void useStore.getState().updateSettings({ providers: settings.providers.map((item) => item.id === provider.id ? { ...item, effort: event.target.value as typeof provider.effort } : item) })}><option value="low">low</option><option value="medium">medium</option><option value="high">high</option><option value="xhigh">xhigh</option></select>}</div>
             <div className="absolute bottom-1.5 right-1.5 flex items-center gap-1">{RECOMMENDED_SKILLS.slice(0, 2).map(([preset, label]) => <button key={preset} className="btn btn-xs" disabled={busy} onClick={() => void send(preset)}>{label}</button>)}<button className="btn btn-xs btn-primary" disabled={busy || !instruction.trim()} onClick={() => void send()}>{busy ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />}</button></div>
           </div>
         </div>
