@@ -58,6 +58,14 @@ async function dispatch(prompt: (t: Target) => string, pending: Omit<PendingRepl
   if (t.target === "harness") {
     try {
       sendToTerminal(t.id, text, autoSubmit);
+      // PTY writes are fire-and-forget. Keep the workspace visibly busy for the
+      // handoff window so the user gets feedback while the background harness
+      // starts processing; terminal output remains hidden in the background.
+      useStore.setState({ pendingReply: { ...pending, tabId: t.id } });
+      window.setTimeout(() => {
+        const current = useStore.getState().pendingReply;
+        if (current?.tabId === t.id) useStore.setState({ pendingReply: null });
+      }, 1500);
     } catch (error) {
       toast.error((error as Error).message);
       throw error;
