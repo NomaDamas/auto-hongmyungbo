@@ -128,6 +128,11 @@ export interface MediaItem {
   alt?: string;
 }
 
+export interface FileSearchResult {
+  path: string;
+  snippet: string;
+}
+
 /** A source code/project folder the post is about; harnesses read it via --add-dir. */
 export interface SourceProject {
   path: string;
@@ -280,6 +285,7 @@ export interface Api {
     mediaUrl(slug: string, file: string): string;
     /** Choose a source code folder; returns detected name, links (git remote, homepage, README URLs) and summary. */
     pickSource(): Promise<SourceProject | null>;
+    searchFiles(slug: string, query: string): Promise<FileSearchResult[]>;
   };
   pty: {
     spawn(id: string, command: string, cwd: string, cols: number, rows: number): Promise<void>;

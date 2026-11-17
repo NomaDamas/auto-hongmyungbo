@@ -16,6 +16,7 @@ import {
   openProject,
   pickMedia,
   pickSource,
+  searchFiles,
   readSnapshot,
   renameFolder,
   resolveMediaFile,
@@ -141,6 +142,7 @@ function registerIpc(): void {
   ipcMain.handle("projects:addMedia", (_e, slug: string, paths: string[]) => addMedia(slug, paths));
   ipcMain.handle("projects:pickMedia", (_e, slug: string) => pickMedia(slug));
   ipcMain.handle("projects:pickSource", () => pickSource());
+  ipcMain.handle("projects:searchFiles", (_e, slug: string, query: string) => searchFiles(slug, query));
 
   ipcMain.handle("pty:spawn", (e, id: string, command: string, cwd: string, cols: number, rows: number) =>
     spawnPty(e.sender, id, command, cwd, cols, rows),

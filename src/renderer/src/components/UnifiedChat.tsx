@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
-import { Bot, Loader2, Send, Sparkles } from "lucide-react";
+import { Bot, FileSearch, Loader2, Send, Sparkles } from "lucide-react";
 import { toast } from "sonner";
-import type { DocId } from "@shared/types";
+import type { DocId, FileSearchResult } from "@shared/types";
 import type { Preset } from "@/lib/prompts";
 import { useStore } from "@/store";
 import { cancelPending, runAsideIntent, runIntent } from "@/lib/dispatch";
@@ -25,6 +25,10 @@ export function UnifiedChat() {
   const [providerId, setProviderId] = useState("");
   const [instruction, setInstruction] = useState("");
   const [busy, setBusy] = useState(false);
+  const [chatTab, setChatTab] = useState<"promotion" | "files">("promotion");
+  const [fileQuery, setFileQuery] = useState("");
+  const [fileResults, setFileResults] = useState<FileSearchResult[]>([]);
+  const [fileContext, setFileContext] = useState<FileSearchResult[]>([]);
   const [targets, setTargets] = useState<DocId[]>([activeDoc]);
   useEffect(() => setTargets((current) => current.length === 1 ? [activeDoc] : current), [activeDoc]);
   const providers = useMemo(() => (settings?.providers ?? []).filter((provider) => provider.enabled), [settings?.providers]);
@@ -54,7 +58,8 @@ export function UnifiedChat() {
       useStore.setState((state) => ({ runTabs: [...state.runTabs.filter((tab) => tab.id !== runId), { id: runId, label: provider.label, command: `${provider.command} ${args}`.trim() }], dockTab: `run:${runId}` }));
     }
     const settingsHint = [provider.model && `model=${provider.model}`, provider.effort && `effort=${provider.effort}`].filter(Boolean).join(", ");
-    const requestInstruction = settingsHint ? `${instruction}\n\nProvider settings: ${settingsHint}` : instruction;
+    const context = fileContext.length ? `\n\nSelected project files for context:\n${fileContext.map((item) => `--- ${item.path} ---\n${item.snippet}`).join("\n")}` : "";
+    const requestInstruction = settingsHint ? `${instruction}\n\nProvider settings: ${settingsHint}${context}` : `${instruction}${context}`;
     setBusy(true);
     try {
       const fullInstruction = provider.skills.length ? `${requestInstruction}\n\nSkills: ${provider.skills.join(", ")}` : requestInstruction;
@@ -97,6 +102,10 @@ export function UnifiedChat() {
     <section className="flex h-full min-h-0 flex-col bg-[var(--surface)]">
       <header className="flex h-11 shrink-0 items-center gap-2 border-b border-[var(--border)] px-3">
         <Bot size={14} className="text-[var(--focus)]" />
+        <div className="flex items-center gap-1 rounded-md bg-[var(--surface-2)] p-0.5">
+          <button className={`btn btn-xs ${chatTab === "promotion" ? "btn-primary" : "btn-ghost"}`} onClick={() => setChatTab("promotion")}>홍보관리</button>
+          <button className={`btn btn-xs ${chatTab === "files" ? "btn-primary" : "btn-ghost"}`} onClick={() => setChatTab("files")}><FileSearch size={12} /> 파일 에이전트</button>
+        </div>
         <span className="text-[12px] font-medium">통합 Chat</span>
         <select className="input ml-auto h-7 py-0 text-[11px]" value={provider?.id ?? ""} onChange={(event) => setProviderId(event.target.value)}>
           {providers.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
@@ -104,7 +113,19 @@ export function UnifiedChat() {
         {provider?.model && <span className="pill pill-accent">{provider.model}</span>}
         {provider?.effort && <span className="pill pill-accent">{provider.effort}</span>}
       </header>
-      <div className="flex min-h-0 flex-1 flex-col justify-end gap-3 p-3">
+      {chatTab === "files" ? (
+        <div className="flex min-h-0 flex-1 flex-col gap-3 p-3">
+          <div className="text-[11px] text-[var(--muted)]">현재 프로젝트 폴더에서 파일명·본문을 검색하고, 선택한 파일을 홍보관리 Chat context로 넘깁니다. 바이너리·media·node_modules는 제외합니다.</div>
+          <div className="flex gap-2">
+            <input className="input flex-1" value={fileQuery} onChange={(event) => setFileQuery(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && fileQuery.trim()) void window.api.projects.searchFiles(project.slug, fileQuery).then(setFileResults); }} placeholder="파일명 또는 내용 검색…" />
+            <button className="btn btn-primary" onClick={() => void window.api.projects.searchFiles(project.slug, fileQuery).then(setFileResults)}><FileSearch size={13} /> 찾기</button>
+          </div>
+          <div className="min-h-0 flex-1 space-y-2 overflow-y-auto">
+            {fileResults.map((item) => <button key={item.path} className={`block w-full rounded-lg border p-2 text-left text-[11px] ${fileContext.some((selected) => selected.path === item.path) ? "border-[var(--focus)]" : "border-[var(--border)]"}`} onClick={() => setFileContext((current) => current.some((selected) => selected.path === item.path) ? current.filter((selected) => selected.path !== item.path) : [...current, item])}><div className="font-medium">{item.path}</div><div className="mt-1 line-clamp-3 text-[var(--muted)]">{item.snippet}</div></button>)}
+          </div>
+          <div className="text-[11px] text-[var(--muted)]">Chat에 전달할 파일: {fileContext.map((item) => item.path).join(", ") || "없음"}</div>
+        </div>
+      ) : <div className="flex min-h-0 flex-1 flex-col justify-end gap-3 p-3">
         <div className="rounded-xl border border-[var(--border)] bg-[var(--surface-2)] p-3 text-[11.5px] text-[var(--muted)]" onDragOver={(event) => event.preventDefault()} onDrop={(event) => { event.preventDefault(); const doc = event.dataTransfer.getData("application/x-hmb-doc") as DocId; if (doc) setTargets((current) => current.includes(doc) ? current : [...current, doc]); }}>
           <Sparkles size={13} className="mb-1 text-[var(--focus)]" />
           <div>대상: <strong className="text-[var(--fg)]">{targets.join(", ") || activeDoc}</strong></div>
@@ -118,7 +139,7 @@ export function UnifiedChat() {
           <textarea className="input min-h-20 flex-1 resize-none" value={instruction} onChange={(event) => setInstruction(event.target.value)} placeholder="현재 글에 원하는 작업을 입력하세요…" onKeyDown={(event) => { if ((event.metaKey || event.ctrlKey) && event.key === "Enter") { event.preventDefault(); void send(); } }} />
           <button className="btn btn-primary h-9" disabled={busy || !instruction.trim()} onClick={() => void send()}>{busy ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />} 전송</button>
         </div>
-      </div>
+      </div>}
     </section>
   );
 }
