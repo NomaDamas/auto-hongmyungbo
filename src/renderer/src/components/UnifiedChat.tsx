@@ -38,6 +38,7 @@ export function UnifiedChat({ initialTab = "promotion", hideHeader = false, onCl
   const [fileContext, setFileContext] = useState<FileSearchResult[]>([]);
   const [slashOpen, setSlashOpen] = useState(false);
   const [chatTabs, setChatTabs] = useState<Array<"promotion" | "files" | "library">>(["promotion", "files", "library"]);
+  const [closedChatTabs, setClosedChatTabs] = useState<Array<"promotion" | "files" | "library">>([]);
   const [newItem, setNewItem] = useState<"post" | "folder" | null>(null);
   const [newTitle, setNewTitle] = useState("");
   useEffect(() => { setFileQuery(""); setFileResults([]); setFileContext([]); }, [project?.slug]);
@@ -133,7 +134,8 @@ export function UnifiedChat({ initialTab = "promotion", hideHeader = false, onCl
   const slashQuery = instruction.endsWith("/") ? "" : instruction.split("/").at(-1)?.toLowerCase() ?? "";
   const visibleSkills = RECOMMENDED_SKILLS.filter(([id, label]) => !slashQuery || id.includes(slashQuery) || label.toLowerCase().includes(slashQuery));
   const reorderChatTab = (from: "promotion" | "files" | "library", toIndex: number) => setChatTabs((current) => { const next = current.filter((item) => item !== from); next.splice(Math.max(0, Math.min(toIndex, next.length)), 0, from); return next; });
-  const closeChatTab = (tab: "promotion" | "files" | "library") => { setChatTabs((current) => current.filter((item) => item !== tab)); if (chatTab === tab) setChatTab(chatTabs.find((item) => item !== tab) ?? "promotion"); if (splitTab === tab) setSplitTab(null); };
+  const closeChatTab = (tab: "promotion" | "files" | "library") => { setChatTabs((current) => current.filter((item) => item !== tab)); setClosedChatTabs((current) => current.includes(tab) ? current : [...current, tab]); if (chatTab === tab) setChatTab(chatTabs.find((item) => item !== tab) ?? "promotion"); if (splitTab === tab) setSplitTab(null); };
+  const reopenChatTab = (tab: "promotion" | "files" | "library") => { setChatTabs((current) => current.includes(tab) ? current : [...current, tab]); setClosedChatTabs((current) => current.filter((item) => item !== tab)); setChatTab(tab); };
   const enabled = useStore.getState().enabledPlatforms();
   const groupState = (tab: TabId) => { const ids = platformsInTab(tab, enabled); const count = ids.filter((id) => selectedPlatforms.includes(id)).length; return { ids, checked: ids.length > 0 && count === ids.length, partial: count > 0 && count < ids.length }; };
   const toggleGroup = (tab: TabId) => { const { ids, checked } = groupState(tab); setSelectedPlatforms((current) => checked ? current.filter((id) => !ids.includes(id)) : [...new Set([...current, ...ids])]); };
@@ -145,6 +147,7 @@ export function UnifiedChat({ initialTab = "promotion", hideHeader = false, onCl
         <Bot size={14} className="text-[var(--focus)]" />
         <div className="flex items-center gap-1 rounded-md bg-[var(--surface-2)] p-0.5" onDragOver={(event) => event.preventDefault()} onDrop={(event) => { const from = event.dataTransfer.getData("application/x-hmb-chat-tab") as typeof chatTab; if (from) reorderChatTab(from, chatTabs.length); }}>
           {chatTabs.map((tab, index) => <div key={tab} draggable className={`flex items-center rounded ${chatTab === tab ? "bg-[var(--surface-3)]" : ""}`} onDragStart={(event) => event.dataTransfer.setData("application/x-hmb-chat-tab", tab)} onDragOver={(event) => event.preventDefault()} onDrop={(event) => { event.preventDefault(); event.stopPropagation(); const from = event.dataTransfer.getData("application/x-hmb-chat-tab") as typeof chatTab; if (from) reorderChatTab(from, index); }}><button className={`btn btn-xs ${chatTab === tab ? "btn-primary" : "btn-ghost"}`} onClick={() => setChatTab(tab)}>{tab === "files" ? <FileSearch size={12} /> : tab === "library" ? <GitBranch size={12} /> : null}{tab === "promotion" ? "통합 Chat" : tabLabel[tab]}</button><button className="icon-btn h-5 w-5" title={`${tabLabel[tab]} 닫기`} onClick={() => closeChatTab(tab)}><X size={11} /></button></div>)}
+          {closedChatTabs.length > 0 && <div className="relative"><button className="icon-btn h-6 w-6" title="닫힌 Chat 탭 다시 열기" onClick={() => { const tab = closedChatTabs[0]; if (tab) reopenChatTab(tab); }}>+</button></div>}
         </div>
         <select className="input ml-auto h-7 py-0 text-[11px]" value={provider?.id ?? ""} onChange={(event) => setProviderId(event.target.value)}>
           {providers.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
