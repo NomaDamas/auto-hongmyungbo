@@ -131,14 +131,15 @@ export function UnifiedChat({ initialTab = "promotion", hideHeader = false }: { 
   const tabLabel = { promotion: "홍보관리", files: "파일 에이전트", library: "글 목록" } as const;
   const sendSkill = (skill: Preset) => { setInstruction(""); setSlashOpen(false); void send(skill); };
   const slashQuery = instruction.endsWith("/") ? "" : instruction.split("/").at(-1)?.toLowerCase() ?? "";
-  const visibleSkills = RECOMMENDED_SKILLS.filter(([, label]) => !slashQuery || label.toLowerCase().includes(slashQuery));
+  const visibleSkills = RECOMMENDED_SKILLS.filter(([id, label]) => !slashQuery || id.includes(slashQuery) || label.toLowerCase().includes(slashQuery));
+  const reorderChatTab = (from: "promotion" | "files" | "library", toIndex: number) => setChatTabs((current) => { const next = current.filter((item) => item !== from); next.splice(Math.max(0, Math.min(toIndex, next.length)), 0, from); return next; });
   return (
     <div className={splitTab && !hideHeader ? "grid h-full min-h-0 grid-cols-2 gap-px bg-[var(--border)]" : "h-full min-h-0"}>
     <section className="flex h-full min-h-0 flex-col bg-[var(--surface)]">
       {!hideHeader && <header className="flex h-11 shrink-0 items-center gap-2 border-b border-[var(--border)] px-3">
         <Bot size={14} className="text-[var(--focus)]" />
-        <div className="flex items-center gap-1 rounded-md bg-[var(--surface-2)] p-0.5" onDragOver={(event) => event.preventDefault()} onDrop={(event) => { const from = event.dataTransfer.getData("application/x-hmb-chat-tab") as typeof chatTab; if (from) setChatTabs((current) => { const next = current.filter((item) => item !== from); return [...next.slice(0, 1), from, ...next.slice(1)]; }); }}>
-          {chatTabs.map((tab) => <button key={tab} draggable className={`btn btn-xs ${chatTab === tab ? "btn-primary" : "btn-ghost"}`} onClick={() => setChatTab(tab)} onDragStart={(event) => event.dataTransfer.setData("application/x-hmb-chat-tab", tab)}>{tab === "files" ? <FileSearch size={12} /> : tab === "library" ? <GitBranch size={12} /> : null}{tab === "promotion" ? "통합 Chat" : tabLabel[tab]}</button>)}
+        <div className="flex items-center gap-1 rounded-md bg-[var(--surface-2)] p-0.5" onDragOver={(event) => event.preventDefault()} onDrop={(event) => { const from = event.dataTransfer.getData("application/x-hmb-chat-tab") as typeof chatTab; if (from) reorderChatTab(from, chatTabs.length); }}>
+          {chatTabs.map((tab, index) => <button key={tab} draggable className={`btn btn-xs ${chatTab === tab ? "btn-primary" : "btn-ghost"}`} onClick={() => setChatTab(tab)} onDragStart={(event) => event.dataTransfer.setData("application/x-hmb-chat-tab", tab)} onDragOver={(event) => event.preventDefault()} onDrop={(event) => { event.preventDefault(); event.stopPropagation(); const from = event.dataTransfer.getData("application/x-hmb-chat-tab") as typeof chatTab; if (from) reorderChatTab(from, index); }}>{tab === "files" ? <FileSearch size={12} /> : tab === "library" ? <GitBranch size={12} /> : null}{tab === "promotion" ? "통합 Chat" : tabLabel[tab]}</button>)}
         </div>
         <select className="input ml-auto h-7 py-0 text-[11px]" value={provider?.id ?? ""} onChange={(event) => setProviderId(event.target.value)}>
           {providers.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
