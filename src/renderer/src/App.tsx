@@ -73,7 +73,7 @@ export function App() {
         void runPropagate();
       } else if (key === "l") {
         e.preventDefault();
-        document.querySelector<HTMLTextAreaElement>("[data-intent-input]")?.focus();
+        document.querySelector<HTMLTextAreaElement>("[data-unified-chat-input]")?.focus();
       } else if (/^[1-4]$/.test(key)) {
         e.preventDefault();
         focusEditorTab(TABS[Number(key) - 1].id);
