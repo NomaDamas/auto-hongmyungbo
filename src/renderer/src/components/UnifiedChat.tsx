@@ -29,6 +29,7 @@ export function UnifiedChat() {
   const [fileQuery, setFileQuery] = useState("");
   const [fileResults, setFileResults] = useState<FileSearchResult[]>([]);
   const [fileContext, setFileContext] = useState<FileSearchResult[]>([]);
+  useEffect(() => { setFileQuery(""); setFileResults([]); setFileContext([]); }, [project?.slug]);
   const [targets, setTargets] = useState<DocId[]>([activeDoc]);
   useEffect(() => setTargets((current) => current.length === 1 ? [activeDoc] : current), [activeDoc]);
   const providers = useMemo(() => (settings?.providers ?? []).filter((provider) => provider.enabled), [settings?.providers]);
