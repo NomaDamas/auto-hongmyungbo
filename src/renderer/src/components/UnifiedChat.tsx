@@ -39,6 +39,7 @@ export function UnifiedChat() {
   useEffect(() => {
     const onLibraryCreate = (event: Event) => {
       const detail = (event as CustomEvent<"post" | "folder">).detail;
+      useStore.setState({ dockOpen: true });
       setChatTab("library");
       setNewItem(detail);
       setNewTitle("");
