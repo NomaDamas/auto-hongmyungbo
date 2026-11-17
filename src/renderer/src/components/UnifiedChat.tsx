@@ -22,7 +22,7 @@ const RECOMMENDED_SKILLS = [["humanize", "윤문"], ["hook", "훅 강화"], ["sh
 const COMMON_MODELS = ["gpt-6.1-sol", "gpt-6.1-sol-high", "gpt-6.1-terra-medium", "claude-sonnet", "gemini-2.5-pro", "grok-4"];
 type Scope = "all" | TabId;
 
-export function UnifiedChat({ initialTab = "promotion", hideHeader = false }: { initialTab?: "promotion" | "files" | "library"; hideHeader?: boolean } = {}) {
+export function UnifiedChat({ initialTab = "promotion", hideHeader = false, onCloseSplit }: { initialTab?: "promotion" | "files" | "library"; hideHeader?: boolean; onCloseSplit?: () => void } = {}) {
   const settings = useStore((s) => s.settings);
   const project = useStore((s) => s.project);
   const projects = useStore((s) => s.projects);
@@ -133,6 +133,7 @@ export function UnifiedChat({ initialTab = "promotion", hideHeader = false }: { 
   const slashQuery = instruction.endsWith("/") ? "" : instruction.split("/").at(-1)?.toLowerCase() ?? "";
   const visibleSkills = RECOMMENDED_SKILLS.filter(([id, label]) => !slashQuery || id.includes(slashQuery) || label.toLowerCase().includes(slashQuery));
   const reorderChatTab = (from: "promotion" | "files" | "library", toIndex: number) => setChatTabs((current) => { const next = current.filter((item) => item !== from); next.splice(Math.max(0, Math.min(toIndex, next.length)), 0, from); return next; });
+  const closeChatTab = (tab: "promotion" | "files" | "library") => { setChatTabs((current) => current.filter((item) => item !== tab)); if (chatTab === tab) setChatTab(chatTabs.find((item) => item !== tab) ?? "promotion"); if (splitTab === tab) setSplitTab(null); };
   const enabled = useStore.getState().enabledPlatforms();
   const groupState = (tab: TabId) => { const ids = platformsInTab(tab, enabled); const count = ids.filter((id) => selectedPlatforms.includes(id)).length; return { ids, checked: ids.length > 0 && count === ids.length, partial: count > 0 && count < ids.length }; };
   const toggleGroup = (tab: TabId) => { const { ids, checked } = groupState(tab); setSelectedPlatforms((current) => checked ? current.filter((id) => !ids.includes(id)) : [...new Set([...current, ...ids])]); };
@@ -143,7 +144,7 @@ export function UnifiedChat({ initialTab = "promotion", hideHeader = false }: { 
       {!hideHeader && <header className="flex h-11 shrink-0 items-center gap-2 border-b border-[var(--border)] px-3">
         <Bot size={14} className="text-[var(--focus)]" />
         <div className="flex items-center gap-1 rounded-md bg-[var(--surface-2)] p-0.5" onDragOver={(event) => event.preventDefault()} onDrop={(event) => { const from = event.dataTransfer.getData("application/x-hmb-chat-tab") as typeof chatTab; if (from) reorderChatTab(from, chatTabs.length); }}>
-          {chatTabs.map((tab, index) => <button key={tab} draggable className={`btn btn-xs ${chatTab === tab ? "btn-primary" : "btn-ghost"}`} onClick={() => setChatTab(tab)} onDragStart={(event) => event.dataTransfer.setData("application/x-hmb-chat-tab", tab)} onDragOver={(event) => event.preventDefault()} onDrop={(event) => { event.preventDefault(); event.stopPropagation(); const from = event.dataTransfer.getData("application/x-hmb-chat-tab") as typeof chatTab; if (from) reorderChatTab(from, index); }}>{tab === "files" ? <FileSearch size={12} /> : tab === "library" ? <GitBranch size={12} /> : null}{tab === "promotion" ? "통합 Chat" : tabLabel[tab]}</button>)}
+          {chatTabs.map((tab, index) => <div key={tab} draggable className={`flex items-center rounded ${chatTab === tab ? "bg-[var(--surface-3)]" : ""}`} onDragStart={(event) => event.dataTransfer.setData("application/x-hmb-chat-tab", tab)} onDragOver={(event) => event.preventDefault()} onDrop={(event) => { event.preventDefault(); event.stopPropagation(); const from = event.dataTransfer.getData("application/x-hmb-chat-tab") as typeof chatTab; if (from) reorderChatTab(from, index); }}><button className={`btn btn-xs ${chatTab === tab ? "btn-primary" : "btn-ghost"}`} onClick={() => setChatTab(tab)}>{tab === "files" ? <FileSearch size={12} /> : tab === "library" ? <GitBranch size={12} /> : null}{tab === "promotion" ? "통합 Chat" : tabLabel[tab]}</button><button className="icon-btn h-5 w-5" title={`${tabLabel[tab]} 닫기`} onClick={() => closeChatTab(tab)}><X size={11} /></button></div>)}
         </div>
         <select className="input ml-auto h-7 py-0 text-[11px]" value={provider?.id ?? ""} onChange={(event) => setProviderId(event.target.value)}>
           {providers.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
@@ -186,7 +187,7 @@ export function UnifiedChat({ initialTab = "promotion", hideHeader = false }: { 
         </div>
       </div>}
     </section>
-    {splitTab && !hideHeader && <UnifiedChat initialTab={splitTab} hideHeader />}
+    {splitTab && !hideHeader && <div className="relative min-h-0"><UnifiedChat initialTab={splitTab} hideHeader onCloseSplit={() => setSplitTab(null)} /><button className="icon-btn absolute right-1 top-1 z-10 h-6 w-6" title={`${tabLabel[splitTab]} 닫기`} onClick={() => setSplitTab(null)}><X size={12} /></button></div>}
     </div>
   );
 }
