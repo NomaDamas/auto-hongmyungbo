@@ -230,7 +230,7 @@ export const useStore = create<State>((set, get) => {
     sidebarOpen: true,
     sidebarInput: null,
     dockTab: "web:chatgpt",
-    dockOpen: false,
+    dockOpen: true,
     runTabs: [],
     pendingReply: null,
     autoSubmit: true,
