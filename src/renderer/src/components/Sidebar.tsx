@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { ChevronDown, ChevronRight, FilePlus2, Folder, FolderPlus, MoreHorizontal, Plus, Settings, ShieldCheck, Wand2 } from "lucide-react";
+import { ChevronDown, ChevronRight, Folder, FolderPlus, MoreHorizontal, Plus, Settings, ShieldCheck, Wand2 } from "lucide-react";
 import clsx from "clsx";
 import { toast } from "sonner";
 import type { ProjectSummary } from "@shared/types";
@@ -199,9 +199,6 @@ export function Sidebar() {
         <div className="ml-auto flex items-center gap-0.5">
           <button className="btn btn-xs btn-ghost" onClick={() => openInput({ kind: "folder", path: "" })}>
             <FolderPlus size={12} /> 폴더
-          </button>
-          <button className="btn btn-xs btn-ghost" onClick={() => openInput({ kind: "post", path: "" })}>
-            <FilePlus2 size={12} /> 새 글
           </button>
         </div>
       </header>

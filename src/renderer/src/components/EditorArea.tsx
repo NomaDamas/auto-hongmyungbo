@@ -9,7 +9,6 @@ import {
   type SerializedDockview,
 } from "dockview-react";
 import "dockview-react/dist/styles/dockview.css";
-import { Plus } from "lucide-react";
 import { TABS, commentDoc, platformsInTab, type TabId } from "@shared/platforms";
 import { useStore } from "@/store";
 import { DocPane } from "./DocPane";
@@ -111,10 +110,6 @@ export function EditorArea() {
   return (
     <div className="flex h-full min-h-0 flex-col">
       <ReviewBar />
-      <div className="flex h-8 shrink-0 items-center gap-1 border-b border-[var(--border)] px-2">
-        <span className="mr-1 text-[10px] text-[var(--muted)]">Pane</span>
-        {visibleTabs.filter((tab) => !openPanels.includes(tab.id)).map((tab) => <button key={tab.id} className="btn btn-xs btn-ghost" onClick={() => window.dispatchEvent(new CustomEvent<TabId>("hmb:reopen-tab", { detail: tab.id }))}><Plus size={11} /> {tab.label}</button>)}
-      </div>
       <DockviewReact
         key={layoutKey}
         className="hmb-dockview min-h-0 flex-1"
